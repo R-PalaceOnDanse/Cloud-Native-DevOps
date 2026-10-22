@@ -15,3 +15,13 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 node "$script"
+
+if command -v terraform >/dev/null 2>&1 && git ls-files --cached --others --exclude-standard -- '*.tf' | grep -q .; then
+  terraform fmt -check -recursive
+fi
+
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks git --pre-commit --staged --redact
+else
+  echo "pre-commit: gitleaks not found, secret scan skipped (run 'mise run setup')." >&2
+fi

@@ -18,6 +18,7 @@ scripts/     documentation check (check-docs.mjs)
 .github/     PR and issue templates, docs-check workflow
 .githooks/   commit-msg and pre-commit hooks
 .claude/     agent settings, hooks and vendored skills
+.mise.toml   pinned local tool versions and setup tasks (docs/development.md)
 ```
 
 The intended target layout comes from the subject (`infra/access`, `infra/foundation`,
