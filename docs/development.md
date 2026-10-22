@@ -17,15 +17,21 @@ mise run setup
 
 This installs the tools pinned in `.mise.toml` and sets `core.hooksPath` to `.githooks`.
 
-| Tool | Version in `.mise.toml` | Used for |
-|---|---|---|
-| Node | 22 | documentation check, and tooling scripts |
-| Terraform | 1.9 | infrastructure as code |
-| gcloud | latest | GCP access and authentication |
-| kubectl | 1.31 | GKE access |
-| Helm | 3.16 | runners and cluster charts |
-| tflint | 0.53 | Terraform linting |
-| gitleaks | 8.21 | secret scan before each commit |
+## Tools
+
+| Tool | Version in `.mise.toml` | Required by the subject | Why it is here | Where it runs today | Decision |
+|---|---|---|---|---|---|
+| [mise](https://mise.jdx.dev/) | not pinned (install it yourself) | no | pins and installs every other tool | `mise run setup` | [ADR-0001](adr/0001-mise-for-local-tooling.md) |
+| [Terraform](https://developer.hashicorp.com/terraform) | 1.9 | yes (IaC for foundation and serverless) | provisions all GCP resources | `terraform fmt -check` in the pre-commit hook once `.tf` files exist | mandated by the subject |
+| [gcloud](https://cloud.google.com/sdk/docs) | latest (exact release in `mise.lock`) | yes (GCP is our provider) | GCP login, project selection, cluster credentials | manually | mandated by the provider choice (decisions log, 2026-10-22) |
+| [kubectl](https://kubernetes.io/docs/reference/kubectl/) | 1.31 | yes (managed Kubernetes cluster) | inspect and debug the GKE cluster and runners | manually | mandated by the subject |
+| [Helm](https://helm.sh/docs/) | 3.16 | yes (runners deployed with Helm) | deploys the self-hosted runners and other charts | manually | mandated by the subject |
+| [Node](https://nodejs.org/) | 22 | no | runs `scripts/check-docs.mjs`, the documentation check | pre-commit hook, `mise run check`, docs-check workflow | decisions log, 2026-10-22 |
+| [tflint](https://github.com/terraform-linters/tflint) | 0.53 | no | catches Terraform mistakes that `validate` misses | installed only: not yet in the hook or CI | [ADR-0002](adr/0002-tflint-for-terraform-linting.md) |
+| [gitleaks](https://github.com/gitleaks/gitleaks) | 8.21 | no (the subject forbids committed secrets) | blocks secrets before they are committed | pre-commit hook | [ADR-0003](adr/0003-gitleaks-for-secret-scanning.md) |
+
+The versions of the tools mandated by the subject are only starting points: the subject does not
+dictate a version, so any bump is a normal pull request.
 
 `.mise.toml` is the only place where versions are defined; change a version there, in a pull
 request, never on one machine only. Versions are prefixes; `mise.lock` pins the exact release
