@@ -28,8 +28,9 @@ This installs the tools pinned in `.mise.toml` and sets `core.hooksPath` to `.gi
 | gitleaks | 8.21 | secret scan before each commit |
 
 `.mise.toml` is the only place where versions are defined; change a version there, in a pull
-request, never on one machine only. Versions are prefixes, so two machines can resolve different
-patch releases until a lockfile is committed.
+request, never on one machine only. Versions are prefixes; `mise.lock` pins the exact release
+(for example Terraform 1.9.8, gcloud 590.0.0) and its checksums for every platform. After
+changing `.mise.toml`, run `mise lock` and commit `mise.lock` with it.
 
 ## Commit hooks
 
@@ -47,6 +48,4 @@ mise run check    # documentation check
 ## Unknown
 
 - Whether the team wants a devcontainer: only added if a teammate prefers to install nothing.
-- Pinned patch versions: this setup was written without running mise; `mise install` has not yet
-  been verified on a clean machine. Whoever runs it first should report problems and commit
-  `mise.lock` (`mise lock`) if it works.
+- `mise install` was verified on one Linux (WSL2) machine only; macOS is untested.

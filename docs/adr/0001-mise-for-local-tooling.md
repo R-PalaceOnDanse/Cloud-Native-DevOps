@@ -31,7 +31,7 @@ no-secrets rule.
 ## Consequences
 
 - Positive: identical tool versions locally and, later, in CI; a short onboarding.
-- Negative / trade-offs accepted: everyone installs mise; versions are prefixes until a lockfile
-  is committed.
+- Negative / trade-offs accepted: everyone installs mise; `mise.lock` must be regenerated
+  (`mise lock`) whenever `.mise.toml` changes.
 - Follow-up work or new ADRs triggered: the function runtime (language) is a separate decision;
   CI will use `jdx/mise-action` when the first pipeline is written.
