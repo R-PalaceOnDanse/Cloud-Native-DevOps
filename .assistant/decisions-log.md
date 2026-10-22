@@ -9,3 +9,4 @@ Format: `YYYY-MM-DD — what was decided — why (the trade-off)`.
 Never rewrite history: if a choice is reversed, add a new line that says so.
 
 2026-10-22 — GCP chosen as the cloud provider (not AWS) — the team decided to use GCP; the subject allows either and covers both.
+2026-10-22 — Local tooling pinned with mise — see ADR-0001

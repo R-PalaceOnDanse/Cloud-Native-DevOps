@@ -1,0 +1,21 @@
+# Single source of tool versions for local work. See docs/development.md.
+# Versions are prefixes: mise resolves the latest matching release.
+[tools]
+node = "22"
+terraform = "1.9"
+gcloud = "latest"
+kubectl = "1.31"
+helm = "3.16"
+tflint = "0.53"
+gitleaks = "8.21"
+
+[tasks.setup]
+description = "Install the pinned tools and activate the git hooks"
+run = [
+  "mise install",
+  "git config core.hooksPath .githooks",
+]
+
+[tasks.check]
+description = "Run the documentation check"
+run = "node scripts/check-docs.mjs"

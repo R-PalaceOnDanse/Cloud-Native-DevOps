@@ -51,8 +51,8 @@ This file stays short. Details live in the documents below — link to them, do 
 ## 4. Commands
 
 ```bash
-git config core.hooksPath .githooks   # once per clone
-node scripts/check-docs.mjs           # documentation check
+mise run setup                        # once per clone: tools + git hooks (docs/development.md)
+mise run check                        # documentation check (node scripts/check-docs.mjs)
 ```
 
 No build, test or lint command exists yet; add them here when the first code lands.
