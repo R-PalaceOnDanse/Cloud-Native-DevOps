@@ -1,36 +1,31 @@
 # Environments
 
 Overview of the cloud environments, their purpose, isolation model, and GCP project details. Read
-by anyone developing, deploying, or operating resources in the project.
+it before creating, importing or deleting anything in a project, and to know what the Terraform code
+does and does not manage.
 
 The decision to isolate environments into distinct GCP projects is recorded in
 [ADR-0004](adr/0004-terraform-layout-and-environments.md).
 
 ## Summary
 
-| Environment | GCP Project ID | Project Number | Region | State Bucket | Subnet CIDR | VPC Name |
-|---|---|---|---|---|---|---|
-| **dev** | `teampasx-cloudnative-dev` | `812267599723` | `europe-west1` | `state_bucket_dev` (in `europe-west9`) | `10.10.0.0/24` | `teampasx-dev-vpc` |
-| **prd** | `teampasx-cloudnative-prd` | `1024204425086` | `europe-west1` | `state_bucket_prd` (in `europe-west9`) | `10.20.0.0/24` | `teampasx-prd-vpc` |
+The values that configure each environment (project ID, region, network ranges, state bucket) are
+in `infra/<stack>/<env>.tfvars` and `infra/<stack>/backends/<env>.hcl`; this page does not repeat
+them. How to run the code is in [infra.md](infra.md). The inventory below was read from the
+projects with `gcloud` on **2026-10-23**, after the access stack was applied; it describes that
+day and drifts as people work, so re-read the project before relying on it.
 
-The configuration files under `infra/foundation/` (`<env>.tfvars` and `backends/<env>.hcl`) remain
-the single source of truth for Terraform.
-
-## Environments
-
-### Development (`dev`)
-
-- **GCP Project ID**: `teampasx-cloudnative-dev`
-- **Purpose**: Fast feedback loop, integration testing, deploying experimental branches, and validating CI/CD pipelines.
-- **Access**: All three team members have Owner permissions; instructor (`jeremie@jjaouen.com`) has Editor access.
-- **Isolation**: Completely separated from production resources, databases, Pub/Sub topics, and IAM roles.
-
-### Production (`prd`)
-
-- **GCP Project ID**: `teampasx-cloudnative-prd`
-- **Purpose**: Stable production environment hosting the final pixel canvas and public Discord bot integrations.
-- **Access**: Team members have Owner permissions; changes will be strictly applied through automated CI/CD pipelines (issues #32 and #33).
-- **Isolation**: Production data and events never mix with development data. Subnet CIDRs are non-overlapping (`10.20.0.0/24` vs `10.10.0.0/24` in dev) to allow secure VPC peering if needed later.
+| | dev | prd |
+|---|---|---|
+| Project ID | `teampasx-cloudnative-dev` | `teampasx-cloudnative-prd` |
+| Project number | 812267599723 | 1024204425086 |
+| Region | `europe-west1` | `europe-west1` |
+| State bucket | `state_bucket_dev` (in `europe-west9`) | `state_bucket_prd` (in `europe-west9`) |
+| Subnet CIDR | `10.10.0.0/24` | `10.20.0.0/24` |
+| VPC Name | `teampasx-dev-vpc` | `teampasx-prd-vpc` |
+| Billing | enabled (budget alerts: none yet, issue #21) | enabled (budget alerts: none yet, issue #21) |
+| Foundation stack (VPC and subnet) | **not applied**: only the `default` network exists | **not applied**: the Compute Engine API is not even enabled |
+| Access stack | applied 2026-10-23, 16 resources | applied 2026-10-23, 16 resources |
 
 ## Working with environments
 
@@ -52,3 +47,72 @@ gcloud projects describe teampasx-cloudnative-prd
 ```
 
 Planning infrastructure for an environment is detailed in [infra.md](infra.md).
+
+## Managed by Terraform
+
+### Access stack, in both projects
+
+Defined in `infra/access`, applied by hand on 2026-10-23 with a project Owner's login. The design
+is in [ADR-0011](adr/0011-workload-identity-in-the-access-stack.md) and the behaviour in
+[infra.md](infra.md#github-actions-authentication). Each project holds the same 16 resources:
+
+| Resource | Name | Purpose |
+|---|---|---|
+| Workload identity pool | `github` | Trust anchor for GitHub Actions |
+| Pool provider | `github-actions` | Accepts GitHub's OIDC tokens, only from `R-PalaceOnDanse/Cloud-Native-DevOps` |
+| Service account | `github-plan` | Read-only identity for `terraform plan`, usable by any workflow of the repository |
+| Service account | `github-apply` | Identity for apply and destroy, usable only by the GitHub environment of the same name as the project's environment |
+| Project roles of `github-plan` | Viewer, Security Reviewer | Refresh the state and read IAM policies |
+| Project roles of `github-apply` | Editor, Project IAM Admin | Create resources and their IAM bindings |
+| State bucket role | `roles/storage.objectAdmin` on the bucket, for both accounts | Terraform writes a lock even for a plan |
+| Impersonation bindings | `roles/iam.workloadIdentityUser` on each account | Who may use each account, as described above |
+| Enabled APIs | Cloud Resource Manager, IAM, IAM Credentials, Security Token Service | Required by the federation; left enabled on destroy |
+
+The full names of the provider and of the two accounts are the outputs of the stack
+(`terraform -chdir=infra/access output`).
+
+## Not managed by Terraform
+
+Created by hand, or by someone else, and not described by any code in this repository.
+
+### In both projects
+
+- **The project itself, its billing link and its human access.** Three team members are Owner. One
+  of them also holds *Project Mover* on dev.
+- **The state bucket** (`state_bucket_dev`, `state_bucket_prd`), created by hand before the first
+  `init`, in `europe-west9`. Its properties are in [infra.md](infra.md#rules); creating one is
+  described there.
+- **The APIs enabled by default on a new project** (BigQuery, Cloud Storage, Logging, Monitoring
+  and similar).
+
+### Only in dev, found on 2026-10-23
+
+These were not created by this repository's Terraform. Who created them, and why, is not
+recorded: **Unknown, the team can answer**, and the answer belongs in the decisions log.
+
+- **A second workload identity pool, `github-actions`**, next to the `github` pool of the access
+  stack, and a service account **`github-terraform-dev`** with the *Compute Network Admin* role.
+  They look like an earlier manual attempt at the same federation. Two pools do the same job; one
+  should be removed, or imported into the access stack, once the pipelines (issue #31) are known to
+  work with the stack's pool.
+- **Firebase and related APIs**: Firebase, Firebase Hosting, Firebase Rules, Identity Toolkit,
+  App Engine, Datastore, FCM, Remote Config, and the service account `firebase-adminsdk-…`. They
+  are the kind of services that [ADR-0008](adr/0008-firestore-listeners-for-realtime.md) and
+  [ADR-0009](adr/0009-firebase-hosting-and-discord-oauth.md) rely on, and may come from the spike
+  those ADRs ask for. Nothing in the code uses them yet.
+- **The instructor's access**: the instructor has the *Editor* role on dev. On prd the instructor
+  has no role, which the project owner chose to leave as it is (the subject asks for access to
+  both environments; see issue #22).
+- **Budget Alerts API** (`billingbudgets.googleapis.com`) is enabled, but no budget exists yet.
+
+### Only in prd
+
+Nothing beyond the access stack, the state bucket and the human access listed above.
+
+## Not created yet
+
+- The foundation network (VPC and subnet) in either project: planned, not applied.
+- The GKE cluster and the runners, the serverless components (Pub/Sub, API Gateway, functions,
+  Firestore, Secret Manager) and the monitoring. The Secret Manager API is not enabled in either
+  project.
+- Budgets and alerts (issue #21), whose billing accounts belong to other team members.

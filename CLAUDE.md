@@ -55,9 +55,9 @@ This file stays short. Details live in the documents below — link to them, do 
 ```bash
 mise run setup                        # once per clone: tools + git hooks (docs/development.md)
 mise run check                        # documentation check (node scripts/check-docs.mjs)
+npm --prefix app/functions ci         # functions: install (docs/functions.md)
+npm --prefix app/functions run typecheck && npm --prefix app/functions run lint && npm --prefix app/functions test
 ```
-
-No build, test or lint command exists yet; add them here when the first code lands.
 
 ## 5. Living documentation protocol
 
