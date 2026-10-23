@@ -1,52 +1,33 @@
-name: terraform-destroy
-
-# Destroys the foundation of one environment, on demand. The access stack is never destroyed here:
-# it holds the identity this workflow runs with.
+# From the subject, C03 sections 6 to 8, unchanged except for the Terraform version marked below.
+# .github/workflows/terraform-destroy.yml
+name: Terraform Destroy
 on:
   workflow_dispatch:
     inputs:
-      environment:
-        description: Environment to destroy
+      env:
+        description: "Environment to destroy (dev or prd)"
         required: true
-        type: choice
-        options:
-          - dev
-          - prd
-      confirm:
-        description: Type the name of the environment again to confirm
-        required: true
-        type: string
-
+        default: dev
 permissions:
   contents: read
   id-token: write
-
-concurrency:
-  group: terraform-deploy
-  cancel-in-progress: false
-
 jobs:
-  guard:
-    name: confirmation and branch
-    runs-on: ubuntu-latest
-    steps:
-      - name: Refuse anything but main with the environment name repeated
-        env:
-          ENVIRONMENT: ${{ inputs.environment }}
-          CONFIRM: ${{ inputs.confirm }}
-        run: |
-          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
-            echo "::error::Destroy is run from main only (this run is on $GITHUB_REF)."
-            exit 1
-          fi
-          if [ "$CONFIRM" != "$ENVIRONMENT" ]; then
-            echo "::error::The confirmation must be exactly '$ENVIRONMENT'."
-            exit 1
-          fi
-
   destroy:
-    needs: guard
-    uses: ./.github/workflows/terraform-run.yml
-    with:
-      environment: ${{ inputs.environment }}
-      action: destroy
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.env }}
+    defaults:
+      run:
+        working-directory: infra/foundation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        # The only change to the subject's example: the stack requires Terraform 1.9.x
+        # (required_version), and the action installs the latest version when none is given.
+        with:
+          terraform_version: 1.9.8
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
+      - run: terraform init -backend-config=backends/${{ github.event.inputs.env }}.hcl
+      - run: terraform destroy -auto-approve -var-file=${{ github.event.inputs.env }}.tfvars

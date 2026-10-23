@@ -1,80 +1,35 @@
-name: terraform-ci
-
-# Checks every change to the infrastructure, and shows what it would change in dev and in prd.
-# It only reads: it authenticates as the read-only plan account, in no GitHub environment.
+# From the subject, C03 sections 6 to 8, unchanged except for the Terraform version marked below.
+# .github/workflows/terraform-ci.yml
+name: Terraform CI
 on:
   pull_request:
-    paths:
-      - 'infra/**'
-      - '.tflint.hcl'
-      - '.github/actions/terraform-init/**'
-      - '.github/workflows/terraform-ci.yml'
-
+    branches: [main]
 permissions:
   contents: read
-  id-token: write
-
-concurrency:
-  group: terraform-ci-${{ github.ref }}
-  cancel-in-progress: true
-
+  id-token: write # required for OIDC
 jobs:
-  static:
-    name: static (${{ matrix.stack }})
+  validate-plan:
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
       matrix:
-        stack: [foundation, access]
+        env: [dev, prd]
+    environment: ${{ matrix.env }}
+    defaults:
+      run:
+        working-directory: infra/foundation
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
+        # The only change to the subject's example: the stack requires Terraform 1.9.x
+        # (required_version), and the action installs the latest version when none is given.
         with:
           terraform_version: 1.9.8
-          terraform_wrapper: false
-      - name: terraform fmt
-        run: terraform -chdir=infra/${{ matrix.stack }} fmt -check -diff
-      - name: terraform validate
-        run: |
-          terraform -chdir=infra/${{ matrix.stack }} init -backend=false -input=false
-          terraform -chdir=infra/${{ matrix.stack }} validate
-      - uses: terraform-linters/setup-tflint@v4
+      # Authenticate with OIDC (GCP example; swap for AWS as needed)
+      - uses: google-github-actions/auth@v2
         with:
-          tflint_version: v0.53.0
-      - name: tflint
-        run: tflint --chdir=infra/${{ matrix.stack }} --config="$GITHUB_WORKSPACE/.tflint.hcl"
-
-  plan:
-    name: plan (${{ matrix.stack }}, ${{ matrix.environment }})
-    needs: static
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        stack: [foundation, access]
-        environment: [dev, prd]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/terraform-init
-        with:
-          stack: ${{ matrix.stack }}
-          environment: ${{ matrix.environment }}
-          workload-identity-provider: ${{ matrix.environment == 'dev' && vars.GCP_WIF_PROVIDER_DEV || vars.GCP_WIF_PROVIDER_PRD }}
-          service-account: ${{ matrix.environment == 'dev' && vars.GCP_PLAN_SA_DEV || vars.GCP_PLAN_SA_PRD }}
-      - name: terraform plan
-        shell: bash
-        working-directory: infra/${{ matrix.stack }}
-        env:
-          ENVIRONMENT: ${{ matrix.environment }}
-        # -lock=false: a plan only reads, so two pull requests can plan at the same time.
-        run: terraform plan -input=false -lock=false -no-color -var-file="$ENVIRONMENT.tfvars" 2>&1 | tee plan.txt
-      - name: Show the plan in the job summary
-        if: always()
-        shell: bash
-        run: |
-          {
-            echo "### Plan: ${{ matrix.stack }} in ${{ matrix.environment }}"
-            echo '```'
-            cat infra/${{ matrix.stack }}/plan.txt || true
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
+      - run: terraform fmt -check
+      - run: terraform init -backend-config=backends/${{ matrix.env }}.hcl
+      - run: terraform validate
+      - run: terraform plan -var-file=${{ matrix.env }}.tfvars

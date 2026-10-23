@@ -1,46 +1,33 @@
-name: terraform-deploy
-
-# A release: pushing a tag vMAJOR.MINOR.PATCH applies the foundation to dev, then to prd.
+# From the subject, C03 sections 6 to 8, unchanged except for the Terraform version marked below.
+# .github/workflows/terraform-deploy.yml
+name: Terraform Deploy
 on:
   push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-
+    tags: ['v*']
 permissions:
   contents: read
   id-token: write
-
-# One release at a time, and a running apply is never cancelled.
-concurrency:
-  group: terraform-deploy
-  cancel-in-progress: false
-
 jobs:
-  check-tag:
-    name: the tag is on main
+  deploy:
     runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1 # dev must succeed before prd
+      matrix:
+        env: [dev, prd]
+    environment: ${{ matrix.env }} # add required reviewers on prd
+    defaults:
+      run:
+        working-directory: infra/foundation
     steps:
       - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        # The only change to the subject's example: the stack requires Terraform 1.9.x
+        # (required_version), and the action installs the latest version when none is given.
         with:
-          fetch-depth: 0
-      - name: Refuse a tag whose commit is not on main
-        run: |
-          git fetch origin main
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-            echo "::error::$GITHUB_REF_NAME is not on main. Releases are made from main only."
-            exit 1
-          fi
-
-  dev:
-    needs: check-tag
-    uses: ./.github/workflows/terraform-run.yml
-    with:
-      environment: dev
-      action: apply
-
-  prd:
-    needs: dev
-    uses: ./.github/workflows/terraform-run.yml
-    with:
-      environment: prd
-      action: apply
+          terraform_version: 1.9.8
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
+      - run: terraform init -backend-config=backends/${{ matrix.env }}.hcl
+      - run: terraform apply -auto-approve -var-file=${{ matrix.env }}.tfvars
