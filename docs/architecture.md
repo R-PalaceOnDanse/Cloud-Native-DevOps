@@ -17,7 +17,7 @@ Built so far:
   (signature, PING, slash commands to events), the event envelope and logger, the grid rules (tiles,
   colors, rate limit decision, tile images) and the command definitions.
 
-Nothing is deployed from `app/` yet: no function, no broker, no database. The rest is documentation
+Nothing of the application is deployed yet: no function, no broker, no database. The rest is documentation
 and tooling.
 
 The flow the pieces are written for, from [ADR-0006](adr/0006-api-gateway-cloud-run-functions-pubsub.md),
