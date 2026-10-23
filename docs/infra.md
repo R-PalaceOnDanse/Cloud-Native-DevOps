@@ -150,28 +150,24 @@ control is planned for the section 1 issues.
 
 ## Budget alerts
 
-To prevent accidental credit burns from autoscaling or resource misconfigurations, both projects
-have a monthly budget alert configured on their respective billing accounts.
+To prevent accidental credit burns from autoscaling or resource misconfigurations, each project has
+a monthly budget with alerts. The budgets are defined in `infra/foundation/budget.tf`; the billing
+account and the monthly amount of each environment are `billing_account` and `budget_amount` in
+`infra/foundation/<env>.tfvars`, the single source for those values.
 
-| Environment | Project | Billing Account | Monthly Budget | Alert Thresholds | Recipients |
-|---|---|---|---|---|---|
-| **dev** | `teampasx-cloudnative-dev` | `015B95-C1627B-339E15` | 20 EUR | 50%, 90%, 100% (actual), 100% (forecasted) | All team members (Billing Account Admin & Users) |
-| **prd** | `teampasx-cloudnative-prd` | `01A021-589B0D-8ED8BC` | 20 EUR | 50%, 90%, 100% (actual), 100% (forecasted) | All team members (Billing Account Admin & Users) |
+| Threshold | Basis |
+|---|---|
+| 50 % | actual spend |
+| 90 % | actual spend |
+| 100 % | actual spend |
+| 100 % | forecasted spend |
 
-### Creating or updating budget alerts
-
-Budget alerts are created per billing account, filtered to the target project:
-
-```bash
-gcloud billing budgets create --billing-account=<BILLING_ACCOUNT_ID> \
-  --display-name=teampasx-cloudnative-<env> \
-  --budget-amount=20EUR \
-  --filter-projects=projects/teampasx-cloudnative-<env> \
-  --threshold-rule=percent=0.5 \
-  --threshold-rule=percent=0.9 \
-  --threshold-rule=percent=1.0 \
-  --threshold-rule=percent=1.0,basis=forecasted-spend
-```
+**Do not create a budget by hand** (`gcloud billing budgets create`): the budget is in the Terraform
+state, and a second one would send every alert twice. To change an amount, change `budget_amount`
+in the `tfvars` through a pull request. Changing a budget needs *Billing Account Administrator* on
+the billing account of the project, which belongs to another team member (dev and prd use
+different accounts). Alert emails go to the billing account's administrators and users; who that is
+for each account has not been checked for every member.
 
 Standard GCP budgets are notification-only and do not stop resources automatically. When an alert
 fires, the team must inspect and downscale running workloads.
