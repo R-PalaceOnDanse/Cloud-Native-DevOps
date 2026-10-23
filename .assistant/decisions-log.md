@@ -24,3 +24,4 @@ Never rewrite history: if a choice is reversed, add a new line that says so.
 2026-10-23 — Team name is teampasx and the prd project is teampasx-cloudnative-prd; state buckets are state_bucket_dev and state_bucket_prd — these are the resources that exist in GCP; ADR-0004 is amended
 2026-10-23 — Terraform state prefix is the stack name (foundation), not the environment — one bucket per environment already separates dev and prd; the empty state under the old prefix dev/ was left in place
 2026-10-23 — Subnets use non-overlapping ranges, 10.10.0.0/24 for dev and 10.20.0.0/24 for prd — keeps the environments peerable later
+2026-10-23 — Discord bot token and OAuth2 client secret go to Secret Manager, as empty secrets created by Terraform and filled by hand with gcloud — the values then never enter the Terraform state or the repository; see docs/discord.md
