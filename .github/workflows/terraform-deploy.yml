@@ -1,0 +1,46 @@
+name: terraform-deploy
+
+# A release: pushing a tag vMAJOR.MINOR.PATCH applies the foundation to dev, then to prd.
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+  id-token: write
+
+# One release at a time, and a running apply is never cancelled.
+concurrency:
+  group: terraform-deploy
+  cancel-in-progress: false
+
+jobs:
+  check-tag:
+    name: the tag is on main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Refuse a tag whose commit is not on main
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME is not on main. Releases are made from main only."
+            exit 1
+          fi
+
+  dev:
+    needs: check-tag
+    uses: ./.github/workflows/terraform-run.yml
+    with:
+      environment: dev
+      action: apply
+
+  prd:
+    needs: dev
+    uses: ./.github/workflows/terraform-run.yml
+    with:
+      environment: prd
+      action: apply

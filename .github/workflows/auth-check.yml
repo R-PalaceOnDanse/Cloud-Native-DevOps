@@ -1,0 +1,94 @@
+name: auth-check
+
+# Proves, on every change to the federation and on demand, that the keyless authentication does
+# what ADR-0011 says: the plan account works anywhere, the apply account works only in its own
+# GitHub environment. The negative checks pass when the authentication is REFUSED.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'infra/access/**'
+      - '.github/workflows/auth-check.yml'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  plan-account:
+    name: plan account works without an environment (${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, prd]
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ matrix.environment == 'dev' && vars.GCP_WIF_PROVIDER_DEV || vars.GCP_WIF_PROVIDER_PRD }}
+          service_account: ${{ matrix.environment == 'dev' && vars.GCP_PLAN_SA_DEV || vars.GCP_PLAN_SA_PRD }}
+      - name: Read the project with the short-lived credentials
+        run: gcloud projects describe "teampasx-cloudnative-${{ matrix.environment }}" --format="value(projectId)"
+
+  apply-account:
+    name: apply account works in its own environment (${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, prd]
+    environment: ${{ matrix.environment }}
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ matrix.environment == 'dev' && vars.GCP_WIF_PROVIDER_DEV || vars.GCP_WIF_PROVIDER_PRD }}
+          service_account: ${{ matrix.environment == 'dev' && vars.GCP_APPLY_SA_DEV || vars.GCP_APPLY_SA_PRD }}
+      - name: Read the project with the short-lived credentials
+        run: gcloud projects describe "teampasx-cloudnative-${{ matrix.environment }}" --format="value(projectId)"
+
+  apply-account-without-environment:
+    name: apply account is refused outside an environment (${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, prd]
+    steps:
+      # The auth action only prepares the credentials; Google checks them the first time they are
+      # used. So the refusal shows up when the credentials are used, not at this step.
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ matrix.environment == 'dev' && vars.GCP_WIF_PROVIDER_DEV || vars.GCP_WIF_PROVIDER_PRD }}
+          service_account: ${{ matrix.environment == 'dev' && vars.GCP_APPLY_SA_DEV || vars.GCP_APPLY_SA_PRD }}
+      - id: attempt
+        continue-on-error: true
+        run: gcloud projects describe "teampasx-cloudnative-${{ matrix.environment }}" --format="value(projectId)"
+      - name: Using the credentials must have failed
+        env:
+          OUTCOME: ${{ steps.attempt.outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "::error::The apply account accepted a job that is not in a GitHub environment."
+            exit 1
+          fi
+
+  apply-account-of-another-environment:
+    name: prd apply account is refused to a job of the dev environment
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_PRD }}
+          service_account: ${{ vars.GCP_APPLY_SA_PRD }}
+      - id: attempt
+        continue-on-error: true
+        run: gcloud projects describe "teampasx-cloudnative-prd" --format="value(projectId)"
+      - name: Using the credentials must have failed
+        env:
+          OUTCOME: ${{ steps.attempt.outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "::error::A job of the dev environment could use the prd apply account."
+            exit 1
+          fi
