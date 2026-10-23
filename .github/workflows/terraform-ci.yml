@@ -1,0 +1,31 @@
+# .github/workflows/terraform-ci.yml
+name: Terraform CI
+
+on:
+  pull_request:
+    branches: [main]
+permissions:
+    contents: read
+    id-token: write
+
+jobs:
+    validate-plan:
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                env: [dev, prd]
+        environment: ${{ matrix.env }}
+        defaults:
+            run:
+                working-directory: infra/foundation
+        steps:
+            - uses: actions/checkout@v4
+            - uses: hashicorp/setup-terraform@v3
+            - uses: google-github-actions/auth@v2
+              with:
+                workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+                service_account: ${{ vars.GCP_SERVICE_ACCOUNT_PLAN }}
+            - run: terraform fmt -check
+            - run: terraform init -backend-config=backends/${{ matrix.env }}.hcl
+            - run: terraform validate
+            - run: terraform plan -var-file=${{ matrix.env }}.tfvars
