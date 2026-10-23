@@ -21,6 +21,8 @@ and a document whose covered paths keep changing without it is reported as possi
 | [discord.md](discord.md) | What the Discord application is, which values are public or secret and where they live, what remains to configure | the Discord application and its secrets | the application, its scopes, its secrets or its endpoint change |
 | [environments.md](environments.md) | What exists in each GCP project, what Terraform manages and what it does not | `infra/access/` | a stack is applied or destroyed, or something is created by hand in a project |
 | [functions.md](functions.md) | How the TypeScript functions workspace is laid out, its conventions, and how to build, lint and test it | `app/` `.github/workflows/functions-ci.yml` | a function, a command, a tool, a convention or the workflow changes |
+| [data-model.md](data-model.md) | The rules of the pixel grid: tiles, identifiers, colors, rate limit and tile images, and what is not built yet | `app/functions/src/grid/` `app/functions/src/ratelimit/` `app/functions/src/render/` | a grid rule, a palette color, the rate limit or the tile rendering changes |
+| [events.md](events.md) | The events on the broker, their envelope, the correlation ID and the log format | `app/functions/src/events/` | an event type, a payload, an attribute or the log format changes |
 | [adr/](adr/) | Why the structural choices were made | decisions | a structural decision is made or reversed |
 | [decisions-log.md](../.assistant/decisions-log.md) | Smaller choices and their reasons | decisions | a smaller choice is made |
 | [lessons.md](../.assistant/lessons.md) | Mistakes made and what now prevents them | lessons | review, CI or the user catches a mistake |
