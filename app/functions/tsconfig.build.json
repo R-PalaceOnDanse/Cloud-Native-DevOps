@@ -7,6 +7,12 @@
     "declaration": true,
     "sourceMap": true
   },
-  "include": ["src"],
-  "exclude": ["src/**/*.test.ts"]
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/fixtures.ts",
+    "src/**/*-test-decoder.ts"
+  ]
 }

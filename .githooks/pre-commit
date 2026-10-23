@@ -18,6 +18,11 @@ node "$script"
 
 if command -v terraform >/dev/null 2>&1 && git ls-files --cached --others --exclude-standard -- '*.tf' | grep -q .; then
   terraform fmt -check -recursive
+  if command -v tflint >/dev/null 2>&1; then
+    for stack in infra/*/; do
+      tflint --chdir="$stack" --config="$PWD/.tflint.hcl"
+    done
+  fi
 fi
 
 if command -v gitleaks >/dev/null 2>&1; then
