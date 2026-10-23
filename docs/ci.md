@@ -126,8 +126,11 @@ of it is billed.
 | apply account, **no** environment, dev and prd | **refused** |
 | prd apply account, from a job of the `dev` environment | **refused** |
 
-The last two pass when the authentication fails: they show that the apply account cannot be
-reached by a pull request branch, nor across environments.
+The last two pass when the credentials are refused: they show that the apply account cannot be
+reached by a pull request branch, nor across environments. The refusal comes when the credentials
+are first **used**, as `Permission 'iam.serviceAccounts.getAccessToken' denied` (403): the
+authentication action only prepares a credentials file and does not call Google, so a check that
+looked at that step alone would pass whatever the rules are.
 
 ## Limits of the free GitHub plan
 
@@ -148,7 +151,7 @@ three, and written down here so that it is not a surprise.
 | Message or sign | Meaning | Fix |
 |---|---|---|
 | `must specify exactly one of "workload_identity_provider" or "credentials_json"` | A variable is empty | Set the repository variable (see above) |
-| `unable to acquire impersonated credentials` or `403` at the authentication step | The provider and the account are not of the same project, or the job's environment is not the one the account accepts | Compare the three values with `terraform output` of the access stack for that environment |
+| `Unable to acquire impersonated credentials` or a `403` on `iam.serviceAccounts.getAccessToken`, at the first command that uses the credentials | The provider and the account are not of the same project, or the job's environment is not the one the account accepts | Compare the three values with `terraform output` of the access stack for that environment |
 | The authentication works but `plan` says `403` on the state bucket | The account lacks access to the state bucket | The access stack grants it; check that it has been applied in that project |
 | `Error acquiring the state lock` | Another apply is running, or one was killed | Wait; if nobody is running, `terraform force-unlock <id>` after asking the team |
 | `tflint` reports a rule | A real finding | Fix it, or discuss disabling the rule in `.tflint.hcl` in the pull request |
