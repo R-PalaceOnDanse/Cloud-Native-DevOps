@@ -6,16 +6,27 @@ clone.
 ## Prerequisites
 
 - Linux, macOS or WSL2.
-- [mise](https://mise.jdx.dev/getting-started.html), installed and activated in your shell.
+- [mise](https://mise.jdx.dev/getting-started.html), installed and **activated in your shell**.
+  Without activation `mise install` works but the installed tools are not on your `PATH`.
 - Git, with your GPG key configured to sign commits (see the subject, section 1.2).
 
 ## Setup
 
+Install and activate mise once (replace `bash` and `.bashrc` for another shell), then set up the
+clone. The step by step version is in the [README](../README.md#get-started).
+
 ```bash
+curl https://mise.run | sh
+echo 'eval "$(~/.local/bin/mise activate bash)"' >> ~/.bashrc
 mise run setup
 ```
 
-This installs the tools pinned in `.mise.toml` and sets `core.hooksPath` to `.githooks`.
+`mise run setup` installs the tools pinned in `.mise.toml` and sets `core.hooksPath` to
+`.githooks`. Open a new terminal after activating mise.
+
+If a tool is reported as `command not found`, mise is not activated: check that `~/.bashrc`
+contains the `mise activate` line. `mise exec -- <command>` runs a command with the pinned tools
+without activation. Do not install the tools with `apt` or `snap`, which give other versions.
 
 ## Tools
 

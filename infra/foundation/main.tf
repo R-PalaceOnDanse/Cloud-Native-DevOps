@@ -6,11 +6,6 @@ resource "google_compute_network" "main" {
 resource "google_compute_subnetwork" "main" {
   name          = "${var.vpc_name}-subnet"
   network       = google_compute_network.main.id
-  ip_cidr_range = "10.0.1.0/24"
+  ip_cidr_range = var.subnet_cidr
   region        = var.region
-}
-
-output "vpc_id" {
-  value       = google_compute_network.main.id
-  description = "The id of the created vpc network"
 }

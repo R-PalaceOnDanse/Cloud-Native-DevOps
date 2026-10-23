@@ -78,6 +78,6 @@ its work. The deliverables checklist is in the subject (section 5.6).
 
 ## Open questions
 
-- GCP project IDs, team name and deadline (team).
+- Deadline (team).
 - Technology choices for gateway, broker, runtime and language, frontend hosting and the
   observability stack (team; each recorded as an ADR).
