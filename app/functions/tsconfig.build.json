@@ -12,6 +12,7 @@
   ],
   "exclude": [
     "src/**/*.test.ts",
-    "src/**/fixtures.ts"
+    "src/**/fixtures.ts",
+    "src/**/*-test-decoder.ts"
   ]
 }

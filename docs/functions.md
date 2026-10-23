@@ -6,7 +6,8 @@ language is in [ADR-0005](adr/0005-typescript-for-functions.md); the entry path 
 in [ADR-0006](adr/0006-api-gateway-cloud-run-functions-pubsub.md).
 
 Today the workspace holds the first building blocks only: verifying Discord's request signature,
-answering its PING, and the event envelope with its structured logger. No function is deployed yet.
+answering its PING, the event envelope with its structured logger, and the pure rules of the grid
+(tiles, colors, rate limit, tile images). No function is deployed yet.
 
 ## Layout
 
@@ -14,12 +15,15 @@ answering its PING, and the event envelope with its structured logger. No functi
 app/functions/
   package.json           scripts and dev dependencies (npm); package-lock.json pins them
   tsconfig.json          strict type checking, used by the editor, lint and tests
-  tsconfig.build.json    the build: src/ to dist/, tests excluded
+  tsconfig.build.json    the build: src/ to dist/, tests and test helpers excluded
   eslint.config.js       strict, type-aware lint; `any` is an error
   src/discord/           Discord request handling
     signature.ts         Ed25519 verification over timestamp + raw body
     ping.ts              first step of the proxy: verify, answer PING, hand over the rest
   src/events/            event envelope, Pub/Sub codec and validation, structured logger (docs/events.md)
+  src/grid/              grid size, tiles, identifiers, colors (docs/data-model.md)
+  src/ratelimit/         the per-user rate limit decision (docs/data-model.md)
+  src/render/            PNG encoder and tile renderer (docs/data-model.md)
 ```
 
 Tests sit next to the code they test, as `*.test.ts`.
