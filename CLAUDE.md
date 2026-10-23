@@ -81,5 +81,4 @@ user — never guess into a document. Keep this file under about 100 lines.
 
 - Points each ADR (0004–0010) says to verify before implementing, for example Firebase Terraform support and raw-body forwarding by API Gateway (team).
 - Teammates' GitHub handles and GPG setup; instructor access via `Kloox` (GitHub) and `jeremie@jjaouen.com` (GCP Editor) (team).
-- Branch protection on `main` is not configured, so rule 1 is not enforced by GitHub (repository owner).
 - Branch naming convention is not decided (team).

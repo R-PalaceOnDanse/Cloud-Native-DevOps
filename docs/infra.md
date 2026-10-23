@@ -3,7 +3,7 @@
 How the Terraform code under `infra/` is organised, where each environment's values live, and how
 to run it. Read by anyone who plans or changes cloud resources.
 
-The decisions behind this layout are in [ADR-0004](adr/0004-terraform-layout-and-environments.md), and the network topology in [ADR-0012](adr/0012-network-topology-and-ip-addressing.md).
+The decisions behind this layout are in [ADR-0004](adr/0004-terraform-layout-and-environments.md), and the network topology in [ADR-0013](adr/0013-network-topology-and-ip-addressing.md).
 Two stacks exist:
 
 - `foundation`: the network of each environment (VPC, subnets with GKE secondary ranges, Cloud
@@ -48,9 +48,9 @@ values elsewhere. None of them is a secret, so they are committed.
 - **Networks do not overlap**: dev uses `10.10.0.0/24` and prd `10.20.0.0/24`, so the two can be
   peered or connected later.
 - **No workspaces.** The environment is chosen by the two files above, never by a workspace.
-- **Apply and destroy** are done by the pipeline, once it exists (issues #32 and #33). Until then,
-  agree in the team before running `apply` or `destroy`: they change real resources and spend
-  credits.
+- **Apply and destroy** of `foundation` are done by the pipeline ([ci.md](ci.md)): a release tag
+  applies, the destroy workflow destroys. Do not run them from a laptop. The `access` stack is the
+  exception: it is applied by hand by a project Owner, after its pull request is approved.
 
 ## Network topology
 
@@ -66,8 +66,10 @@ use non-overlapping IP address spaces to allow peering:
   without public IPs.
 - **Cloud NAT** provides outbound internet connectivity for private nodes/pods to pull images and packages
   without exposing external IP addresses.
-- **Tear-down**: `terraform destroy` tears down all network resources (including the hourly billable
-  Cloud NAT gateway and Cloud Router).
+- **Tear-down**: `terraform destroy` is meant to remove all network resources (including the hourly
+  billable Cloud NAT gateway and Cloud Router). **Today it is refused**: the budget in the same stack
+  has `prevent_destroy = true`, and Terraform stops before destroying anything. The budget has to
+  move out of the foundation (for example to the access stack) before the destroy workflow can work.
 
 ## Run it
 
@@ -114,13 +116,14 @@ each project it creates:
 - the write access of both accounts to the state bucket, because Terraform locks the state even
   for a plan.
 
-A workflow reads the three values it needs from the stack's outputs (`workload_identity_provider`,
-`plan_service_account`, `apply_service_account`) and passes them to `google-github-actions/auth`
-with `id-token: write` permission. The pipelines that do so are issues #31 to #33.
+The three values a workflow needs for an environment are the stack's outputs
+(`workload_identity_provider`, `plan_service_account`, `apply_service_account`); they are kept as
+repository variables and passed to `google-github-actions/auth` with `id-token: write` permission. The pipelines that do so are described in [ci.md](ci.md).
 
 The first `apply` of this stack is done by hand with the Google login of a project Owner, because
 the pipeline cannot authenticate before this stack exists. After that, changes to it go through a
-pull request like any other.
+pull request like any other, but are still applied by hand, since this stack is the identity the
+pipeline runs with.
 
 `state_bucket` in `<env>.tfvars` repeats the bucket of `backends/<env>.hcl`, as Terraform cannot
 read its own backend configuration: change both together.

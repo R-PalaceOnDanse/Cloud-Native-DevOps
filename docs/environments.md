@@ -14,7 +14,7 @@ day and drifts as people work, so re-read the project before relying on it.
 | Project ID | `teampasx-cloudnative-dev` | `teampasx-cloudnative-prd` |
 | Project number | 812267599723 | 1024204425086 |
 | Created | 2026-10-22 | 2026-10-23 |
-| Billing | enabled (budget alerts: none yet, issue #21) | enabled (budget alerts: none yet, issue #21) |
+| Billing | enabled; one budget with alerts, in the foundation stack | enabled; one budget with alerts, in the foundation stack |
 | Foundation stack (Network) | applied 2026-10-23 (VPC, subnet, router, NAT) | applied 2026-10-23 (VPC, subnet, router, NAT) |
 | Access stack | applied 2026-10-23, 16 resources | applied 2026-10-23, 16 resources |
 
@@ -23,7 +23,7 @@ day and drifts as people work, so re-read the project before relying on it.
 ### Foundation stack (Networking), in both projects
 
 Defined in `infra/foundation`, applied on 2026-10-23. The design is in
-[ADR-0012](adr/0012-network-topology-and-ip-addressing.md) and the topology in
+[ADR-0013](adr/0013-network-topology-and-ip-addressing.md) and the topology in
 [infra.md](infra.md#network-topology). Each project holds:
 
 | Resource | dev | prd | Purpose |
@@ -75,11 +75,11 @@ Created by hand, or by someone else, and not described by any code in this repos
 These were not created by this repository's Terraform. Who created them, and why, is not
 recorded: **Unknown, the team can answer**, and the answer belongs in the decisions log.
 
-- **A second workload identity pool, `github-actions`**, next to the `github` pool of the access
-  stack, and a service account **`github-terraform-dev`** with the *Compute Network Admin* role.
-  They look like an earlier manual attempt at the same federation. Two pools do the same job; one
-  should be removed, or imported into the access stack, once the pipelines (issue #31) are known to
-  work with the stack's pool.
+- **A second federation, removed on 2026-10-23.** A pool `github-actions` and a service account
+  `github-terraform-dev` (Compute Network Admin) had been created by hand in dev, next to the
+  `github` pool of the access stack. The pipelines use the access stack's pool, which `auth-check`
+  proves works in both projects, so both were deleted (a deleted pool or account can be restored
+  for 30 days). Nothing outside the access stack now authenticates GitHub Actions.
 - **Firebase and related APIs**: Firebase, Firebase Hosting, Firebase Rules, Identity Toolkit,
   App Engine, Datastore, FCM, Remote Config, and the service account `firebase-adminsdk-…`. They
   are the kind of services that [ADR-0008](adr/0008-firestore-listeners-for-realtime.md) and
@@ -88,7 +88,7 @@ recorded: **Unknown, the team can answer**, and the answer belongs in the decisi
 - **The instructor's access**: the instructor has the *Editor* role on dev. On prd the instructor
   has no role, which the project owner chose to leave as it is (the subject asks for access to
   both environments; see issue #22).
-- **Budget Alerts API** (`billingbudgets.googleapis.com`) is enabled, but no budget exists yet.
+- **Budget Alerts API** (`billingbudgets.googleapis.com`) is enabled in dev. The budget of each project is created by `infra/foundation/budget.tf` and is in the state; its billing account belongs to another team member.
 
 ### Only in prd
 
@@ -99,4 +99,3 @@ Nothing beyond the access stack, the state bucket and the human access listed ab
 - The GKE cluster and the runners, the serverless components (Pub/Sub, API Gateway, functions,
   Firestore, Secret Manager) and the monitoring. The Secret Manager API is not enabled in either
   project.
-- Budgets and alerts (issue #21), whose billing accounts belong to other team members.

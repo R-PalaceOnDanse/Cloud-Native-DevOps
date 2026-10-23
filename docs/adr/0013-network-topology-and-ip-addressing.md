@@ -1,4 +1,4 @@
-# ADR-0012 — Foundation network topology, VPC-native IP addressing and Cloud NAT egress
+# ADR-0013 — Foundation network topology, VPC-native IP addressing and Cloud NAT egress
 
 - **Status**: Accepted
 - **Date**: 2026-10-23

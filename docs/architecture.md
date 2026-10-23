@@ -12,7 +12,7 @@ describe exists, not before.
 Built so far:
 
 - the network of the foundation (VPC, subnets with GKE secondary ranges, Cloud Router, Cloud NAT,
-  applied in dev and prd; see [ADR-0012](adr/0012-network-topology-and-ip-addressing.md)) and the access stack (applied);
+  applied in dev and prd; see [ADR-0013](adr/0013-network-topology-and-ip-addressing.md)) and the access stack (applied);
 - in the functions workspace, the code that needs no cloud to be tested: the Discord proxy
   (signature, PING, slash commands to events), the event envelope and logger, the grid rules (tiles,
   colors, rate limit decision, tile images) and the command definitions.
