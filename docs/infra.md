@@ -148,6 +148,30 @@ Editor or Owner of the project can read and write the state through the bucket's
 project-level roles; there is no bucket-specific access list. Bringing the buckets under Terraform
 control is planned for the section 1 issues.
 
+## Budget alerts
+
+To prevent accidental credit burns from autoscaling or resource misconfigurations, each project has
+a monthly budget with alerts. The budgets are defined in `infra/foundation/budget.tf`; the billing
+account and the monthly amount of each environment are `billing_account` and `budget_amount` in
+`infra/foundation/<env>.tfvars`, the single source for those values.
+
+| Threshold | Basis |
+|---|---|
+| 50 % | actual spend |
+| 90 % | actual spend |
+| 100 % | actual spend |
+| 100 % | forecasted spend |
+
+**Do not create a budget by hand** (`gcloud billing budgets create`): the budget is in the Terraform
+state, and a second one would send every alert twice. To change an amount, change `budget_amount`
+in the `tfvars` through a pull request. Changing a budget needs *Billing Account Administrator* on
+the billing account of the project, which belongs to another team member (dev and prd use
+different accounts). Alert emails go to the billing account's administrators and users; who that is
+for each account has not been checked for every member.
+
+Standard GCP budgets are notification-only and do not stop resources automatically. When an alert
+fires, the team must inspect and downscale running workloads.
+
 ## Changing it
 
 - A new variable gets a `description`, a `type`, and a value in both `<env>.tfvars`. Mark a
