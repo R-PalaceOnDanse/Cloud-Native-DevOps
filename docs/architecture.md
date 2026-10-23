@@ -9,9 +9,11 @@ describe exists, not before.
 
 ## 1. Layout
 
-Nothing is built yet: the repository holds documentation and tooling only.
+Only the network of the foundation is built: the repository otherwise holds documentation and
+tooling.
 
 ```
+infra/       Terraform stacks (docs/infra.md); today only foundation/ with the VPC and subnet
 docs/        documentation, including the official subject (docs/subject/)
 scripts/     documentation check (check-docs.mjs)
 .assistant/  decisions log and lessons
@@ -21,9 +23,9 @@ scripts/     documentation check (check-docs.mjs)
 .mise.toml   pinned local tool versions and setup tasks (docs/development.md)
 ```
 
-The intended target layout comes from the subject (`infra/access`, `infra/foundation`,
-`infra/serverless`, `app/functions`, `app/frontend`). It is a suggestion, not a decision: each
-folder is added, and documented, in the change that creates it.
+The stacks `infra/access` and `infra/serverless`, and the application folders `app/functions` and
+`app/frontend`, come from the subject's suggested layout and are added, and documented, in the
+change that creates each of them.
 
 ## 2. Conventions in place
 

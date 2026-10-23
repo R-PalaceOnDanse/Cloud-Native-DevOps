@@ -30,8 +30,12 @@ Stacks exchange values through input variables or `data` sources, not `terraform
 to keep them decoupled. A local module is created only for something that is really repeated, for
 example "a function": service account, function and IAM bindings.
 
-Naming: GCP projects are `<team>-cloudnative-dev` and `<team>-cloudnative-prd`; state buckets are
-`<team>-<env>-tfstate`. `<team>` is still to be fixed (see `CLAUDE.md`, open questions).
+Naming: GCP projects are `<team>-cloudnative-dev` and `<team>-cloudnative-prd`.
+
+Amended 2026-10-23: the team name is `teampasx`, and the state buckets that were actually created
+are `state_bucket_dev` and `state_bucket_prd`, not `<team>-<env>-tfstate`. The values of each
+environment are in `infra/foundation/backends/` and `infra/foundation/*.tfvars`; see
+[infra.md](../infra.md).
 
 ## Consequences
 
