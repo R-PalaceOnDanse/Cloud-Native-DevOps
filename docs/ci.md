@@ -6,8 +6,8 @@ elsewhere. Read by anyone who changes `infra/` or starts a release.
 
 The choices are in [ADR-0012](adr/0012-terraform-pipelines.md); the identities are in
 [ADR-0011](adr/0011-workload-identity-in-the-access-stack.md) and
-[infra.md](infra.md#github-actions-authentication). The workflow of the functions is described in
-[functions.md](functions.md) and the documentation check in [development.md](development.md).
+[infra.md](infra.md#github-actions-authentication). The documentation check is described in
+[development.md](development.md).
 
 ## The workflows
 
@@ -18,7 +18,7 @@ The choices are in [ADR-0012](adr/0012-terraform-pipelines.md); the identities a
 | `terraform-destroy` | started by hand (*Run workflow*) | `github-apply` | Destroys `foundation` of one environment, after a confirmation |
 | `terraform-run` | called by the two above | `github-apply` | Plans, then applies the saved plan. Not started by hand |
 | `auth-check` | a pull request changes `infra/access/**` or this workflow, or by hand | both | Proves the keyless authentication behaves as designed (see below) |
-| `docs-check`, `functions-ci` | see [development.md](development.md) and [functions.md](functions.md) | none | Documentation and functions checks |
+| `docs-check` | see [development.md](development.md) | none | Documentation check |
 
 One composite action, `.github/actions/terraform-init`, installs Terraform, authenticates and runs
 `terraform init` for one stack and one environment, so the Terraform workflows cannot drift apart.
