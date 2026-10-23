@@ -22,3 +22,14 @@ variable "subnet_cidr" {
     error_message = "subnet_cidr must be a valid IPv4 CIDR block, for example 10.10.0.0/24."
   }
 }
+
+variable "billing_account" {
+  type        = string
+  description = "Billing account ID of the environment."
+}
+
+variable "budget_amount" {
+  type        = number
+  description = "Monthly budget amount in EUR."
+  default     = 20
+}

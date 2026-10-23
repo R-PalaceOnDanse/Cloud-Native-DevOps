@@ -7,3 +7,8 @@ output "subnet_id" {
   value       = google_compute_subnetwork.main.id
   description = "ID of the subnet."
 }
+
+output "budget_id" {
+  value       = google_billing_budget.main.id
+  description = "Resource name of the billing budget."
+}

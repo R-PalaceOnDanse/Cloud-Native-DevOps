@@ -16,8 +16,9 @@ infra/foundation/
   backends/<env>.hcl  state bucket and prefix of an environment
   <env>.tfvars        project, region and network values of an environment
   main.tf             VPC and subnet
+  budget.tf           monthly budget alerts
   variables.tf        inputs, with validation
-  outputs.tf          vpc_id, subnet_id
+  outputs.tf          vpc_id, subnet_id, budget_id
   providers.tf        Terraform and provider version constraints
 ```
 
@@ -92,6 +93,22 @@ Use `prd` and `teampasx-cloudnative-prd` for the other environment. Then put the
 Editor or Owner of the project can read and write the state through the bucket's default
 project-level roles; there is no bucket-specific access list. Bringing the buckets under Terraform
 control is planned for the section 1 issues.
+
+## Budget alerts
+
+Both projects have a monthly budget alert managed as code in `infra/foundation/budget.tf`.
+
+| Environment | Project | Billing Account | Monthly Budget | Alert Thresholds | Protection |
+|---|---|---|---|---|---|
+| **dev** | `teampasx-cloudnative-dev` | `015B95-C1627B-339E15` | 20 EUR | 50%, 90%, 100% (actual), 100% (forecasted) | `prevent_destroy = true` |
+| **prd** | `teampasx-cloudnative-prd` | `01A021-589B0D-8ED8BC` | 20 EUR | 50%, 90%, 100% (actual), 100% (forecasted) | `prevent_destroy = true` |
+
+### Destruction behavior
+
+The budget resource has `lifecycle { prevent_destroy = true }` configured. Running `terraform destroy`
+on the foundation stack will destroy ephemeral network resources but refuse to destroy the budget alerts,
+ensuring that accidental or automated teardowns of the foundation do not leave the accounts unprotected
+against untracked spending. To destroy the budget, the lifecycle block must be explicitly removed first.
 
 ## Changing it
 
