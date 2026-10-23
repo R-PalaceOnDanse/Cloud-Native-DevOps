@@ -60,11 +60,11 @@ Created by hand, or by someone else, and not described by any code in this repos
 These were not created by this repository's Terraform. Who created them, and why, is not
 recorded: **Unknown, the team can answer**, and the answer belongs in the decisions log.
 
-- **A second workload identity pool, `github-actions`**, next to the `github` pool of the access
-  stack, and a service account **`github-terraform-dev`** with the *Compute Network Admin* role.
-  They look like an earlier manual attempt at the same federation. Two pools do the same job; one
-  should be removed, or imported into the access stack, once the pipelines (issue #31) are known to
-  work with the stack's pool.
+- **A second federation, removed on 2026-10-23.** A pool `github-actions` and a service account
+  `github-terraform-dev` (Compute Network Admin) had been created by hand in dev, next to the
+  `github` pool of the access stack. The pipelines use the access stack's pool, which `auth-check`
+  proves works in both projects, so both were deleted (a deleted pool or account can be restored
+  for 30 days). Nothing outside the access stack now authenticates GitHub Actions.
 - **Firebase and related APIs**: Firebase, Firebase Hosting, Firebase Rules, Identity Toolkit,
   App Engine, Datastore, FCM, Remote Config, and the service account `firebase-adminsdk-…`. They
   are the kind of services that [ADR-0008](adr/0008-firestore-listeners-for-realtime.md) and
