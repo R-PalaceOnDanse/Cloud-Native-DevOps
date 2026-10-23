@@ -22,3 +22,8 @@ variable "subnet_cidr" {
     error_message = "subnet_cidr must be a valid IPv4 CIDR block, for example 10.10.0.0/24."
   }
 }
+
+variable "second_subnet_cidr" {
+  type        = string
+  description = "CIDR range for the second subnet"
+}
