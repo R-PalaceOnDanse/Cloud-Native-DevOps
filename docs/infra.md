@@ -3,7 +3,7 @@
 How the Terraform code under `infra/` is organised, where each environment's values live, and how
 to run it. Read by anyone who plans or changes cloud resources.
 
-The decisions behind this layout are in [ADR-0004](adr/0004-terraform-layout-and-environments.md).
+The decisions behind this layout are in [ADR-0004](adr/0004-terraform-layout-and-environments.md), and the network topology in [ADR-0012](adr/0012-network-topology-and-ip-addressing.md).
 Two stacks exist:
 
 - `foundation`: the network of each environment (VPC, subnets with GKE secondary ranges, Cloud

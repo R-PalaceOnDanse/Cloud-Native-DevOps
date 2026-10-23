@@ -9,13 +9,13 @@ describe exists, not before.
 
 ## 1. Layout
 
-Built so far: the network of the foundation (planned, not applied), the access stack (applied), and
-the first building blocks of the functions (Discord signature check). Nothing is deployed from `app/`
-yet. The rest is documentation and
-tooling.
+Built so far: the network of the foundation (VPC, subnets with GKE secondary ranges, Cloud Router,
+Cloud NAT, applied in dev and prd; see ADR-0012), the access stack (applied), and the first building
+blocks of the functions (Discord signature check). Nothing is deployed from `app/` yet. The rest is
+documentation and tooling.
 
 ```
-infra/       Terraform stacks (docs/infra.md): foundation/ (VPC and subnet), access/ (GitHub Actions federation)
+infra/       Terraform stacks (docs/infra.md): foundation/ (VPC, subnets, NAT, routing), access/ (GitHub Actions federation)
 app/         application code; today only functions/, the TypeScript workspace (docs/functions.md)
 docs/        documentation, including the official subject (docs/subject/)
 scripts/     documentation check (check-docs.mjs)

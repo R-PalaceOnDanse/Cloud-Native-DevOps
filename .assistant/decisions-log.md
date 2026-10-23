@@ -28,3 +28,4 @@ Never rewrite history: if a choice is reversed, add a new line that says so.
 2026-10-23 — GitHub Actions authenticates through Workload Identity Federation defined in the access stack, with a read-only plan identity and an environment-scoped apply identity — see ADR-0011
 2026-10-23 — Functions workspace uses npm, Vitest and ESLint with typescript-eslint (strict, no explicit any) — npm ships with Node so the team installs nothing new, Vitest runs TypeScript ES modules with no extra configuration, and ESLint enforces the no-any rule; see docs/functions.md
 2026-10-23 — The functions keep Node 22 as their runtime, as pinned in .mise.toml — Cloud Run functions list Node.js 22, so no bump was needed to follow ADR-0005
+2026-10-23 — Foundation network uses custom VPC, non-overlapping GKE secondary ranges (pods /16, services /20) and Cloud NAT egress in europe-west1 — see ADR-0012

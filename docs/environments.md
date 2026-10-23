@@ -15,10 +15,25 @@ day and drifts as people work, so re-read the project before relying on it.
 | Project number | 812267599723 | 1024204425086 |
 | Created | 2026-10-22 | 2026-10-23 |
 | Billing | enabled (budget alerts: none yet, issue #21) | enabled (budget alerts: none yet, issue #21) |
-| Foundation stack (VPC and subnet) | **not applied**: only the `default` network exists | **not applied**: the Compute Engine API is not even enabled |
+| Foundation stack (Network) | applied 2026-10-23 (VPC, subnet, router, NAT) | applied 2026-10-23 (VPC, subnet, router, NAT) |
 | Access stack | applied 2026-10-23, 16 resources | applied 2026-10-23, 16 resources |
 
 ## Managed by Terraform
+
+### Foundation stack (Networking), in both projects
+
+Defined in `infra/foundation`, applied on 2026-10-23. The design is in
+[ADR-0012](adr/0012-network-topology-and-ip-addressing.md) and the topology in
+[infra.md](infra.md#network-topology). Each project holds:
+
+| Resource | dev | prd | Purpose |
+|---|---|---|---|
+| VPC (`google_compute_network`) | `teampasx-dev-vpc` | `teampasx-prd-vpc` | Dedicated custom-mode VPC |
+| Subnet (`google_compute_subnetwork`) | `teampasx-dev-vpc-subnet` (`10.10.0.0/24`) | `teampasx-prd-vpc-subnet` (`10.20.0.0/24`) | Primary subnet for GKE nodes with Private Google Access |
+| Pods Range (secondary) | `teampasx-dev-vpc-pods` (`10.11.0.0/16`) | `teampasx-prd-vpc-pods` (`10.21.0.0/16`) | Alias IP range for Kubernetes Pods |
+| Services Range (secondary) | `teampasx-dev-vpc-services` (`10.12.0.0/20`) | `teampasx-prd-vpc-services` (`10.22.0.0/20`) | Alias IP range for Kubernetes Services |
+| Cloud Router (`google_compute_router`) | `teampasx-dev-vpc-router` | `teampasx-prd-vpc-router` | Regional router in `europe-west1` |
+| Cloud NAT (`google_compute_router_nat`) | `teampasx-dev-vpc-nat` | `teampasx-prd-vpc-nat` | Egress NAT for private nodes and runners |
 
 ### Access stack, in both projects
 
@@ -81,7 +96,6 @@ Nothing beyond the access stack, the state bucket and the human access listed ab
 
 ## Not created yet
 
-- The foundation network (VPC and subnet) in either project: planned, not applied.
 - The GKE cluster and the runners, the serverless components (Pub/Sub, API Gateway, functions,
   Firestore, Secret Manager) and the monitoring. The Secret Manager API is not enabled in either
   project.
