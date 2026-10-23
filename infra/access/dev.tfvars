@@ -1,0 +1,5 @@
+project_id        = "teampasx-cloudnative-dev"
+region            = "europe-west1"
+environment       = "dev"
+github_repository = "R-PalaceOnDanse/Cloud-Native-DevOps"
+state_bucket      = "state_bucket_dev"
