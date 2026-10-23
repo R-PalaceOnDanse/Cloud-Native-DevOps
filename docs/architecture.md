@@ -9,11 +9,13 @@ describe exists, not before.
 
 ## 1. Layout
 
-Only the network of the foundation is built: the repository otherwise holds documentation and
+Built so far: the network of the foundation, and the first building blocks of the functions
+(Discord signature check). Nothing is deployed from `app/` yet. The rest is documentation and
 tooling.
 
 ```
 infra/       Terraform stacks (docs/infra.md); today only foundation/ with the VPC and subnet
+app/         application code; today only functions/, the TypeScript workspace (docs/functions.md)
 docs/        documentation, including the official subject (docs/subject/)
 scripts/     documentation check (check-docs.mjs)
 .assistant/  decisions log and lessons
@@ -23,9 +25,9 @@ scripts/     documentation check (check-docs.mjs)
 .mise.toml   pinned local tool versions and setup tasks (docs/development.md)
 ```
 
-The stacks `infra/access` and `infra/serverless`, and the application folders `app/functions` and
-`app/frontend`, come from the subject's suggested layout and are added, and documented, in the
-change that creates each of them.
+The stacks `infra/access` and `infra/serverless`, and the application folder `app/frontend`, come
+from the subject's suggested layout and are added, and documented, in the change that creates each
+of them.
 
 ## 2. Conventions in place
 
