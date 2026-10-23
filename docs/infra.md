@@ -4,25 +4,31 @@ How the Terraform code under `infra/` is organised, where each environment's val
 to run it. Read by anyone who plans or changes cloud resources.
 
 The decisions behind this layout are in [ADR-0004](adr/0004-terraform-layout-and-environments.md).
-Today only the `foundation` stack exists, and it contains the network of each environment (a VPC
-and one subnet). IAM, Workload Identity Federation, the cluster and the runners are added by the
-section 1 and 2 issues.
+Two stacks exist:
+
+- `foundation`: the network of each environment (a VPC and one subnet). The cluster and the
+  runners are added by the section 2 issues.
+- `access`: how GitHub Actions authenticates to Google Cloud without a key (Workload Identity
+  Federation), described [below](#github-actions-authentication). The human access to the projects
+  is added to this stack by issue #28.
 
 ## Layout
 
+Every stack has the same files:
+
 ```
-infra/foundation/
+infra/<stack>/
   backend.tf          empty GCS backend, filled at init time
   backends/<env>.hcl  state bucket and prefix of an environment
-  <env>.tfvars        project, region and network values of an environment
-  main.tf             VPC and subnet
-  budget.tf           monthly budget alerts
+  <env>.tfvars        project, region and other values of an environment
+  main.tf             the resources
+  budget.tf           monthly budget alerts (foundation stack)
   variables.tf        inputs, with validation
-  outputs.tf          vpc_id, subnet_id, budget_id
+  outputs.tf          values other code needs
   providers.tf        Terraform and provider version constraints
 ```
 
-`<env>` is `dev` or `prd`. Both environments run the same code; only `backends/<env>.hcl` and
+`<stack>` is `foundation` or `access`, and `<env>` is `dev` or `prd`. Both environments run the same code; only `backends/<env>.hcl` and
 `<env>.tfvars` differ. These two files are the single source of truth for the project IDs, the
 region, the network names and ranges, and the state buckets: read them rather than copying their
 values elsewhere. None of them is a secret, so they are committed.
@@ -56,23 +62,51 @@ gcloud auth login
 gcloud auth application-default login
 ```
 
-Then, from the repository root, for one environment (`dev` here):
+Then, from the repository root, for one stack and one environment (`foundation` and `dev` here):
 
 ```bash
 terraform -chdir=infra/foundation init -reconfigure -backend-config=backends/dev.hcl
 terraform -chdir=infra/foundation plan -var-file=dev.tfvars
 ```
 
-`-reconfigure` makes the switch to another environment safe: run the same two commands with `prd`
-to plan prd. Use the Terraform version pinned by mise: a state written by a newer Terraform cannot
+`-reconfigure` makes the switch to another environment or stack safe: run the same two commands
+with `prd`, or with `infra/access`, to plan those. Use the Terraform version pinned by mise: a state written by a newer Terraform cannot
 be read by an older one, and `required_version` in `providers.tf` refuses any other minor version.
 
-Checks that must pass before a pull request:
+Checks that must pass before a pull request, for each stack you changed:
 
 ```bash
 terraform -chdir=infra/foundation fmt -check
 terraform -chdir=infra/foundation validate
 ```
+
+## GitHub Actions authentication
+
+The `access` stack lets the pipelines act on a project without any key stored in GitHub, using
+Workload Identity Federation ([ADR-0011](adr/0011-workload-identity-in-the-access-stack.md)). In
+each project it creates:
+
+- a workload identity pool `github` and a provider `github-actions` that trusts GitHub's OIDC
+  tokens, and refuses every token that does not come from the repository named in
+  `github_repository`;
+- the service account `github-plan`, read-only (Viewer and Security Reviewer on the project), which
+  any workflow of the repository may impersonate. Plans use it, including on pull requests;
+- the service account `github-apply`, which creates and changes resources (Editor and Project IAM
+  Admin on the project), and which only a job that runs in the GitHub environment of the same name
+  as the Terraform environment (`dev` or `prd`) may impersonate;
+- the write access of both accounts to the state bucket, because Terraform locks the state even
+  for a plan.
+
+A workflow reads the three values it needs from the stack's outputs (`workload_identity_provider`,
+`plan_service_account`, `apply_service_account`) and passes them to `google-github-actions/auth`
+with `id-token: write` permission. The pipelines that do so are issues #31 to #33.
+
+The first `apply` of this stack is done by hand with the Google login of a project Owner, because
+the pipeline cannot authenticate before this stack exists. After that, changes to it go through a
+pull request like any other.
+
+`state_bucket` in `<env>.tfvars` repeats the bucket of `backends/<env>.hcl`, as Terraform cannot
+read its own backend configuration: change both together.
 
 ## Create a state bucket
 
@@ -89,7 +123,7 @@ gcloud storage buckets update gs://state_bucket_dev --versioning
 ```
 
 Use `prd` and `teampasx-cloudnative-prd` for the other environment. Then put the bucket name in
-`infra/foundation/backends/<env>.hcl` and run `terraform init` as described above. Anyone who is
+`infra/<stack>/backends/<env>.hcl` of each stack and run `terraform init` as described above. Anyone who is
 Editor or Owner of the project can read and write the state through the bucket's default
 project-level roles; there is no bucket-specific access list. Bringing the buckets under Terraform
 control is planned for the section 1 issues.

@@ -5,3 +5,7 @@
 *.tfplan
 crash.log
 crash.*.log
+
+# Node
+node_modules/
+app/functions/dist/
