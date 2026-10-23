@@ -18,6 +18,7 @@ and a document whose covered paths keep changing without it is reported as possi
 | [../README.md](../README.md) | How to get started: install the tools, log in, plan the infrastructure, and the workflow | `README.md` | the setup steps or the workflow change |
 | [development.md](development.md) | How to set up the local tooling and what the commit hooks run | `.mise.toml` `mise.lock` `.githooks/` | a tool, version, task or hook changes |
 | [infra.md](infra.md) | How the Terraform code is laid out, where the environment values live, and how to plan it | `infra/` | a stack, an environment value, a rule about regions or state, or the run commands change |
+| [discord.md](discord.md) | What the Discord application is, which values are public or secret and where they live, what remains to configure | the Discord application and its secrets | the application, its scopes, its secrets or its endpoint change |
 | [environments.md](environments.md) | What exists in each GCP project, what Terraform manages and what it does not | `infra/access/` | a stack is applied or destroyed, or something is created by hand in a project |
 | [functions.md](functions.md) | How the TypeScript functions workspace is laid out, its conventions, and how to build, lint and test it | `app/` `.github/workflows/functions-ci.yml` | a function, a command, a tool, a convention or the workflow changes |
 | [adr/](adr/) | Why the structural choices were made | decisions | a structural decision is made or reversed |
