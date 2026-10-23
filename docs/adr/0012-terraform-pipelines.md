@@ -1,6 +1,6 @@
 # ADR-0012 — Terraform pipelines: plan on pull requests, release on tags, guarded destroy
 
-- **Status**: Accepted
+- **Status**: Superseded by ADR-0013
 - **Date**: 2026-10-23
 - **Deciders**: project owner; team approval through the review of the pull request that adds this ADR
 - **Supersedes**: none

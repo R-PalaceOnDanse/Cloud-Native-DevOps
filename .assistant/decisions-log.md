@@ -40,3 +40,5 @@ Never rewrite history: if a choice is reversed, add a new line that says so.
 2026-10-23 — The access stack is planned by the pipeline but applied by hand — it is the identity the pipeline runs with, so a pipeline that applied it could lock itself out; see ADR-0012
 2026-10-23 — tflint also runs in the pre-commit hook, on each stack, when tflint is installed — completes the follow-up of ADR-0002
 2026-10-23 — The by-hand federation in dev (pool github-actions and account github-terraform-dev) was deleted once auth-check proved the access stack works in both projects — two federations did the same job and only one is reproducible; restorable for 30 days; see docs/environments.md
+2026-10-23 — The pipelines are the subject's three minimal examples, unchanged except for the Terraform version, replacing the design of ADR-0012 — closer to what the subject asks and simpler to explain; the extensions are listed in docs/ci.md and done by hand later; see ADR-0013
+2026-10-23 — The workflows read the environment variables WIF_PROVIDER and DEPLOYER_SA of each GitHub environment, as in the subject — supersedes the six repository variables of the previous design

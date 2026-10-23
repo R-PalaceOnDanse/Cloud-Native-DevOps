@@ -38,7 +38,7 @@ without activation. Do not install the tools with `apt` or `snap`, which give ot
 | [kubectl](https://kubernetes.io/docs/reference/kubectl/) | 1.31 | yes (managed Kubernetes cluster) | inspect and debug the GKE cluster and runners | manually | mandated by the subject |
 | [Helm](https://helm.sh/docs/) | 3.16 | yes (runners deployed with Helm) | deploys the self-hosted runners and other charts | manually | mandated by the subject |
 | [Node](https://nodejs.org/) | 22 | no | runs `scripts/check-docs.mjs`, the documentation check | pre-commit hook, `mise run check`, docs-check workflow | decisions log, 2026-10-22 |
-| [tflint](https://github.com/terraform-linters/tflint) | 0.53 | no | catches Terraform mistakes that `validate` misses | the `terraform-ci` workflow and the pre-commit hook ([ci.md](ci.md)) | [ADR-0002](adr/0002-tflint-for-terraform-linting.md) |
+| [tflint](https://github.com/terraform-linters/tflint) | 0.53 | no | catches Terraform mistakes that `validate` misses | the pre-commit hook only; not in CI yet ([ci.md](ci.md#what-to-extend)) | [ADR-0002](adr/0002-tflint-for-terraform-linting.md) |
 | [gitleaks](https://github.com/gitleaks/gitleaks) | 8.21 | no (the subject forbids committed secrets) | blocks secrets before they are committed | pre-commit hook | [ADR-0003](adr/0003-gitleaks-for-secret-scanning.md) |
 
 The versions of the tools mandated by the subject are only starting points: the subject does not

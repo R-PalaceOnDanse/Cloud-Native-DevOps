@@ -97,8 +97,9 @@ each project it creates:
   for a plan.
 
 The three values a workflow needs for an environment are the stack's outputs
-(`workload_identity_provider`, `plan_service_account`, `apply_service_account`); they are kept as
-repository variables and passed to `google-github-actions/auth` with `id-token: write` permission. The pipelines that do so are described in [ci.md](ci.md).
+(`workload_identity_provider`, `plan_service_account`, `apply_service_account`). The workflows use
+two of them as environment variables of each GitHub environment, `WIF_PROVIDER` and
+`DEPLOYER_SA`, and pass them to `google-github-actions/auth` with `id-token: write` permission. The pipelines that do so are described in [ci.md](ci.md).
 
 The first `apply` of this stack is done by hand with the Google login of a project Owner, because
 the pipeline cannot authenticate before this stack exists. After that, changes to it go through a

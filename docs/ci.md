@@ -1,82 +1,65 @@
 # CI/CD for the infrastructure
 
-How the Terraform code is checked, released and destroyed by GitHub Actions: which workflow does
-what, with which identity, which variables it needs, how to run it, and how to rebuild it
-elsewhere. Read by anyone who changes `infra/` or starts a release.
+The three workflows that check, release and destroy the Terraform of `infra/foundation`, what they
+need, how to run them, and what they do **not** protect against. Read by anyone who changes
+`infra/` or starts a release.
 
-The choices are in [ADR-0012](adr/0012-terraform-pipelines.md); the identities are in
-[ADR-0011](adr/0011-workload-identity-in-the-access-stack.md) and
-[infra.md](infra.md#github-actions-authentication). The workflow of the functions is described in
-[functions.md](functions.md) and the documentation check in [development.md](development.md).
+They are the minimal examples of the subject (C03 sections 6 to 8), **unchanged** except for one
+line: the Terraform version (see below). They are meant as a base that the team extends by hand
+([What to extend](#what-to-extend)). The reasons are in
+[ADR-0013](adr/0013-subject-minimal-pipelines-as-is.md); the identities they use are described in
+[infra.md](infra.md#github-actions-authentication).
 
 ## The workflows
 
-| Workflow | Starts when | Identity | What it does |
-|---|---|---|---|
-| `terraform-ci` | a pull request changes `infra/**`, `.tflint.hcl` or one of these workflows | `github-plan`, read-only, **no** GitHub environment | For each stack (`foundation`, `access`): `fmt -check`, `validate`, `tflint`; then `plan` in dev and in prd |
-| `terraform-deploy` | a tag `vMAJOR.MINOR.PATCH` is pushed | `github-apply` | Checks the tag is on `main`, applies `foundation` to **dev**, then to **prd** |
-| `terraform-destroy` | started by hand (*Run workflow*) | `github-apply` | Destroys `foundation` of one environment, after a confirmation |
-| `terraform-run` | called by the two above | `github-apply` | Plans, then applies the saved plan. Not started by hand |
-| `auth-check` | a pull request changes `infra/access/**` or this workflow, or by hand | both | Proves the keyless authentication behaves as designed (see below) |
-| `docs-check`, `functions-ci` | see [development.md](development.md) and [functions.md](functions.md) | none | Documentation and functions checks |
+| File | Starts when | What it does |
+|---|---|---|
+| `.github/workflows/terraform-ci.yml` | a pull request targets `main` | For `dev` and `prd`: `fmt -check`, `init`, `validate`, `plan` of `infra/foundation` |
+| `.github/workflows/terraform-deploy.yml` | a tag `v*` is pushed | For `dev` then `prd` (`max-parallel: 1`): `init`, `apply -auto-approve` of `infra/foundation` |
+| `.github/workflows/terraform-destroy.yml` | started by hand, with the environment as input | `init`, `destroy -auto-approve` of `infra/foundation` for that environment |
 
-One composite action, `.github/actions/terraform-init`, installs Terraform, authenticates and runs
-`terraform init` for one stack and one environment, so the Terraform workflows cannot drift apart.
+Each job runs in the GitHub **environment** of the same name (`dev` or `prd`) and authenticates
+to Google Cloud without any key: GitHub gives the job a short-lived token, and Google exchanges it
+for short-lived credentials (Workload Identity Federation, the `access` stack).
 
-## Identities and variables
+**The one change to the subject's examples.** Each `hashicorp/setup-terraform@v3` step has
+`terraform_version: 1.9.8`. Without it the action installs the latest Terraform, which the stack
+refuses (`required_version = "~> 1.9.0"`), so every job would fail. Keep this number equal to
+`mise.lock`.
 
-No key is stored in GitHub: each job exchanges a short-lived GitHub token for Google credentials
-(Workload Identity Federation). The jobs read six **repository variables**, which are not secrets:
+## Variables
+
+Two **environment variables**, defined in each GitHub environment (*Settings → Environments →
+`dev` or `prd` → Environment variables*). They are not secrets.
 
 | Variable | Content |
 |---|---|
-| `GCP_WIF_PROVIDER_DEV`, `GCP_WIF_PROVIDER_PRD` | Full name of the workload identity provider of the project |
-| `GCP_PLAN_SA_DEV`, `GCP_PLAN_SA_PRD` | Email of the read-only `github-plan` account |
-| `GCP_APPLY_SA_DEV`, `GCP_APPLY_SA_PRD` | Email of the `github-apply` account |
+| `WIF_PROVIDER` | Full name of the workload identity provider of that environment's project |
+| `DEPLOYER_SA` | Email of the service account the jobs impersonate: the `github-apply` account of that project |
 
-They are repository variables, not environment variables, because the plan job runs **without** a
-GitHub environment and a job can only read the variables of its own environment. The values are the
-outputs of the access stack, so that is where to get them:
+They come from the outputs of the access stack, which is where to read them:
 
 ```bash
 terraform -chdir=infra/access init -reconfigure -backend-config=backends/dev.hcl
-terraform -chdir=infra/access output     # workload_identity_provider, plan_service_account, apply_service_account
+terraform -chdir=infra/access output     # workload_identity_provider, apply_service_account
 ```
 
-Run it again with `backends/prd.hcl` for prd, and set each value without a space before or after:
+Run it again with `backends/prd.hcl` for prd. `WIF_PROVIDER` is `workload_identity_provider` and
+`DEPLOYER_SA` is `apply_service_account`. Paste each value without a space before or after, or
+the authentication fails.
 
 ```bash
-gh variable set GCP_WIF_PROVIDER_DEV --body "<workload_identity_provider of dev>"
-gh variable set GCP_PLAN_SA_DEV --body "<plan_service_account of dev>"
-gh variable set GCP_APPLY_SA_DEV --body "<apply_service_account of dev>"
+gh variable set WIF_PROVIDER --env dev --body "<workload_identity_provider of dev>"
+gh variable set DEPLOYER_SA  --env dev --body "<apply_service_account of dev>"
 ```
 
-If a value is wrong, the authentication step fails with a message from `google-github-actions/auth`
-or from Google (see *When something fails*).
+## Using them
 
-## A pull request on the infrastructure
+**A pull request.** Open it against `main`: `terraform-ci` runs for dev and prd by itself. Open the
+run and read the `plan` step: it is what a release would change. A plan that wants to destroy or
+replace something is what to question in the review.
 
-1. Open the pull request. `terraform-ci` runs by itself.
-2. `static` must pass for both stacks: formatting, validation and tflint.
-3. `plan` runs for each stack in each environment. Open the run, then **Summary**: the text of each
-   plan is there. Read it: it is what a release would change. A plan that wants to *destroy* or
-   *replace* something is the thing to question in the review.
-4. The plan does not lock the state, so two pull requests can plan together. It can show a change
-   that another merged pull request already made; re-run it after merging `main`.
-
-To get the same result before pushing:
-
-```bash
-terraform -chdir=infra/foundation fmt -check
-terraform -chdir=infra/foundation init -backend=false && terraform -chdir=infra/foundation validate
-tflint --chdir=infra/foundation --config="$PWD/.tflint.hcl"
-terraform -chdir=infra/foundation init -reconfigure -backend-config=backends/dev.hcl
-terraform -chdir=infra/foundation plan -var-file=dev.tfvars
-```
-
-## Releasing
-
-A release applies what is on `main` to dev, then to prd. From an up-to-date `main`:
+**A release.** From an up-to-date `main`:
 
 ```bash
 git checkout main && git pull
@@ -84,83 +67,70 @@ git tag -s v0.1.0 -m "v0.1.0"
 git push origin v0.1.0
 ```
 
-`terraform-deploy` then runs, one release at a time and never cancelled halfway:
+`terraform-deploy` applies dev, then prd, and does not start prd if dev failed. To repeat a release
+that failed halfway, use *Re-run failed jobs* on the run. To release a fix, merge it and push the
+next tag; a tag is never moved.
 
-1. `check-tag` refuses a tag whose commit is not on `main`.
-2. `dev` plans, then applies **that saved plan** to dev. The job is in the GitHub environment `dev`,
-   which is what allows it to use the `github-apply` account of dev.
-3. `prd` starts only if `dev` succeeded, and does the same in the environment `prd`.
-
-Version numbers follow semantic versioning; a tag is never moved. To repeat a release that failed
-halfway, use **Re-run failed jobs** on the run: it replays the same tag. To release a fix, merge it
-and push the next tag.
-
-Only `foundation` is applied by the pipeline. The `access` stack is the identity the pipeline
-runs with, so a pipeline that changed it could lock itself out: it is planned on every pull
-request, and applied **by hand** by a project Owner after the pull request is approved
-([infra.md](infra.md#github-actions-authentication)).
-
-## Destroying
-
-From the *Actions* tab, workflow `terraform-destroy`, *Run workflow* on `main`, or:
+**A destroy.** *Actions → Terraform Destroy → Run workflow*, with the environment (`dev` or `prd`),
+or:
 
 ```bash
-gh workflow run terraform-destroy.yml --ref main -f environment=dev -f confirm=dev
+gh workflow run terraform-destroy.yml --ref main -f env=dev
 ```
 
-The environment is a choice between `dev` and `prd`, and `confirm` must repeat it exactly. The
-workflow refuses to run from another branch. It plans the destruction, shows it in the summary, and
-destroys `foundation`. The `access` stack, the state buckets and the projects stay, so the
-pipeline can rebuild: push a new release tag (or use *Re-run all jobs* on the last successful
-release) to recreate the foundation. After a destroy nothing of the foundation remains, so nothing
-of it is billed.
+It destroys the foundation of that environment. The `access` stack, the state buckets and the
+projects stay, so a new tag rebuilds the foundation.
 
-## Proving the authentication
+**The same checks before pushing:**
 
-`auth-check` runs four checks, on every change to `infra/access` and on demand:
+```bash
+terraform -chdir=infra/foundation fmt -check
+terraform -chdir=infra/foundation init -reconfigure -backend-config=backends/dev.hcl
+terraform -chdir=infra/foundation validate
+terraform -chdir=infra/foundation plan -var-file=dev.tfvars
+```
 
-| Job | Expected |
-|---|---|
-| plan account, no environment, dev and prd | works |
-| apply account, in its own environment, dev and prd | works |
-| apply account, **no** environment, dev and prd | **refused** |
-| prd apply account, from a job of the `dev` environment | **refused** |
+## Known limits
 
-The last two pass when the credentials are refused: they show that the apply account cannot be
-reached by a pull request branch, nor across environments. The refusal comes when the credentials
-are first **used**, as `Permission 'iam.serviceAccounts.getAccessToken' denied` (403): the
-authentication action only prepares a credentials file and does not call Google, so a check that
-looked at that step alone would pass whatever the rules are.
+These follow from using the examples as they are, and from the free GitHub plan. They are listed so
+that nobody is surprised, and so that each can be closed when the team extends the workflows.
 
-## Limits of the free GitHub plan
+1. **The pull request plan uses the apply account.** The example has one account (`DEPLOYER_SA`) for
+   everything. A workflow pushed on a branch runs with `environment: dev` or `prd` and can therefore
+   change the infrastructure, not only plan it. Nothing in the repository settings prevents it: on
+   the free plan an environment cannot be restricted to branches.
+2. **No reviewer on prd.** The example says to add required reviewers on prd; the free plan does
+   not offer it. Whoever can push a tag, or start the destroy, deploys to dev and prd.
+3. **A release does not check the tag.** A tag on any commit, even outside `main`, is applied.
+4. **The destroy takes free text** for the environment, asks no confirmation and runs from any
+   branch.
+5. **`access` is not planned** by the pull request workflow, and the plan locks the state, so two
+   pull requests can collide.
+6. **No tflint, no secret scan, no signed-commit check** in CI. tflint and gitleaks run in the
+   pre-commit hook only, which each member must have activated.
+7. **The jobs run on GitHub's runners.** Switching to the self-hosted runners is issue #73.
 
-The repository is private and belongs to an organization on the free plan, where an environment
-cannot require a reviewer or restrict branches, and `main` cannot be protected (issue #25). What
-replaces them:
+## What to extend
 
-- a release needs a tag on a commit of `main`, and prd waits for dev;
-- a destroy needs a typed confirmation and runs from `main` only;
-- the apply accounts are tied to the environment of the same name, so a job outside an environment
-  cannot use them (proved by `auth-check`).
-
-Anyone who can push a tag or start a workflow can still deploy. That is accepted for a team of
-three, and written down here so that it is not a surprise.
+In the order that closes the most risk first: use `github-plan` for the pull request plan and
+`github-apply` for release and destroy only; bind the apply account to the branch or tag as well
+as the environment (a change to `infra/access`); refuse a tag that is not on `main`; take the
+destroy environment from a choice and a typed confirmation; add tflint; plan `access` too; add the
+runner switch.
 
 ## When something fails
 
 | Message or sign | Meaning | Fix |
 |---|---|---|
-| `must specify exactly one of "workload_identity_provider" or "credentials_json"` | A variable is empty | Set the repository variable (see above) |
-| `Unable to acquire impersonated credentials` or a `403` on `iam.serviceAccounts.getAccessToken`, at the first command that uses the credentials | The provider and the account are not of the same project, or the job's environment is not the one the account accepts | Compare the three values with `terraform output` of the access stack for that environment |
-| The authentication works but `plan` says `403` on the state bucket | The account lacks access to the state bucket | The access stack grants it; check that it has been applied in that project |
-| `Error acquiring the state lock` | Another apply is running, or one was killed | Wait; if nobody is running, `terraform force-unlock <id>` after asking the team |
-| `tflint` reports a rule | A real finding | Fix it, or discuss disabling the rule in `.tflint.hcl` in the pull request |
-| `check-tag` fails | The tag is not on `main` | Delete the tag, merge the change to `main`, tag again |
+| `must specify exactly one of "workload_identity_provider" or "credentials_json"` | `WIF_PROVIDER` is empty in that environment | Set it (see above) |
+| `Permission 'iam.serviceAccounts.getAccessToken' denied`, or `Unable to acquire impersonated credentials` | `WIF_PROVIDER` and `DEPLOYER_SA` are not of the same project, or have a stray space | Compare them with the access outputs of that environment |
+| `Unsupported Terraform Core version` | The Terraform version in the workflow differs from `required_version` | Use the version of `mise.lock` |
+| `Error acquiring the state lock` | Another run is applying, or one was killed | Wait; if nobody is running, `terraform force-unlock <id>` after asking the team |
+| `already exists` on the first apply | The resource was created by hand and the state does not know it | Import it into the state, then plan again |
 
 ## Rebuilding this elsewhere
 
-For another repository or other projects: create the projects and the state buckets
-([infra.md](infra.md#create-a-state-bucket)); put the real values in `infra/*/<env>.tfvars` and
-`backends/<env>.hcl`; apply `infra/access` by hand in each project; create the GitHub environments
-`dev` and `prd`; set the six repository variables from the access outputs; open a pull request to
-see `terraform-ci` plan, run `auth-check`, then push a first tag.
+Create the projects and the state buckets ([infra.md](infra.md#create-a-state-bucket)); put the real
+values in `infra/*/<env>.tfvars` and `backends/<env>.hcl`; apply `infra/access` by hand in each
+project; create the GitHub environments `dev` and `prd`; set `WIF_PROVIDER` and `DEPLOYER_SA` in
+each from the access outputs; open a pull request to see the plan, then push a first tag.
