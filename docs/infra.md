@@ -33,10 +33,11 @@ values elsewhere. None of them is a secret, so they are committed.
   `europe-west9` is not supported by API Gateway.
 - **State** lives in a GCS bucket per environment, one prefix per stack (`foundation` here). The
   state buckets were created by hand before the first `terraform init`, as they cannot be created
-  by the code that stores its state in them. They are in `europe-west9`, with versioning enabled,
-  uniform bucket-level access and public access prevention enforced. A bucket location cannot be
-  changed afterwards; moving them to `europe-west1` means creating new buckets and migrating the
-  state.
+  by the code that stores its state in them (see [Create a state bucket](#create-a-state-bucket)).
+  The two existing buckets are in `europe-west9`, with uniform bucket-level access and public
+  access prevention enforced and the default 7-day soft delete; **object versioning is not
+  enabled on them**. A bucket location cannot be changed afterwards; moving them to `europe-west1`
+  means creating new buckets and migrating the state.
 - **Networks do not overlap**: dev uses `10.10.0.0/24` and prd `10.20.0.0/24`, so the two can be
   peered or connected later.
 - **No workspaces.** The environment is chosen by the two files above, never by a workspace.
@@ -63,7 +64,7 @@ terraform -chdir=infra/foundation plan -var-file=dev.tfvars
 
 `-reconfigure` makes the switch to another environment safe: run the same two commands with `prd`
 to plan prd. Use the Terraform version pinned by mise: a state written by a newer Terraform cannot
-be read by an older one.
+be read by an older one, and `required_version` in `providers.tf` refuses any other minor version.
 
 Checks that must pass before a pull request:
 
@@ -71,6 +72,26 @@ Checks that must pass before a pull request:
 terraform -chdir=infra/foundation fmt -check
 terraform -chdir=infra/foundation validate
 ```
+
+## Create a state bucket
+
+Done once per environment, by a member who is Owner of that environment's project, before the
+first `terraform init`. Terraform cannot create the bucket that holds its own state. The bucket is
+private, uniform-access, in the common region, and versioned so that an overwritten or deleted
+state can be recovered:
+
+```bash
+gcloud storage buckets create gs://state_bucket_dev \
+  --project=teampasx-cloudnative-dev --location=europe-west1 \
+  --uniform-bucket-level-access --public-access-prevention
+gcloud storage buckets update gs://state_bucket_dev --versioning
+```
+
+Use `prd` and `teampasx-cloudnative-prd` for the other environment. Then put the bucket name in
+`infra/foundation/backends/<env>.hcl` and run `terraform init` as described above. Anyone who is
+Editor or Owner of the project can read and write the state through the bucket's default
+project-level roles; there is no bucket-specific access list. Bringing the buckets under Terraform
+control is planned for the section 1 issues.
 
 ## Changing it
 
