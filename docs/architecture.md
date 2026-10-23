@@ -11,7 +11,8 @@ describe exists, not before.
 
 Built so far:
 
-- the network of the foundation (planned, not applied) and the access stack (applied);
+- the network of the foundation (VPC, subnets with GKE secondary ranges, Cloud Router, Cloud NAT,
+  applied in dev and prd; see [ADR-0013](adr/0013-network-topology-and-ip-addressing.md)) and the access stack (applied);
 - in the functions workspace, the code that needs no cloud to be tested: the Discord proxy
   (signature, PING, slash commands to events), the event envelope and logger, the grid rules (tiles,
   colors, rate limit decision, tile images) and the command definitions.
@@ -25,7 +26,7 @@ and the shapes of the events, the grid and the images exist; see [functions.md](
 [discord.md](discord.md), [events.md](events.md) and [data-model.md](data-model.md).
 
 ```
-infra/       Terraform stacks (docs/infra.md): foundation/ (VPC and subnet), access/ (GitHub Actions federation)
+infra/       Terraform stacks (docs/infra.md): foundation/ (VPC, subnets, NAT, routing), access/ (GitHub Actions federation)
 app/         application code; today only functions/, the TypeScript workspace (docs/functions.md)
 docs/        documentation, including the official subject (docs/subject/)
 scripts/     documentation check (check-docs.mjs)
