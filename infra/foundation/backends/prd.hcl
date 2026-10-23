@@ -1,2 +1,2 @@
-bucket = "state_bucket_prod"
-prefix = "prd"
+bucket = "state_bucket_prd"
+prefix = "foundation"

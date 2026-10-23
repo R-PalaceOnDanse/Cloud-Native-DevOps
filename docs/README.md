@@ -16,6 +16,7 @@ and a document whose covered paths keep changing without it is reported as possi
 | [subject/cloud-native-devops-iac-serverless.md](subject/cloud-native-devops-iac-serverless.md) | The official assignment, syllabus and course supports C00–C08 (read-only source) | `docs/subject/` | the school publishes a new version |
 | [architecture.md](architecture.md) | How the code is organised and how its parts fit together | `docs/` `.assistant/` `.githooks/` `.claude/` | a module, folder, flow or convention is added, moved or removed |
 | [development.md](development.md) | How to set up the local tooling and what the commit hooks run | `.mise.toml` `mise.lock` `.githooks/` | a tool, version, task or hook changes |
+| [infra.md](infra.md) | How the Terraform code is laid out, where the environment values live, and how to plan it | `infra/` | a stack, an environment value, a rule about regions or state, or the run commands change |
 | [adr/](adr/) | Why the structural choices were made | decisions | a structural decision is made or reversed |
 | [decisions-log.md](../.assistant/decisions-log.md) | Smaller choices and their reasons | decisions | a smaller choice is made |
 | [lessons.md](../.assistant/lessons.md) | Mistakes made and what now prevents them | lessons | review, CI or the user catches a mistake |

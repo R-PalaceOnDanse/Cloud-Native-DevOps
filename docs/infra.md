@@ -1,0 +1,84 @@
+# Infrastructure
+
+How the Terraform code under `infra/` is organised, where each environment's values live, and how
+to run it. Read by anyone who plans or changes cloud resources.
+
+The decisions behind this layout are in [ADR-0004](adr/0004-terraform-layout-and-environments.md).
+Today only the `foundation` stack exists, and it contains the network of each environment (a VPC
+and one subnet). IAM, Workload Identity Federation, the cluster and the runners are added by the
+section 1 and 2 issues.
+
+## Layout
+
+```
+infra/foundation/
+  backend.tf          empty GCS backend, filled at init time
+  backends/<env>.hcl  state bucket and prefix of an environment
+  <env>.tfvars        project, region and network values of an environment
+  main.tf             VPC and subnet
+  variables.tf        inputs, with validation
+  outputs.tf          vpc_id, subnet_id
+  providers.tf        Terraform and provider version constraints
+```
+
+`<env>` is `dev` or `prd`. Both environments run the same code; only `backends/<env>.hcl` and
+`<env>.tfvars` differ. These two files are the single source of truth for the project IDs, the
+region, the network names and ranges, and the state buckets: read them rather than copying their
+values elsewhere. None of them is a secret, so they are committed.
+
+## Rules
+
+- **One region: `europe-west1` (Belgium)** for every regional resource, in both environments. It is
+  one of the regions where API Gateway can be created ([ADR-0006](adr/0006-api-gateway-cloud-run-functions-pubsub.md)).
+  `europe-west9` is not supported by API Gateway.
+- **State** lives in a GCS bucket per environment, one prefix per stack (`foundation` here). The
+  state buckets were created by hand before the first `terraform init`, as they cannot be created
+  by the code that stores its state in them. They are in `europe-west9`, with versioning enabled,
+  uniform bucket-level access and public access prevention enforced. A bucket location cannot be
+  changed afterwards; moving them to `europe-west1` means creating new buckets and migrating the
+  state.
+- **Networks do not overlap**: dev uses `10.10.0.0/24` and prd `10.20.0.0/24`, so the two can be
+  peered or connected later.
+- **No workspaces.** The environment is chosen by the two files above, never by a workspace.
+- **Apply and destroy** are done by the pipeline, once it exists (issues #32 and #33). Until then,
+  agree in the team before running `apply` or `destroy`: they change real resources and spend
+  credits.
+
+## Run it
+
+Prerequisites: the tools of [development.md](development.md) (Terraform 1.9 comes from mise), and a
+Google login that can read the project and the state bucket.
+
+```bash
+gcloud auth login
+gcloud auth application-default login
+```
+
+Then, from the repository root, for one environment (`dev` here):
+
+```bash
+terraform -chdir=infra/foundation init -reconfigure -backend-config=backends/dev.hcl
+terraform -chdir=infra/foundation plan -var-file=dev.tfvars
+```
+
+`-reconfigure` makes the switch to another environment safe: run the same two commands with `prd`
+to plan prd. Use the Terraform version pinned by mise: a state written by a newer Terraform cannot
+be read by an older one.
+
+Checks that must pass before a pull request:
+
+```bash
+terraform -chdir=infra/foundation fmt -check
+terraform -chdir=infra/foundation validate
+```
+
+## Changing it
+
+- A new variable gets a `description`, a `type`, and a value in both `<env>.tfvars`. Mark a
+  variable `sensitive` only if it is a secret: a sensitive value is hidden from the plan that
+  reviewers read.
+- `.terraform.lock.hcl` is committed and covers `linux_amd64`, `darwin_arm64` and `darwin_amd64`.
+  After changing a provider constraint, run `terraform providers lock` for those three platforms
+  and commit the result.
+- A new stack goes in its own folder under `infra/`, with its own `backends/` and `<env>.tfvars`
+  and the prefix of its name.
