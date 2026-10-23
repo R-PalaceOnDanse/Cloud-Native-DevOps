@@ -19,6 +19,7 @@ and a document whose covered paths keep changing without it is reported as possi
 | [development.md](development.md) | How to set up the local tooling and what the commit hooks run | `.mise.toml` `mise.lock` `.githooks/` | a tool, version, task or hook changes |
 | [infra.md](infra.md) | How the Terraform code is laid out, where the environment values live, and how to plan it | `infra/` | a stack, an environment value, a rule about regions or state, or the run commands change |
 | [environments.md](environments.md) | What exists in each GCP project, what Terraform manages and what it does not | `infra/access/` | a stack is applied or destroyed, or something is created by hand in a project |
+| [functions.md](functions.md) | How the TypeScript functions workspace is laid out, its conventions, and how to build, lint and test it | `app/` `.github/workflows/functions-ci.yml` | a function, a command, a tool, a convention or the workflow changes |
 | [adr/](adr/) | Why the structural choices were made | decisions | a structural decision is made or reversed |
 | [decisions-log.md](../.assistant/decisions-log.md) | Smaller choices and their reasons | decisions | a smaller choice is made |
 | [lessons.md](../.assistant/lessons.md) | Mistakes made and what now prevents them | lessons | review, CI or the user catches a mistake |
