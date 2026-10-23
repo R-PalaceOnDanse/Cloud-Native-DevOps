@@ -20,6 +20,10 @@ app/functions/
   src/discord/           Discord request handling
     signature.ts         Ed25519 verification over timestamp + raw body
     ping.ts              first step of the proxy: verify, answer PING, hand over the rest
+    commands.ts          the slash commands as data
+    register.ts          registers them with Discord (bulk overwrite)
+    interaction.ts       reads a slash command interaction
+    proxy.ts             the proxy: verify, build an event, publish, defer the answer (docs/discord.md)
   src/events/            event envelope, Pub/Sub codec and validation, structured logger (docs/events.md)
   src/grid/              grid size, tiles, identifiers, colors (docs/data-model.md)
   src/ratelimit/         the per-user rate limit decision (docs/data-model.md)
