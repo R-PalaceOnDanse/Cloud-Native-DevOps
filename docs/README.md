@@ -18,6 +18,7 @@ and a document whose covered paths keep changing without it is reported as possi
 | [../README.md](../README.md) | How to get started: install the tools, log in, plan the infrastructure, and the workflow | `README.md` | the setup steps or the workflow change |
 | [development.md](development.md) | How to set up the local tooling and what the commit hooks run | `.mise.toml` `mise.lock` `.githooks/` | a tool, version, task or hook changes |
 | [infra.md](infra.md) | How the Terraform code is laid out, where the environment values live, and how to plan it | `infra/` | a stack, an environment value, a rule about regions or state, or the run commands change |
+| [environments.md](environments.md) | GCP projects, environment isolation, IDs, and network parameters | `infra/foundation/dev.tfvars` `infra/foundation/prd.tfvars` `infra/foundation/backends/` | an environment, project ID, region or network range changes |
 | [adr/](adr/) | Why the structural choices were made | decisions | a structural decision is made or reversed |
 | [decisions-log.md](../.assistant/decisions-log.md) | Smaller choices and their reasons | decisions | a smaller choice is made |
 | [lessons.md](../.assistant/lessons.md) | Mistakes made and what now prevents them | lessons | review, CI or the user catches a mistake |

@@ -21,10 +21,12 @@ infra/foundation/
   providers.tf        Terraform and provider version constraints
 ```
 
-`<env>` is `dev` or `prd`. Both environments run the same code; only `backends/<env>.hcl` and
-`<env>.tfvars` differ. These two files are the single source of truth for the project IDs, the
-region, the network names and ranges, and the state buckets: read them rather than copying their
-values elsewhere. None of them is a secret, so they are committed.
+`<env>` is `dev` (`teampasx-cloudnative-dev`) or `prd` (`teampasx-cloudnative-prd`). Both
+environments run the same code; only `backends/<env>.hcl` and `<env>.tfvars` differ. These two
+files are the single source of truth for the project IDs, the region, the network names and
+ranges, and the state buckets: read them rather than copying their values elsewhere. None of them
+is a secret, so they are committed. Full environment and project descriptions live in
+[environments.md](environments.md).
 
 ## Rules
 

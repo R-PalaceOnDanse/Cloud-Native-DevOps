@@ -24,6 +24,7 @@ This file stays short. Details live in the documents below — link to them, do 
 | What to build: purpose, scope, priorities, success criteria | `docs/brief.md` |
 | Official subject, syllabus and course supports C00–C08 (read-only source) | `docs/subject/cloud-native-devops-iac-serverless.md` |
 | Index of all documentation: structure, interfaces, deployment, CI, tests, technologies… | `docs/README.md` |
+| Environments and GCP projects (dev, prd) | `docs/environments.md` |
 | Code structure and flows | `docs/architecture.md` |
 | Decisions and their reasons | `docs/adr/` · `.assistant/decisions-log.md` |
 | Mistakes already made, and what now prevents them | `.assistant/lessons.md` |

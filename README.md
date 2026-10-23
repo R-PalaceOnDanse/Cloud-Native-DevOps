@@ -53,7 +53,8 @@ terraform -chdir=infra/foundation plan -var-file=dev.tfvars
 ```
 
 Replace `dev` with `prd` for the other environment. The details, the rules about regions and
-state, and how to change the code are in [docs/infra.md](docs/infra.md).
+state, and how to change the code are in [docs/infra.md](docs/infra.md). The environments and their
+GCP projects are detailed in [docs/environments.md](docs/environments.md).
 
 **6. Check the documentation** (it also runs before every commit):
 
