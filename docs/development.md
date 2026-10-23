@@ -8,7 +8,7 @@ clone.
 - Linux, macOS or WSL2.
 - [mise](https://mise.jdx.dev/getting-started.html), installed and **activated in your shell**.
   Without activation `mise install` works but the installed tools are not on your `PATH`.
-- Git, with your GPG key configured to sign commits (see the subject, section 1.2).
+- Git, with your GPG or SSH key configured to sign commits (see [Commit and tag signing](#commit-and-tag-signing)).
 
 ## Setup
 
@@ -48,6 +48,75 @@ dictate a version, so any bump is a normal pull request.
 request, never on one machine only. Versions are prefixes; `mise.lock` pins the exact release
 (for example Terraform 1.9.8, gcloud 590.0.0) and its checksums for every platform. After
 changing `.mise.toml`, run `mise lock` and commit `mise.lock` with it.
+
+## Commit and tag signing
+
+Every commit and tag in this repository must be cryptographically signed and show as **Verified**
+on GitHub (mandated by the subject §1.2 and C01 §3.2). Signatures using GPG or SSH keys are both
+accepted.
+
+### Option A: GPG key
+
+1. **Generate a key** (choose RSA 4096 or ed25519) if you do not have one yet:
+
+   ```bash
+   gpg --full-generate-key
+   ```
+
+   Provide your full name and your verified GitHub email address (e.g. `firstname.lastname@epitech.eu`).
+
+2. **List secret keys and retrieve your key ID** (the hex ID following the algorithm or the full fingerprint):
+
+   ```bash
+   gpg --list-secret-keys --keyid-format=long
+   ```
+
+3. **Export the public key and add it to GitHub**:
+
+   ```bash
+   gpg --armor --export <KEY_ID>
+   ```
+
+   Go to GitHub **Settings > SSH and GPG keys > New GPG key**, paste the exported block, and save.
+
+4. **Configure Git to sign commits and tags by default**:
+
+   ```bash
+   git config --global user.signingkey <KEY_ID>
+   git config --global commit.gpgsign true
+   git config --global tag.gpgsign true
+   ```
+
+   On Windows, if `gpg` is not in your system `PATH`, specify Git's embedded GPG binary:
+
+   ```bash
+   git config --global gpg.program "C:\Program Files\Git\usr\bin\gpg.exe"
+   ```
+
+### Option B: SSH signing key
+
+1. **Add your SSH key as a Signing Key on GitHub**:
+   Go to GitHub **Settings > SSH and GPG keys > New SSH key**, choose **Key type: Signing Key**,
+   and paste your public key (e.g. `cat ~/.ssh/id_ed25519.pub`).
+
+2. **Configure Git to sign with SSH**:
+
+   ```bash
+   git config --global gpg.format ssh
+   git config --global user.signingkey ~/.ssh/id_ed25519.pub
+   git config --global commit.gpgsign true
+   git config --global tag.gpgsign true
+   ```
+
+### Verification
+
+Verify locally that signatures are valid on the latest commit:
+
+```bash
+git log --show-signature -1
+```
+
+Once pushed, check the commit on GitHub to verify that it carries the green **Verified** badge.
 
 ## Commit hooks
 
