@@ -5,8 +5,8 @@ The TypeScript workspace under `app/functions`, which holds the code of the serv
 language is in [ADR-0005](adr/0005-typescript-for-functions.md); the entry path they plug into is
 in [ADR-0006](adr/0006-api-gateway-cloud-run-functions-pubsub.md).
 
-Today the workspace holds the first building blocks only: verifying Discord's request signature
-and answering its PING. No function is deployed yet.
+Today the workspace holds the first building blocks only: verifying Discord's request signature,
+answering its PING, and the event envelope with its structured logger. No function is deployed yet.
 
 ## Layout
 
@@ -19,6 +19,7 @@ app/functions/
   src/discord/           Discord request handling
     signature.ts         Ed25519 verification over timestamp + raw body
     ping.ts              first step of the proxy: verify, answer PING, hand over the rest
+  src/events/            event envelope, Pub/Sub codec and validation, structured logger (docs/events.md)
 ```
 
 Tests sit next to the code they test, as `*.test.ts`.
