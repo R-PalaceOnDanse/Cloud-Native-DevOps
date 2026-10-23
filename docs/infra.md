@@ -6,8 +6,9 @@ to run it. Read by anyone who plans or changes cloud resources.
 The decisions behind this layout are in [ADR-0004](adr/0004-terraform-layout-and-environments.md).
 Two stacks exist:
 
-- `foundation`: the network of each environment (a VPC and one subnet). The cluster and the
-  runners are added by the section 2 issues.
+- `foundation`: the network of each environment (VPC, subnets with GKE secondary ranges, Cloud
+  Router, Cloud NAT) and budget alerts. The cluster and the runners are added by the section 2
+  issues.
 - `access`: how GitHub Actions authenticates to Google Cloud without a key (Workload Identity
   Federation), described [below](#github-actions-authentication). The human access to the projects
   is added to this stack by issue #28.
@@ -50,6 +51,23 @@ values elsewhere. None of them is a secret, so they are committed.
 - **Apply and destroy** are done by the pipeline, once it exists (issues #32 and #33). Until then,
   agree in the team before running `apply` or `destroy`: they change real resources and spend
   credits.
+
+## Network topology
+
+The `foundation` stack manages the networking resources for each environment. Both environments
+use non-overlapping IP address spaces to allow peering:
+
+| Environment | VPC Name | Primary Subnet (Nodes) | Pods Secondary Range | Services Secondary Range | Egress NAT |
+|---|---|---|---|---|---|
+| **dev** | `teampasx-dev-vpc` | `10.10.0.0/24` (256 IPs) | `10.11.0.0/16` (65,536 IPs) | `10.12.0.0/20` (4,096 IPs) | Cloud Router + Cloud NAT |
+| **prd** | `teampasx-prd-vpc` | `10.20.0.0/24` (256 IPs) | `10.21.0.0/16` (65,536 IPs) | `10.22.0.0/20` (4,096 IPs) | Cloud Router + Cloud NAT |
+
+- **Private Google Access** is enabled on each subnet so that private GKE nodes can reach Google APIs
+  without public IPs.
+- **Cloud NAT** provides outbound internet connectivity for private nodes/pods to pull images and packages
+  without exposing external IP addresses.
+- **Tear-down**: `terraform destroy` tears down all network resources (including the hourly billable
+  Cloud NAT gateway and Cloud Router).
 
 ## Run it
 
