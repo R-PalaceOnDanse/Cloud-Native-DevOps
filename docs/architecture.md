@@ -13,7 +13,7 @@ Only the network of the foundation is built: the repository otherwise holds docu
 tooling.
 
 ```
-infra/       Terraform stacks (docs/infra.md); today only foundation/ with the VPC and subnet
+infra/       Terraform stacks (docs/infra.md): foundation/ (VPC and subnet), access/ (GitHub Actions federation)
 docs/        documentation, including the official subject (docs/subject/)
 scripts/     documentation check (check-docs.mjs)
 .assistant/  decisions log and lessons
@@ -23,9 +23,9 @@ scripts/     documentation check (check-docs.mjs)
 .mise.toml   pinned local tool versions and setup tasks (docs/development.md)
 ```
 
-The stacks `infra/access` and `infra/serverless`, and the application folders `app/functions` and
-`app/frontend`, come from the subject's suggested layout and are added, and documented, in the
-change that creates each of them.
+The stack `infra/serverless`, and the application folders `app/functions` and `app/frontend`, come
+from the subject's suggested layout and are added, and documented, in the change that creates each
+of them.
 
 ## 2. Conventions in place
 
