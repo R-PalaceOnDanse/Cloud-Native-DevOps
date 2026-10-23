@@ -93,6 +93,34 @@ Editor or Owner of the project can read and write the state through the bucket's
 project-level roles; there is no bucket-specific access list. Bringing the buckets under Terraform
 control is planned for the section 1 issues.
 
+## Budget alerts
+
+To prevent accidental credit burns from autoscaling or resource misconfigurations, both projects
+have a monthly budget alert configured on their respective billing accounts.
+
+| Environment | Project | Billing Account | Monthly Budget | Alert Thresholds | Recipients |
+|---|---|---|---|---|---|
+| **dev** | `teampasx-cloudnative-dev` | `015B95-C1627B-339E15` | 20 EUR | 50%, 90%, 100% (actual), 100% (forecasted) | All team members (Billing Account Admin & Users) |
+| **prd** | `teampasx-cloudnative-prd` | `01A021-589B0D-8ED8BC` | 20 EUR | 50%, 90%, 100% (actual), 100% (forecasted) | All team members (Billing Account Admin & Users) |
+
+### Creating or updating budget alerts
+
+Budget alerts are created per billing account, filtered to the target project:
+
+```bash
+gcloud billing budgets create --billing-account=<BILLING_ACCOUNT_ID> \
+  --display-name=teampasx-cloudnative-<env> \
+  --budget-amount=20EUR \
+  --filter-projects=projects/teampasx-cloudnative-<env> \
+  --threshold-rule=percent=0.5 \
+  --threshold-rule=percent=0.9 \
+  --threshold-rule=percent=1.0 \
+  --threshold-rule=percent=1.0,basis=forecasted-spend
+```
+
+Standard GCP budgets are notification-only and do not stop resources automatically. When an alert
+fires, the team must inspect and downscale running workloads.
+
 ## Changing it
 
 - A new variable gets a `description`, a `type`, and a value in both `<env>.tfvars`. Mark a
