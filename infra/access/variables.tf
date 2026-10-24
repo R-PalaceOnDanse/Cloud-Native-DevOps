@@ -32,3 +32,14 @@ variable "state_bucket" {
   type        = string
   description = "Name of the Terraform state bucket of the environment. Must match the bucket in backends/<env>.hcl."
 }
+
+variable "billing_account" {
+  type        = string
+  description = "Billing account ID of the environment."
+}
+
+variable "budget_amount" {
+  type        = number
+  description = "Monthly budget amount in EUR."
+  default     = 20
+}

@@ -28,7 +28,3 @@ output "services_range_name" {
   description = "Name of the secondary IP range for GKE services."
 }
 
-output "budget_id" {
-  value       = google_billing_budget.main.id
-  description = "Resource name of the billing budget."
-}

@@ -12,3 +12,8 @@ output "apply_service_account" {
   value       = google_service_account.apply.email
   description = "Email of the service account used by apply and destroy."
 }
+
+output "budget_id" {
+  value       = google_billing_budget.main.id
+  description = "Resource name of the billing budget."
+}
