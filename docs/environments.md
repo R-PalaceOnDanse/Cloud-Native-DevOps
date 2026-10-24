@@ -14,7 +14,7 @@ day and drifts as people work, so re-read the project before relying on it.
 | Project ID | `teampasx-cloudnative-dev` | `teampasx-cloudnative-prd` |
 | Project number | 812267599723 | 1024204425086 |
 | Created | 2026-10-22 | 2026-10-23 |
-| Billing | enabled; one budget with alerts, in the foundation stack | enabled; one budget with alerts, in the foundation stack |
+| Billing | enabled; one budget with alerts, in the access stack (`01A021-589B0D-8ED8BC`) | enabled; one budget with alerts, in the access stack (`01A021-589B0D-8ED8BC`) |
 | Foundation stack (Network) | applied 2026-10-23 (VPC, subnet, router, NAT) | applied 2026-10-23 (VPC, subnet, router, NAT) |
 | Access stack | applied 2026-10-23, 16 resources | applied 2026-10-23, 16 resources |
 
@@ -88,7 +88,7 @@ recorded: **Unknown, the team can answer**, and the answer belongs in the decisi
 - **The instructor's access**: the instructor has the *Editor* role on dev. On prd the instructor
   has no role, which the project owner chose to leave as it is (the subject asks for access to
   both environments; see issue #22).
-- **Budget Alerts API** (`billingbudgets.googleapis.com`) is enabled in dev. The budget of each project is created by `infra/foundation/budget.tf` and is in the state; its billing account belongs to another team member.
+- **Budget Alerts API** (`billingbudgets.googleapis.com`) is enabled in dev and prd. The budget of each project is created by `infra/access/budget.tf` and managed in the `access` stack with `prevent_destroy = true`. Both projects share the team billing account `01A021-589B0D-8ED8BC`.
 
 ### Only in prd
 

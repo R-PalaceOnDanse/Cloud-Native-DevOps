@@ -66,10 +66,10 @@ use non-overlapping IP address spaces to allow peering:
   without public IPs.
 - **Cloud NAT** provides outbound internet connectivity for private nodes/pods to pull images and packages
   without exposing external IP addresses.
-- **Tear-down**: `terraform destroy` is meant to remove all network resources (including the hourly
-  billable Cloud NAT gateway and Cloud Router). **Today it is refused**: the budget in the same stack
-  has `prevent_destroy = true`, and Terraform stops before destroying anything. The budget has to
-  move out of the foundation (for example to the access stack) before the destroy workflow can work.
+- **Tear-down**: `terraform destroy` removes all network resources (including the hourly
+  billable Cloud NAT gateway and Cloud Router). The budget alerts live in the `access` stack
+  with `prevent_destroy = true`, so destroying `foundation` leaves the budget safeguards intact
+  and runs cleanly.
 
 ## Run it
 
@@ -151,9 +151,10 @@ control is planned for the section 1 issues.
 ## Budget alerts
 
 To prevent accidental credit burns from autoscaling or resource misconfigurations, each project has
-a monthly budget with alerts. The budgets are defined in `infra/foundation/budget.tf`; the billing
-account and the monthly amount of each environment are `billing_account` and `budget_amount` in
-`infra/foundation/<env>.tfvars`, the single source for those values.
+a monthly budget with alerts. The budgets are defined in `infra/access/budget.tf` and managed as part
+of the `access` stack (which is never destroyed). The billing account and monthly amount of each
+environment are `billing_account` and `budget_amount` in `infra/access/<env>.tfvars`, the single
+source for those values. Both `dev` and `prd` share the same billing account (`01A021-589B0D-8ED8BC`).
 
 | Threshold | Basis |
 |---|---|
@@ -164,10 +165,10 @@ account and the monthly amount of each environment are `billing_account` and `bu
 
 **Do not create a budget by hand** (`gcloud billing budgets create`): the budget is in the Terraform
 state, and a second one would send every alert twice. To change an amount, change `budget_amount`
-in the `tfvars` through a pull request. Changing a budget needs *Billing Account Administrator* on
-the billing account of the project, which belongs to another team member (dev and prd use
-different accounts). Alert emails go to the billing account's administrators and users; who that is
-for each account has not been checked for every member.
+in the `tfvars` through a pull request. Changing or importing a budget requires the
+*Billing Account Administrator* (`roles/billing.admin`) or *Billing Account Costs Manager*
+(`roles/billing.costsManager`) role on the billing account of the project, which belongs to another
+team member. Alert emails go to the billing account's administrators and users.
 
 Standard GCP budgets are notification-only and do not stop resources automatically. When an alert
 fires, the team must inspect and downscale running workloads.
