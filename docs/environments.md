@@ -85,9 +85,8 @@ recorded: **Unknown, the team can answer**, and the answer belongs in the decisi
   are the kind of services that [ADR-0008](adr/0008-firestore-listeners-for-realtime.md) and
   [ADR-0009](adr/0009-firebase-hosting-and-discord-oauth.md) rely on, and may come from the spike
   those ADRs ask for. Nothing in the code uses them yet.
-- **The instructor's access**: the instructor has the *Editor* role on dev. On prd the instructor
-  has no role, which the project owner chose to leave as it is (the subject asks for access to
-  both environments; see issue #22).
+- **The instructor's access**: the instructor (`jeremie@jjaouen.com`) has the *Editor* role on both dev and prd, managed as code in `infra/access/members.tf`.
+- **Team members access**: team members have the *Owner* role on both dev and prd, managed as code in `infra/access/members.tf`.
 - **Budget Alerts API** (`billingbudgets.googleapis.com`) is enabled in dev and prd. The budget of each project is created by `infra/access/budget.tf` and managed in the `access` stack with `prevent_destroy = true`. Both projects share the team billing account `01A021-589B0D-8ED8BC`.
 
 ### Only in prd

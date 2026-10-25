@@ -12,6 +12,7 @@ locals {
   plan_project_roles = [
     "roles/viewer",
     "roles/iam.securityReviewer",
+    "roles/serviceusage.serviceUsageConsumer",
   ]
 
   # Creates and changes resources and their IAM bindings. Broad on purpose for now: it is narrowed

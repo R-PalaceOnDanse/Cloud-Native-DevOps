@@ -15,5 +15,5 @@ output "apply_service_account" {
 
 output "budget_id" {
   value       = google_billing_budget.main.id
-  description = "Resource name of the billing budget."
+  description = "Resource name of the GCP billing budget."
 }
