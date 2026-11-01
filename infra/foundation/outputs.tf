@@ -32,3 +32,13 @@ output "budget_id" {
   value       = google_billing_budget.main.id
   description = "Resource name of the billing budget."
 }
+
+output "cluster_name" {
+  value       = google_container_cluster.primary.name
+  description = "Name of the GKE cluster."
+}
+
+output "cluster_id" {
+  value       = google_container_cluster.primary.id
+  description = "ID of the GKE cluster."
+}
