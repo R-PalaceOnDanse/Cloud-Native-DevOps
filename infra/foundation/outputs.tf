@@ -4,7 +4,7 @@ output "vpc_id" {
 }
 
 output "subnet_id" {
-  value       = google_compute_subnetwork.main.id
+  value       = google_compute_subnetwork.subnet_k8s.id
   description = "ID of the subnet."
 }
 
@@ -19,12 +19,12 @@ output "nat_name" {
 }
 
 output "pods_range_name" {
-  value       = "${var.vpc_name}-pods"
+  value       = "pods-range"
   description = "Name of the secondary IP range for GKE pods."
 }
 
 output "services_range_name" {
-  value       = "${var.vpc_name}-services"
+  value       = "services-range"
   description = "Name of the secondary IP range for GKE services."
 }
 

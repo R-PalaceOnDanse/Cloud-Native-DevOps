@@ -3,7 +3,7 @@ resource "google_compute_network" "main" {
   auto_create_subnetworks = false
 }
 
-resource "google_compute_subnetwork" "main" {
+resource "google_compute_subnetwork" "subnet_k8s" {
   name                     = "${var.vpc_name}-subnet"
   network                  = google_compute_network.main.id
   ip_cidr_range            = var.subnet_cidr
@@ -11,14 +11,19 @@ resource "google_compute_subnetwork" "main" {
   private_ip_google_access = true
 
   secondary_ip_range {
-    range_name    = "${var.vpc_name}-pods"
+    range_name    = "pods-range"
     ip_cidr_range = var.pods_cidr
   }
 
   secondary_ip_range {
-    range_name    = "${var.vpc_name}-services"
+    range_name    = "services-range"
     ip_cidr_range = var.services_cidr
   }
+}
+
+moved {
+  from = google_compute_subnetwork.main
+  to   = google_compute_subnetwork.subnet_k8s
 }
 
 resource "google_compute_router" "router" {
