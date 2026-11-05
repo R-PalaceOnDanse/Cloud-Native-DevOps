@@ -4,7 +4,7 @@ output "vpc_id" {
 }
 
 output "subnet_id" {
-  value       = google_compute_subnetwork.main.id
+  value       = google_compute_subnetwork.subnet_k8s.id
   description = "ID of the subnet."
 }
 
@@ -19,12 +19,26 @@ output "nat_name" {
 }
 
 output "pods_range_name" {
-  value       = "${var.vpc_name}-pods"
+  value       = "pods-range"
   description = "Name of the secondary IP range for GKE pods."
 }
 
 output "services_range_name" {
-  value       = "${var.vpc_name}-services"
+  value       = "services-range"
   description = "Name of the secondary IP range for GKE services."
 }
 
+output "budget_id" {
+  value       = google_billing_budget.main.id
+  description = "Resource name of the billing budget."
+}
+
+output "cluster_name" {
+  value       = google_container_cluster.primary.name
+  description = "Name of the GKE cluster."
+}
+
+output "cluster_id" {
+  value       = google_container_cluster.primary.id
+  description = "ID of the GKE cluster."
+}

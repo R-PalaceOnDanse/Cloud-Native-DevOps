@@ -38,8 +38,4 @@ resource "google_billing_budget" "main" {
     threshold_percent = 1.0
     spend_basis       = "FORECASTED_SPEND"
   }
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
