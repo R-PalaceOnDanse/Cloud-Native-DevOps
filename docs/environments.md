@@ -1,7 +1,13 @@
 # Environments
 
-What exists in each GCP project, and where it comes from. Read it before creating, importing or
-deleting anything in a project, and to know what the Terraform code does and does not manage.
+Overview of the cloud environments, their purpose, isolation model, and GCP project details. Read
+it before creating, importing or deleting anything in a project, and to know what the Terraform code
+does and does not manage.
+
+The decision to isolate environments into distinct GCP projects is recorded in
+[ADR-0004](adr/0004-terraform-layout-and-environments.md).
+
+## Summary
 
 The values that configure each environment (project ID, region, network ranges, state bucket) are
 in `infra/<stack>/<env>.tfvars` and `infra/<stack>/backends/<env>.hcl`; this page does not repeat
@@ -17,6 +23,27 @@ day and drifts as people work, so re-read the project before relying on it.
 | Billing | enabled; one budget with alerts, in the access stack (`01A021-589B0D-8ED8BC`) | enabled; one budget with alerts, in the access stack (`01A021-589B0D-8ED8BC`) |
 | Foundation stack (Network) | applied 2026-10-23 (VPC, subnet, router, NAT) | applied 2026-10-23 (VPC, subnet, router, NAT) |
 | Access stack | applied 2026-10-23, 16 resources | applied 2026-10-23, 16 resources |
+
+## Working with environments
+
+Switch active project in the Google Cloud CLI:
+
+```bash
+# Switch to dev
+gcloud config set project teampasx-cloudnative-dev
+
+# Switch to prd
+gcloud config set project teampasx-cloudnative-prd
+```
+
+Inspect project metadata:
+
+```bash
+gcloud projects describe teampasx-cloudnative-dev
+gcloud projects describe teampasx-cloudnative-prd
+```
+
+Planning infrastructure for an environment is detailed in [infra.md](infra.md).
 
 ## Managed by Terraform
 
