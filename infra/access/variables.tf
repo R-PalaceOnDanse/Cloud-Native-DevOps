@@ -43,3 +43,13 @@ variable "budget_amount" {
   description = "Monthly budget amount in EUR."
   default     = 20
 }
+
+variable "instructor_email" {
+  type        = string
+  description = "Google account email address of the instructor (granted roles/editor)."
+}
+
+variable "team_members" {
+  type        = set(string)
+  description = "Google account email addresses of the team members (granted roles/owner)."
+}

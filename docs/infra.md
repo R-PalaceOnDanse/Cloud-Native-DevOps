@@ -10,8 +10,8 @@ Two stacks exist:
   Router, Cloud NAT) and budget alerts. The cluster and the runners are added by the section 2
   issues.
 - `access`: how GitHub Actions authenticates to Google Cloud without a key (Workload Identity
-  Federation), described [below](#github-actions-authentication). The human access to the projects
-  is added to this stack by issue #28.
+  Federation), budget alerts, and human access (team and instructor). Human access to both projects
+  is managed in `infra/access/members.tf` so that destroying `foundation` never locks anyone out.
 
 ## Layout
 
@@ -127,6 +127,13 @@ pipeline runs with.
 
 `state_bucket` in `<env>.tfvars` repeats the bucket of `backends/<env>.hcl`, as Terraform cannot
 read its own backend configuration: change both together.
+
+## Human access
+
+Human access to the GCP projects is managed as code in `infra/access/members.tf`. Keeping these permissions in the `access` stack guarantees that running `terraform destroy` on `infra/foundation` removes the networking infrastructure without ever locking team members or the instructor out:
+
+- **Instructor**: `jeremie@jjaouen.com` is granted `roles/editor` on both `dev` and `prd` (`instructor_email` variable).
+- **Team members**: `aurelienbara13@gmail.com`, `nicolaslouis320@gmail.com`, and `quaduval@gmail.com` are granted `roles/owner` on both projects (`team_members` variable).
 
 ## Create a state bucket
 
