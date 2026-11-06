@@ -1,11 +1,6 @@
 resource "google_container_cluster" "primary" {
   name     = "${var.vpc_name}-gke"
-  location = var.region
-
-  node_locations = [
-    "${var.region}-b",
-    "${var.region}-d",
-  ]
+  location = "${var.region}-b"
 
   network    = google_compute_network.main.id
   subnetwork = google_compute_subnetwork.subnet_k8s.id
