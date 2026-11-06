@@ -25,6 +25,10 @@ resource "google_container_cluster" "primary" {
     google_project_service.container,
     google_project_service.compute,
   ]
+
+  cluster_autoscaling {
+    autoscaling_profile = "OPTIMIZE_UTILIZATION"
+  }
 }
 
 resource "google_container_node_pool" "system" {
