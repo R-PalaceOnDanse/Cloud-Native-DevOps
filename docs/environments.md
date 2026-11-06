@@ -21,7 +21,7 @@ day and drifts as people work, so re-read the project before relying on it.
 | Project number | 812267599723 | 1024204425086 |
 | Created | 2026-10-22 | 2026-10-23 |
 | Billing | enabled; one budget with alerts, in the access stack (`01A021-589B0D-8ED8BC`) | enabled; one budget with alerts, in the access stack (`01A021-589B0D-8ED8BC`) |
-| Foundation stack (Network) | applied 2026-10-23 (VPC, subnet, router, NAT) | applied 2026-10-23 (VPC, subnet, router, NAT) |
+| Foundation stack (Network & GKE) | applied (VPC, subnet, router, NAT, GKE cluster, system & runner node pools) | applied (VPC, subnet, router, NAT, GKE cluster, system & runner node pools) |
 | Access stack | applied 2026-10-23, 16 resources | applied 2026-10-23, 16 resources |
 
 ## Working with environments
@@ -47,7 +47,7 @@ Planning infrastructure for an environment is detailed in [infra.md](infra.md).
 
 ## Managed by Terraform
 
-### Foundation stack (Networking), in both projects
+### Foundation stack (Network & GKE Cluster), in both projects
 
 Defined in `infra/foundation`, applied on 2026-10-23. The design is in
 [ADR-0013](adr/0013-network-topology-and-ip-addressing.md) and the topology in
@@ -61,6 +61,9 @@ Defined in `infra/foundation`, applied on 2026-10-23. The design is in
 | Services Range (secondary) | `teampasx-dev-vpc-services` (`10.12.0.0/20`) | `teampasx-prd-vpc-services` (`10.22.0.0/20`) | Alias IP range for Kubernetes Services |
 | Cloud Router (`google_compute_router`) | `teampasx-dev-vpc-router` | `teampasx-prd-vpc-router` | Regional router in `europe-west1` |
 | Cloud NAT (`google_compute_router_nat`) | `teampasx-dev-vpc-nat` | `teampasx-prd-vpc-nat` | Egress NAT for private nodes and runners |
+| GKE Cluster (`google_container_cluster`) | `teampasx-dev-vpc-gke` | `teampasx-prd-vpc-gke` | Private GKE cluster in `europe-west1-b` for CI/CD runners |
+| System Node Pool (`google_container_node_pool`) | `system-pool` (1 × `e2-small`) | `system-pool` (1 × `e2-small`) | Dedicated pool for controllers and cluster services |
+| Runner Node Pool (`google_container_node_pool`) | `runner-pool` (0-2 × `e2-medium` Spot) | `runner-pool` (0-2 × `e2-medium` Spot) | Autoscaling Spot pool with `runner=true:NoSchedule` taint |
 
 ### Access stack, in both projects
 
@@ -122,6 +125,6 @@ Nothing beyond the access stack, the state bucket and the human access listed ab
 
 ## Not created yet
 
-- The GKE cluster and the runners, the serverless components (Pub/Sub, API Gateway, functions,
+- The GitHub Actions Runner Controller (ARC) Helm deployment (the GKE cluster and node pools are already provisioned in the foundation stack), the serverless components (Pub/Sub, API Gateway, functions,
   Firestore, Secret Manager) and the monitoring. The Secret Manager API is not enabled in either
   project.

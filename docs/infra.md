@@ -6,9 +6,9 @@ to run it. Read by anyone who plans or changes cloud resources.
 The decisions behind this layout are in [ADR-0004](adr/0004-terraform-layout-and-environments.md), and the network topology in [ADR-0013](adr/0013-network-topology-and-ip-addressing.md).
 Two stacks exist:
 
-- `foundation`: the network of each environment (VPC, subnets with GKE secondary ranges, Cloud
-  Router, Cloud NAT) and budget alerts. The cluster and the runners are added by the section 2
-  issues.
+- `foundation`: the foundational infrastructure of each environment: VPC network, subnets with GKE
+  secondary ranges, Cloud Router, Cloud NAT, and the private GKE cluster dedicated to self-hosted
+  GitHub Actions runners.
 - `access`: how GitHub Actions authenticates to Google Cloud without a key (Workload Identity
   Federation), budget alerts, and human access (team and instructor). Human access to both projects
   is managed in `infra/access/members.tf` so that destroying `foundation` never locks anyone out.
@@ -72,6 +72,85 @@ use non-overlapping IP address spaces to allow peering:
   billable Cloud NAT gateway and Cloud Router). The budget alerts live in the `access` stack
   with `prevent_destroy = true`, so destroying `foundation` leaves the budget safeguards intact
   and runs cleanly.
+
+## GKE Cluster & Runner Node Pools
+
+The `foundation` stack provisions a private, managed Google Kubernetes Engine (GKE) cluster in each
+environment (`dev` and `prd`).
+
+### Role & Architectural Constraint
+
+In accordance with the project constraints (C05, C06):
+- **100% Serverless Application**: Application workloads (pixel drawing, Discord bot proxy, workers,
+  and real-time streaming) are strictly forbidden on GKE. The entire application runs serverless.
+- **Dedicated CI/CD Infrastructure**: The GKE cluster is exclusively reserved for hosting
+  self-hosted GitHub Actions runners (Action Runner Controller - ARC), cert-manager, metrics, and
+  cluster-level controllers.
+
+### Cluster Specification & Topology
+
+The cluster resource is defined in `infra/foundation/gke.tf`:
+
+| Property | Value | Justification / Details |
+|---|---|---|
+| **Resource** | `google_container_cluster.primary` | Declarative GKE control plane managed by Terraform |
+| **Cluster Name** | `${var.vpc_name}-gke` | `teampasx-dev-vpc-gke` in dev, `teampasx-prd-vpc-gke` in prd |
+| **Location** | `${var.region}-b` (`europe-west1-b`) | Zonal cluster pinned to zone `b` to avoid inter-zone egress latency/costs and regional capacity limits |
+| **Network & Subnet** | `google_compute_network.main.id` / `google_compute_subnetwork.subnet_k8s.id` | Attached to the primary subnet (`10.10.0.0/24` in dev, `10.20.0.0/24` in prd) |
+| **IP Allocation Policy** | Alias IP / VPC-native | Pods use `pods-range` (`10.11.0.0/16` dev, `10.21.0.0/16` prd); Services use `services-range` (`10.12.0.0/20` dev, `10.22.0.0/20` prd) |
+| **Private Nodes** | `enable_private_nodes = true` | Cluster nodes do not receive external public IP addresses; outbound traffic uses Cloud NAT |
+| **Control Plane Endpoint** | `enable_private_endpoint = false` | Endpoint is publicly reachable with Google IAM authentication, allowing direct operator and CI access without a bastion |
+| **Master CIDR** | `172.16.0.0/28` | Dedicated private /28 block for GKE master control plane peering |
+| **Default Node Pool** | `remove_default_node_pool = true` | Default pool deleted immediately; workloads run strictly in custom, purpose-built node pools |
+| **Deletion Protection** | `deletion_protection = false` | Ensures `terraform destroy` tears down the cluster cleanly without retention locks |
+| **Autoscaling Profile** | `OPTIMIZE_UTILIZATION` | Aggressively bin-packs pods to allow idle nodes to scale down quickly |
+
+### Dedicated Node Pools
+
+Compute resources are separated into two specialized node pools:
+
+#### 1. System Node Pool (`system-pool`)
+- **Node Count**: Fixed `1` node (`e2-small`: 2 vCPU burstable, 2 GB RAM, 20 GB pd-standard disk).
+- **Purpose**: Runs essential cluster daemonsets and controllers (CoreDNS, kube-proxy, cert-manager, metrics-server, and runner controllers).
+- **Labels**: `role = "system"`.
+- **Management**: `auto_repair = true` and `auto_upgrade = true`.
+
+#### 2. Runner Node Pool (`runner-pool`)
+- **Autoscaling**: `min_node_count = 0`, `max_node_count = 2` (dynamically scales to zero when no CI jobs are running).
+- **Machine Type**: `e2-medium` (2 vCPU, 4 GB RAM, 20 GB pd-standard disk).
+- **Cost Safeguard (Spot VMs)**: Configured with `spot = true` to use Google Cloud Spot VMs, slashing compute costs by 60% to 91% compared to standard on-demand VMs.
+- **Taint Isolation**: Configured with `taint { key = "runner", value = "true", effect = "NO_SCHEDULE" }` and label `role = "runner"`. This guarantees that system pods never schedule on runner nodes, allowing the pool to scale down to 0 instances when idle.
+- **Management**: `auto_repair = true` and `auto_upgrade = true`.
+
+### Connecting & Operating the Cluster
+
+To configure `kubectl` credentials locally for an environment:
+
+```bash
+# Connect to dev cluster
+gcloud container clusters get-credentials teampasx-dev-vpc-gke \
+  --zone europe-west1-b \
+  --project teampasx-cloudnative-dev
+
+# Connect to prd cluster
+gcloud container clusters get-credentials teampasx-prd-vpc-gke \
+  --zone europe-west1-b \
+  --project teampasx-cloudnative-prd
+```
+
+Inspect cluster nodes, labels, and taints:
+
+```bash
+# List all nodes with their assigned roles and node pools
+kubectl get nodes -L role,cloud.google.com/gke-nodepool
+
+# Check runner taint on runner nodes
+kubectl describe nodes -l role=runner | grep -E "(Taints|Allocated resources)"
+```
+
+### Clean Teardown
+
+The cluster and its node pools are declared without `prevent_destroy` or `deletion_protection`. Running `terraform destroy` on `infra/foundation` removes the runner node pool, system node pool, GKE cluster, subnets, and Cloud NAT cleanly in dependency order without leaving orphan cloud resources.
 
 ## Run it
 
