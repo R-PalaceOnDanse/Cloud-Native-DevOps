@@ -1,0 +1,10 @@
+template:
+  spec:
+    nodeSelector:
+      role: runner
+
+    tolerations:
+      - key: "runner"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"

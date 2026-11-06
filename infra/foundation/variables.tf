@@ -42,3 +42,19 @@ variable "services_cidr" {
     error_message = "services_cidr must be a valid IPv4 CIDR block, for example 10.12.0.0/20."
   }
 }
+
+variable "github_token" {
+  description = "Token GitHub to authorize runners to register themselves."
+  type        = string
+  sensitive   = true
+}
+
+variable "environment" {
+  type        = string
+  description = "Name of the environment, which is also the name of the GitHub environment allowed to apply."
+
+  validation {
+    condition     = contains(["dev", "prd"], var.environment)
+    error_message = "environment must be dev or prd."
+  }
+}
