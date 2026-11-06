@@ -25,4 +25,61 @@ resource "google_container_cluster" "primary" {
     google_project_service.container,
     google_project_service.compute,
   ]
+
+  cluster_autoscaling {
+    autoscaling_profile = "OPTIMIZE_UTILIZATION"
+  }
+}
+
+resource "google_container_node_pool" "system" {
+  name       = "system-pool"
+  cluster    = google_container_cluster.primary.id
+  location   = google_container_cluster.primary.location
+  node_count = 1
+
+  node_config {
+    machine_type = "e2-small"
+    disk_size_gb = 20
+
+    labels = {
+      role = "system"
+    }
+  }
+
+  management {
+    auto_repair  = true
+    auto_upgrade = true
+  }
+}
+
+resource "google_container_node_pool" "runners" {
+  name     = "runner-pool"
+  cluster  = google_container_cluster.primary.id
+  location = google_container_cluster.primary.location
+
+  autoscaling {
+    min_node_count = 0
+    max_node_count = 2
+  }
+
+  node_config {
+    machine_type = "e2-medium"
+    disk_size_gb = 20
+    spot         = true
+
+    labels = {
+      role = "runner"
+    }
+
+    taint {
+      key    = "runner"
+      value  = "true"
+      effect = "NO_SCHEDULE"
+    }
+  }
+
+  management {
+    auto_repair  = true
+    auto_upgrade = true
+  }
 }

@@ -5,8 +5,7 @@ foundation (network, IAM, GKE with self-hosted GitHub Actions runners) and a ser
 event-driven pixel canvas driven by a Discord bot and a real-time web frontend, in two
 environments, `dev` and `prd`.
 
-Status: only the foundation's network (VPC and subnet) exists. What is to be built is in
-[docs/brief.md](docs/brief.md); the work is tracked in the GitHub issues, grouped by milestone.
+Status: the foundation's network (VPC, subnets, Cloud NAT) and private GKE cluster (system and autoscaling runner node pools) are deployed in `infra/foundation`. What is to be built is tracked in the GitHub issues, grouped by milestone.
 
 ## Get started
 
