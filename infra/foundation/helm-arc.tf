@@ -31,7 +31,7 @@ resource "helm_release" "arc_runner" {
 
   set {
     name  = "githubConfigUrl"
-    value = "https://github.com/teampasx/cloudnative"
+    value = "https://github.com/R-PalaceOnDanse/Cloud-Native-DevOps"
   }
 
   set {
