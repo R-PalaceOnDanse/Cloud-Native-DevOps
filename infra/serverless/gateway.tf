@@ -56,6 +56,8 @@ resource "google_project_service" "canvas_api" {
   project            = var.project_id
   service            = google_api_gateway_api.canvas.managed_service
   disable_on_destroy = false
+
+  depends_on = [google_api_gateway_gateway.canvas]
 }
 
 # Key used for the C05 demo. It only works on this API. Its value is in the state (private bucket)
