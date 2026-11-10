@@ -1,0 +1,23 @@
+{
+  "name": "hello",
+  "version": "0.1.0",
+  "private": true,
+  "description": "First Cloud Run function (C05): reached through API Gateway only, reads a value from Secret Manager with its own service account.",
+  "main": "dist/index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "gcp-build": "npm run build",
+    "start": "functions-framework --target=hello"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^5.0.5",
+    "@google-cloud/secret-manager": "^7.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "~5.9.3"
+  }
+}

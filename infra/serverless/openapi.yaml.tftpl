@@ -1,0 +1,33 @@
+swagger: "2.0"
+info:
+  title: canvas-api
+  description: Public entry point of the pixel canvas. Every route is checked here, then forwarded to a private function.
+  version: "0.1.0"
+schemes:
+  - https
+produces:
+  - application/json
+
+securityDefinitions:
+  # The gateway refuses any request without a valid key for this API, before any function runs.
+  api_key:
+    type: apiKey
+    name: x-api-key
+    in: header
+
+paths:
+  /hello:
+    get:
+      operationId: hello
+      summary: C05 demo, reads a value from Secret Manager.
+      security:
+        - api_key: []
+      x-google-backend:
+        # The gateway signs the call with an ID token of its service account, for this audience.
+        address: ${hello_url}
+        deadline: 10.0
+      responses:
+        "200":
+          description: The function read its secret.
+        "401":
+          description: Missing or invalid API key.

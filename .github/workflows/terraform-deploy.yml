@@ -1,6 +1,6 @@
 name: terraform-deploy
 
-# A release: pushing a tag vMAJOR.MINOR.PATCH applies the foundation to dev, then to prd.
+# A release: pushing a tag vMAJOR.MINOR.PATCH applies foundation then serverless to dev, then to prd.
 on:
   push:
     tags:
@@ -31,16 +31,34 @@ jobs:
             exit 1
           fi
 
-  dev:
+  foundation-dev:
     needs: check-tag
     uses: ./.github/workflows/terraform-run.yml
     with:
+      stack: foundation
       environment: dev
       action: apply
 
-  prd:
-    needs: dev
+  serverless-dev:
+    needs: foundation-dev
     uses: ./.github/workflows/terraform-run.yml
     with:
+      stack: serverless
+      environment: dev
+      action: apply
+
+  foundation-prd:
+    needs: serverless-dev
+    uses: ./.github/workflows/terraform-run.yml
+    with:
+      stack: foundation
+      environment: prd
+      action: apply
+
+  serverless-prd:
+    needs: foundation-prd
+    uses: ./.github/workflows/terraform-run.yml
+    with:
+      stack: serverless
       environment: prd
       action: apply

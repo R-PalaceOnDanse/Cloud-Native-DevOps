@@ -4,11 +4,13 @@ How the Terraform code under `infra/` is organised, where each environment's val
 to run it. Read by anyone who plans or changes cloud resources.
 
 The decisions behind this layout are in [ADR-0004](adr/0004-terraform-layout-and-environments.md), and the network topology in [ADR-0013](adr/0013-network-topology-and-ip-addressing.md).
-Two stacks exist:
+Three stacks exist:
 
 - `foundation`: the foundational infrastructure of each environment: VPC network, subnets with GKE
   secondary ranges, Cloud Router, Cloud NAT, and the private GKE cluster dedicated to self-hosted
   GitHub Actions runners.
+- `serverless`: the application (API Gateway, Cloud Run functions, secrets), described in
+  [serverless.md](serverless.md).
 - `access`: how GitHub Actions authenticates to Google Cloud without a key (Workload Identity
   Federation), budget alerts, and human access (team and instructor). Human access to both projects
   is managed in `infra/access/members.tf` so that destroying `foundation` never locks anyone out.
@@ -28,7 +30,7 @@ infra/<stack>/
   providers.tf        Terraform and provider version constraints
 ```
 
-`<stack>` is `foundation` or `access`, and `<env>` is `dev` (`teampasx-cloudnative-dev`) or `prd`
+`<stack>` is `foundation`, `serverless` or `access`, and `<env>` is `dev` (`teampasx-cloudnative-dev`) or `prd`
 (`teampasx-cloudnative-prd`). Both environments run the same code; only `backends/<env>.hcl` and
 `<env>.tfvars` differ. These two files are the single source of truth for the project IDs, the
 region, the network names and ranges, and the state buckets: read them rather than copying their

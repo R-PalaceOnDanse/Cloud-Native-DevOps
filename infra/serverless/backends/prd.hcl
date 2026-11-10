@@ -1,0 +1,2 @@
+bucket = "state_bucket_prd"
+prefix = "serverless"
