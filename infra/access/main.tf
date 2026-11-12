@@ -13,6 +13,8 @@ locals {
     "roles/viewer",
     "roles/iam.securityReviewer",
     "roles/serviceusage.serviceUsageConsumer",
+    # The serverless stack has an API key: refreshing it reads its value.
+    "roles/serviceusage.apiKeysViewer",
   ]
 
   # Creates and changes resources and their IAM bindings. Broad on purpose for now: it is narrowed
@@ -20,6 +22,10 @@ locals {
   apply_project_roles = [
     "roles/editor",
     "roles/resourcemanager.projectIamAdmin",
+    # Editor cannot set IAM policies on resources. The serverless stack sets them on a Cloud Run
+    # service (who may invoke a function) and on a secret (which function may read it).
+    "roles/run.admin",
+    "roles/secretmanager.admin",
   ]
 }
 

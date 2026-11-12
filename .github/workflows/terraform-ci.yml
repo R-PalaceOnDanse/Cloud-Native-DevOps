@@ -6,6 +6,7 @@ on:
   pull_request:
     paths:
       - 'infra/**'
+      - 'app/functions/**'
       - '.tflint.hcl'
       - '.github/actions/terraform-init/**'
       - '.github/workflows/terraform-ci.yml'
@@ -25,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        stack: [foundation, access]
+        stack: [foundation, access, serverless]
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
@@ -51,7 +52,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        stack: [foundation, access]
+        stack: [foundation, access, serverless]
         environment: [dev, prd]
     steps:
       - uses: actions/checkout@v4

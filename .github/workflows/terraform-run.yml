@@ -1,10 +1,14 @@
 name: terraform-run
 
-# Plans, then applies the saved plan, for the foundation of one environment. Called by the release
+# Plans, then applies the saved plan, for one stack (foundation or serverless) of one environment. Called by the release
 # and by the destroy workflows; it is not meant to be started by hand.
 on:
   workflow_call:
     inputs:
+      stack:
+        description: foundation or serverless. Folder name under infra/.
+        required: true
+        type: string
       environment:
         description: dev or prd. Also the name of the GitHub environment the job runs in.
         required: true
@@ -20,7 +24,7 @@ permissions:
 
 jobs:
   run:
-    name: ${{ inputs.action }} foundation in ${{ inputs.environment }}
+    name: ${{ inputs.action }} ${{ inputs.stack }} in ${{ inputs.environment }}
     runs-on: ubuntu-latest
     # Only a job of this environment may impersonate the apply account (ADR-0011).
     environment: ${{ inputs.environment }}
@@ -28,13 +32,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/terraform-init
         with:
-          stack: foundation
+          stack: ${{ inputs.stack }}
           environment: ${{ inputs.environment }}
           workload-identity-provider: ${{ inputs.environment == 'dev' && vars.GCP_WIF_PROVIDER_DEV || vars.GCP_WIF_PROVIDER_PRD }}
           service-account: ${{ inputs.environment == 'dev' && vars.GCP_APPLY_SA_DEV || vars.GCP_APPLY_SA_PRD }}
       - name: terraform plan
         shell: bash
-        working-directory: infra/foundation
+        working-directory: infra/${{ inputs.stack }}
         env:
           ACTION: ${{ inputs.action }}
           ENVIRONMENT: ${{ inputs.environment }}
@@ -49,14 +53,15 @@ jobs:
         env:
           ACTION: ${{ inputs.action }}
           ENVIRONMENT: ${{ inputs.environment }}
+          STACK: ${{ inputs.stack }}
         run: |
           {
-            echo "### $ACTION: foundation in $ENVIRONMENT"
+            echo "### $ACTION: $STACK in $ENVIRONMENT"
             echo '```'
-            cat infra/foundation/plan.txt || true
+            cat "infra/$STACK/plan.txt" || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: terraform apply the saved plan
         shell: bash
-        working-directory: infra/foundation
+        working-directory: infra/${{ inputs.stack }}
         run: terraform apply -input=false -no-color tfplan

@@ -1,6 +1,6 @@
 name: terraform-destroy
 
-# Destroys the foundation of one environment, on demand. The access stack is never destroyed here:
+# Destroys the serverless stack, then the foundation, of one environment, on demand. The access stack is never destroyed here:
 # it holds the identity this workflow runs with.
 on:
   workflow_dispatch:
@@ -44,10 +44,20 @@ jobs:
             exit 1
           fi
 
-  destroy:
+  destroy-serverless:
     needs: guard
     uses: ./.github/workflows/terraform-run.yml
     secrets: inherit
     with:
+      stack: serverless
+      environment: ${{ inputs.environment }}
+      action: destroy
+
+  destroy-foundation:
+    needs: destroy-serverless
+    uses: ./.github/workflows/terraform-run.yml
+    secrets: inherit
+    with:
+      stack: foundation
       environment: ${{ inputs.environment }}
       action: destroy
