@@ -96,7 +96,7 @@ Version numbers follow semantic versioning; a tag is never moved. To repeat a re
 halfway, use **Re-run failed jobs** on the run: it replays the same tag. To release a fix, merge it
 and push the next tag.
 
-Only `foundation` is applied by the pipeline. The `access` stack is the identity the pipeline
+The pipeline applies `foundation` and `serverless`. The `access` stack is the identity the pipeline
 runs with, so a pipeline that changed it could lock itself out: it is planned on every pull
 request, and applied **by hand** by a project Owner after the pull request is approved
 ([infra.md](infra.md#github-actions-authentication)).
@@ -111,10 +111,13 @@ gh workflow run terraform-destroy.yml --ref main -f environment=dev -f confirm=d
 
 The environment is a choice between `dev` and `prd`, and `confirm` must repeat it exactly. The
 workflow refuses to run from another branch. It plans the destruction, shows it in the summary, and
-destroys `foundation`. The `access` stack, the state buckets and the projects stay, so the
-pipeline can rebuild: push a new release tag (or use *Re-run all jobs* on the last successful
-release) to recreate the foundation. After a destroy nothing of the foundation remains, so nothing
-of it is billed.
+destroys `serverless`, then `foundation`. The `access` stack, the state buckets and the projects
+stay, so the pipeline can rebuild: push a new release tag (or use *Re-run all jobs* on the last
+successful release) to recreate both. After a destroy nothing of them remains, so nothing of
+them is billed.
+
+Tested on prd on 2026-11-06 (run 42195805274, foundation only at that time) and rebuilt by the tag
+`v0.2.2`. Not run on dev, by decision of the team.
 
 ## Proving the authentication
 
