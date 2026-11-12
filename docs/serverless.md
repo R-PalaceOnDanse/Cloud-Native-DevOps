@@ -18,10 +18,14 @@ client --HTTPS + x-api-key--> API Gateway (canvas-gw) --ID token of api-gateway 
 | Cloud Run function | `hello` (Node.js 22, TypeScript) | Returns proof that it read its secret; never returns the value. |
 | Service account | `fn-hello` | Runtime identity of `hello`: writes logs, reads `hello-greeting`. Nothing else. |
 | Service account | `api-gateway` | Identity of the gateway. The only principal with `run.invoker` on `hello`. |
-| Service account | `fn-build` | Builds the sources with Cloud Build, instead of the default compute account. |
+| Service account | `fn-build` | Builds the sources with Cloud Build, instead of the default compute account. Roles: log writer, Artifact Registry writer, Storage object viewer. |
 | Secret | `hello-greeting` | Created by Terraform, **value added by hand** (below). |
 | Bucket | `<project>-fn-sources` | Private bucket of the zipped sources. |
 | API key | `canvas-demo` | Restricted to `canvas-api`. Read with `terraform output -raw demo_api_key`. |
+
+Every identity is explicit: the function runtime, the build and the gateway each name their own
+account in the code, and nothing uses the default compute account (which has Editor on the
+project). A new function gets its own account and its own secret binding, as `hello` does.
 
 The function's ingress is `ALLOW_ALL` because API Gateway does not run in the VPC; it is protected
 by IAM: a call that does not carry an ID token of the `api-gateway` account gets 403.
@@ -29,7 +33,8 @@ by IAM: a call that does not carry an ID token of the `api-gateway` account gets
 ## Add the secret value (once per environment)
 
 Terraform creates the secret but not its value, so the value is in neither the repository nor the
-state. After the first apply of the stack in an environment:
+state (rules in [infra.md](infra.md#secrets)). After the first apply of the stack in an
+environment:
 
 ```bash
 printf 'any demo value' | gcloud secrets versions add hello-greeting \

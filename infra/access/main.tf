@@ -7,6 +7,7 @@ locals {
     "iamcredentials.googleapis.com",
     "sts.googleapis.com",
     "cloudbilling.googleapis.com",
+    "secretmanager.googleapis.com",
   ]
 
   # Reads everything and the IAM policies, so that terraform plan can refresh the state.

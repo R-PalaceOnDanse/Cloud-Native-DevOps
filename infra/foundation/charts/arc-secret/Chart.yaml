@@ -1,0 +1,4 @@
+apiVersion: v2
+name: arc-secret
+description: Copies the runner controller's GitHub token from Secret Manager into the arc-github secret.
+version: 0.1.0

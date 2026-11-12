@@ -1,0 +1,25 @@
+apiVersion: external-secrets.io/v1
+kind: SecretStore
+metadata:
+  name: gcp
+spec:
+  provider:
+    gcpsm:
+      projectID: {{ required "projectId is required" .Values.projectId | quote }}
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: arc-github
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: SecretStore
+    name: gcp
+  target:
+    name: arc-github
+    creationPolicy: Owner
+  data:
+    - secretKey: github_token
+      remoteRef:
+        key: {{ required "secretName is required" .Values.secretName | quote }}

@@ -56,6 +56,20 @@ descriptions live in [environments.md](environments.md).
   applies, the destroy workflow destroys. Do not run them from a laptop. The `access` stack is the
   exception: it is applied by hand by a project Owner, after its pull request is approved.
 
+## Secrets
+
+One place per kind of secret ([ADR-0015](adr/0015-secrets-in-secret-manager.md)). Terraform creates
+a secret but never its value, because it would be written in the state.
+
+| Kind | Where it lives | Who adds the value | Rotation |
+|---|---|---|---|
+| Runtime secret (function, runner) | Secret Manager | a team member: `gcloud secrets versions add <name> --data-file=-` | add a new version, then disable the old one |
+| Pipeline configuration | GitHub repository variables | an Owner, from the `access` outputs ([ci.md](ci.md)) | `gh variable set` |
+| Secret needed in the cluster | Kubernetes secret synced from Secret Manager | nobody | rotate it in Secret Manager |
+
+No Terraform variable holds a secret. gitleaks scans the whole history on every pull request
+(`secret-scan`), and before a commit once the hooks are active.
+
 ## Network topology
 
 The `foundation` stack manages the networking resources for each environment. Both environments
@@ -149,6 +163,33 @@ kubectl get nodes -L role,cloud.google.com/gke-nodepool
 # Check runner taint on runner nodes
 kubectl describe nodes -l role=runner | grep -E "(Taints|Allocated resources)"
 ```
+
+### Runner token
+
+The runners register with a GitHub token. It never goes through Terraform, so it is not in the
+state ([ADR-0016](adr/0016-external-secrets-operator.md)). It lives in Secret Manager, in the
+secret `arc-github-token` of each project, created by the `access` stack. External Secrets Operator
+copies it into the Kubernetes secret `arc-github` (namespace `arc-runners`) that the Helm release
+names, and refreshes it every hour.
+
+Add the value once per environment, after the `access` stack is applied. The token needs the
+`repo` scope:
+
+```bash
+printf '%s' '<token>' | gcloud secrets versions add arc-github-token \
+  --project=teampasx-cloudnative-dev --data-file=-
+```
+
+To rotate it, create a new token, add it as a new version (same command), then revoke the old
+token. The cluster picks it up within the hour; to force it now:
+
+```bash
+kubectl annotate externalsecret arc-github --namespace arc-runners force-sync=$(date +%s) --overwrite
+```
+
+A cluster that is destroyed and rebuilt finds its secret by itself: the value stays in Secret
+Manager. Check the copy with `kubectl get externalsecret --namespace arc-runners` (status
+`SecretSynced`).
 
 ### Clean Teardown
 
