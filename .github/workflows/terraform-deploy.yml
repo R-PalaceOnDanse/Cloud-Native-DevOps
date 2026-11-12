@@ -34,6 +34,7 @@ jobs:
   foundation-dev:
     needs: check-tag
     uses: ./.github/workflows/terraform-run.yml
+    secrets: inherit
     with:
       stack: foundation
       environment: dev
@@ -42,6 +43,7 @@ jobs:
   serverless-dev:
     needs: foundation-dev
     uses: ./.github/workflows/terraform-run.yml
+    secrets: inherit
     with:
       stack: serverless
       environment: dev

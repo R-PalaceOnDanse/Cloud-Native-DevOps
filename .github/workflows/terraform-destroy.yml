@@ -47,6 +47,7 @@ jobs:
   destroy-serverless:
     needs: guard
     uses: ./.github/workflows/terraform-run.yml
+    secrets: inherit
     with:
       stack: serverless
       environment: ${{ inputs.environment }}
