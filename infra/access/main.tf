@@ -6,6 +6,7 @@ locals {
     "iam.googleapis.com",
     "iamcredentials.googleapis.com",
     "sts.googleapis.com",
+    "cloudbilling.googleapis.com",
   ]
 
   # Reads everything and the IAM policies, so that terraform plan can refresh the state.
@@ -26,6 +27,8 @@ locals {
     # service (who may invoke a function) and on a secret (which function may read it).
     "roles/run.admin",
     "roles/secretmanager.admin",
+    # Editor cannot create Kubernetes roles. The ARC controller chart creates some in the cluster.
+    "roles/container.admin",
   ]
 }
 
@@ -84,6 +87,22 @@ resource "google_project_iam_member" "plan" {
 
   project = var.project_id
   role    = each.value
+  member  = "serviceAccount:${google_service_account.plan.email}"
+}
+
+# Helm keeps the record of each release in a Kubernetes secret of its namespace, so refreshing a
+# helm_release in a plan lists and reads secrets. Viewer excludes them; this role adds only that.
+resource "google_project_iam_custom_role" "helm_state_reader" {
+  project     = var.project_id
+  role_id     = "helmStateReader"
+  title       = "Helm state reader"
+  description = "Read the Kubernetes secrets where Helm stores its releases, for terraform plan."
+  permissions = ["container.secrets.get", "container.secrets.list"]
+}
+
+resource "google_project_iam_member" "plan_helm_state" {
+  project = var.project_id
+  role    = google_project_iam_custom_role.helm_state_reader.id
   member  = "serviceAccount:${google_service_account.plan.email}"
 }
 
