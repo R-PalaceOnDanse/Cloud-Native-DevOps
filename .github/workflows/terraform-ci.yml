@@ -66,6 +66,7 @@ jobs:
         working-directory: infra/${{ matrix.stack }}
         env:
           ENVIRONMENT: ${{ matrix.environment }}
+          TF_VAR_github_token: ${{ secrets.TF_VAR_github_token }}
         # -lock=false: a plan only reads, so two pull requests can plan at the same time.
         run: terraform plan -input=false -lock=false -no-color -var-file="$ENVIRONMENT.tfvars" 2>&1 | tee plan.txt
       - name: Show the plan in the job summary

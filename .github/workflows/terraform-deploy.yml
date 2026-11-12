@@ -34,6 +34,7 @@ jobs:
   dev:
     needs: check-tag
     uses: ./.github/workflows/terraform-run.yml
+    secrets: inherit
     with:
       environment: dev
       action: apply
@@ -41,6 +42,7 @@ jobs:
   prd:
     needs: dev
     uses: ./.github/workflows/terraform-run.yml
+    secrets: inherit
     with:
       environment: prd
       action: apply

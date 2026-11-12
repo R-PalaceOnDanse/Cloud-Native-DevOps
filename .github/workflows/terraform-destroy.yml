@@ -47,6 +47,7 @@ jobs:
   destroy:
     needs: guard
     uses: ./.github/workflows/terraform-run.yml
+    secrets: inherit
     with:
       environment: ${{ inputs.environment }}
       action: destroy
