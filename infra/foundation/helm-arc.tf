@@ -15,7 +15,7 @@ resource "helm_release" "arc_controller" {
   repository       = "oci://ghcr.io/actions/actions-runner-controller-charts"
   chart            = "gha-runner-scale-set-controller"
   version          = "0.9.3"
-  depends_on = [google_container_node_pool.system]
+  depends_on       = [google_container_node_pool.system]
 }
 
 resource "helm_release" "arc_runner" {
@@ -25,7 +25,7 @@ resource "helm_release" "arc_runner" {
   repository       = "oci://ghcr.io/actions/actions-runner-controller-charts"
   chart            = "gha-runner-scale-set"
   version          = "0.9.3"
-  depends_on = [helm_release.arc_controller]
+  depends_on       = [helm_release.arc_controller]
 
   values = [
     file("values/runners-${var.environment}.yaml")
