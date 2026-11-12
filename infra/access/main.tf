@@ -6,6 +6,7 @@ locals {
     "iam.googleapis.com",
     "iamcredentials.googleapis.com",
     "sts.googleapis.com",
+    "cloudbilling.googleapis.com",
   ]
 
   # Reads everything and the IAM policies, so that terraform plan can refresh the state.
@@ -26,6 +27,8 @@ locals {
     # service (who may invoke a function) and on a secret (which function may read it).
     "roles/run.admin",
     "roles/secretmanager.admin",
+    # Editor cannot create Kubernetes roles. The ARC controller chart creates some in the cluster.
+    "roles/container.admin",
   ]
 }
 
