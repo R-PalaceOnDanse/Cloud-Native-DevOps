@@ -90,6 +90,22 @@ resource "google_project_iam_member" "plan" {
   member  = "serviceAccount:${google_service_account.plan.email}"
 }
 
+# Helm keeps the record of each release in a Kubernetes secret of its namespace, so refreshing a
+# helm_release in a plan lists and reads secrets. Viewer excludes them; this role adds only that.
+resource "google_project_iam_custom_role" "helm_state_reader" {
+  project     = var.project_id
+  role_id     = "helmStateReader"
+  title       = "Helm state reader"
+  description = "Read the Kubernetes secrets where Helm stores its releases, for terraform plan."
+  permissions = ["container.secrets.get", "container.secrets.list"]
+}
+
+resource "google_project_iam_member" "plan_helm_state" {
+  project = var.project_id
+  role    = google_project_iam_custom_role.helm_state_reader.id
+  member  = "serviceAccount:${google_service_account.plan.email}"
+}
+
 resource "google_project_iam_member" "apply" {
   for_each = toset(local.apply_project_roles)
 
