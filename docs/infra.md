@@ -150,6 +150,20 @@ kubectl get nodes -L role,cloud.google.com/gke-nodepool
 kubectl describe nodes -l role=runner | grep -E "(Taints|Allocated resources)"
 ```
 
+### Runner token
+
+The runners register with a GitHub token. It never goes through Terraform, so it is not in the
+state: the Helm release only names a secret, `arc-github`, in the namespace `arc-runners`. That
+secret is created by hand, once per cluster, after connecting `kubectl` (see above):
+
+```bash
+kubectl create secret generic arc-github --namespace arc-runners --from-literal=github_token='<token>'
+```
+
+The token needs the `repo` scope. To rotate it, create a new token, replace the secret
+(`kubectl delete secret`, then the command above) and revoke the old token. A cluster that is
+destroyed and rebuilt starts without the secret: create it again.
+
 ### Clean Teardown
 
 The cluster and its node pools are declared without `prevent_destroy` or `deletion_protection`. Running `terraform destroy` on `infra/foundation` removes the runner node pool, system node pool, GKE cluster, subnets, and Cloud NAT cleanly in dependency order without leaving orphan cloud resources.

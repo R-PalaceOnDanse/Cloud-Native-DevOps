@@ -43,12 +43,6 @@ variable "services_cidr" {
   }
 }
 
-variable "github_token" {
-  description = "Token GitHub to authorize runners to register themselves."
-  type        = string
-  sensitive   = true
-}
-
 variable "environment" {
   type        = string
   description = "Name of the environment, which is also the name of the GitHub environment allowed to apply."

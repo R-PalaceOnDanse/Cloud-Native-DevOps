@@ -36,8 +36,9 @@ resource "helm_release" "arc_runner" {
     value = "https://github.com/R-PalaceOnDanse/Cloud-Native-DevOps"
   }
 
+  # The secret is created by hand in the cluster, so the token never goes through Terraform.
   set {
-    name  = "githubConfigSecret.github_token"
-    value = var.github_token
+    name  = "githubConfigSecret"
+    value = "arc-github"
   }
 }
