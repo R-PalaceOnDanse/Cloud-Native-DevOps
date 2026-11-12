@@ -32,6 +32,10 @@ resource "google_container_cluster" "primary" {
   ]
 
   cluster_autoscaling {
+    # Node auto-provisioning stays off: the autoscaler may only resize the node pools declared
+    # in this file, so it can never create a new pool without a size limit.
+    # OPTIMIZE_UTILIZATION removes empty nodes sooner than the default BALANCED profile.
+    enabled             = false
     autoscaling_profile = "OPTIMIZE_UTILIZATION"
   }
 }
@@ -66,9 +70,12 @@ resource "google_container_node_pool" "runners" {
   cluster  = google_container_cluster.primary.id
   location = google_container_cluster.primary.location
 
+  # Cost ceiling of the runner pool (docs/infra.md#cost-safeguards). The total_* limits count the
+  # nodes of the whole pool, whatever the number of zones of the cluster. 0 lets the pool empty
+  # itself when no job runs.
   autoscaling {
-    min_node_count = 0
-    max_node_count = 2
+    total_min_node_count = 0
+    total_max_node_count = var.runner_node_max_count
   }
 
   node_config {

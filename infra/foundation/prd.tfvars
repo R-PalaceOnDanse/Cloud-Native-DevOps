@@ -5,3 +5,7 @@ subnet_cidr   = "10.20.0.0/24"
 pods_cidr     = "10.21.0.0/16"
 services_cidr = "10.22.0.0/20"
 environment   = "prd"
+
+# Cost safeguards of the runners (docs/infra.md#cost-safeguards).
+runner_node_max_count = 2
+runner_max_count      = 2

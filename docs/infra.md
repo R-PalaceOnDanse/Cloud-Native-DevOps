@@ -132,11 +132,54 @@ Compute resources are separated into two specialized node pools:
 - **Management**: `auto_repair = true` and `auto_upgrade = true`.
 
 #### 2. Runner Node Pool (`runner-pool`)
-- **Autoscaling**: `min_node_count = 0`, `max_node_count = 2` (dynamically scales to zero when no CI jobs are running).
+- **Autoscaling**: `total_min_node_count = 0`, `total_max_node_count = runner_node_max_count`
+  (2 in both environments). The pool scales to zero when no CI job is running; see
+  [Cost safeguards](#cost-safeguards).
 - **Machine Type**: `e2-medium` (2 vCPU, 4 GB RAM, 20 GB pd-standard disk).
 - **Cost Safeguard (Spot VMs)**: Configured with `spot = true` to use Google Cloud Spot VMs, slashing compute costs by 60% to 91% compared to standard on-demand VMs.
 - **Taint Isolation**: Configured with `taint { key = "runner", value = "true", effect = "NO_SCHEDULE" }` and label `role = "runner"`. This guarantees that system pods never schedule on runner nodes, allowing the pool to scale down to 0 instances when idle.
 - **Management**: `auto_repair = true` and `auto_upgrade = true`.
+
+### Cost safeguards
+
+A mistake in autoscaling must not be able to burn the credits (subject §2.3). The limits below are
+enforced in code, so a queue of jobs, a stuck workflow or a typo in a `tfvars` file cannot push the
+cluster past them.
+
+| Limit | Value (dev and prd) | Where it is set | What it prevents |
+|---|---|---|---|
+| Runner nodes, maximum | 2 | `runner_node_max_count` in `infra/foundation/<env>.tfvars`, used as `total_max_node_count` in `gke.tf` | The cluster autoscaler never adds a third runner node, however many jobs wait. `total_*` counts the whole pool, so the ceiling holds even if the cluster becomes regional |
+| Runner nodes, when idle | 0 | `total_min_node_count = 0` in `gke.tf` | No runner node is paid for while no job runs |
+| Runner pods, maximum | 2 | `runner_max_count` in `<env>.tfvars`, passed as `maxRunners` by `helm-arc.tf` | Actions Runner Controller never starts more runners than the nodes can hold |
+| Runner pods, when idle | 0 | `minRunners = "0"` in `helm-arc.tf`, deliberately not a variable | No idle runner keeps a node alive |
+| New node pools | none | `cluster_autoscaling { enabled = false }` in `gke.tf` | Node auto-provisioning is off: the autoscaler can only resize the two pools declared in `gke.tf` |
+| System pool | 1 `e2-small`, fixed | `node_count = 1` in `gke.tf` | Not autoscaled |
+| Runner machine | `e2-medium`, Spot | `gke.tf` | Smallest machine that holds one runner (500m CPU requested), at the Spot price |
+| Budget | 20 EUR per month per project | `infra/access/budget.tf`, see [Budget alerts](#budget-alerts) | Warns the team at 50 %, 90 % and 100 % of actual spend and 100 % of forecasted spend |
+
+**Guards on the values.** `runner_node_max_count` and `runner_max_count` only accept whole numbers
+from 1 to 3, so a value such as `20` fails at `terraform plan`. A precondition on
+`helm_release.arc_runner` also refuses more runners than nodes: one runner fills one `e2-medium`
+node, so extra runners would only stay `Pending`. Raising a ceiling above 3 is a cost decision:
+change the validation in `variables.tf` in its own pull request.
+
+**Idle scale-down.** When a job ends, its ephemeral runner pod is deleted. With `minRunners = 0` no
+other runner pod remains, the runner node has nothing left to run (system pods cannot be scheduled
+there because of the `runner` taint), and the cluster autoscaler removes it after a few minutes.
+The `OPTIMIZE_UTILIZATION` profile shortens that wait compared with the default profile. The
+measured time is recorded by the scaling demonstration (issue #75).
+
+**Worst case.** Whatever the load, an environment runs at most 1 `e2-small` node, 2 `e2-medium` Spot
+nodes, the cluster management fee and the Cloud NAT gateway. Note that the GKE free tier gives a
+monthly credit per **billing account**, enough for about one zonal cluster
+([GKE pricing](https://cloud.google.com/kubernetes-engine/pricing)). Since dev and prd share the
+same billing account, a second cluster running all month pays its own management fee (USD 0.10 an
+hour, about USD 72 a month), which is more than the 20 EUR budget of its project. The forecast
+alert catches this. To avoid it, destroy the `foundation` of an environment that is not being used
+([ci.md](ci.md#destroying)).
+
+The budget only sends alerts; it does not stop resources. When an alert fires, check the runner
+nodes (`kubectl get nodes -l role=runner`) and the queued workflows first.
 
 ### Connecting & Operating the Cluster
 

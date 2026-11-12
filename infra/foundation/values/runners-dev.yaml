@@ -1,4 +1,5 @@
-maxRunners: 2
+# maxRunners and minRunners are set by helm-arc.tf from <env>.tfvars, where Terraform validates
+# them (docs/infra.md#cost-safeguards). Do not set them here.
 
 template:
   spec:
