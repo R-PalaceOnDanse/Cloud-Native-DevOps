@@ -167,16 +167,29 @@ kubectl describe nodes -l role=runner | grep -E "(Taints|Allocated resources)"
 ### Runner token
 
 The runners register with a GitHub token. It never goes through Terraform, so it is not in the
-state: the Helm release only names a secret, `arc-github`, in the namespace `arc-runners`. That
-secret is created by hand, once per cluster, after connecting `kubectl` (see above):
+state ([ADR-0016](adr/0016-external-secrets-operator.md)). It lives in Secret Manager, in the
+secret `arc-github-token` of each project, created by the `access` stack. External Secrets Operator
+copies it into the Kubernetes secret `arc-github` (namespace `arc-runners`) that the Helm release
+names, and refreshes it every hour.
+
+Add the value once per environment, after the `access` stack is applied. The token needs the
+`repo` scope:
 
 ```bash
-kubectl create secret generic arc-github --namespace arc-runners --from-literal=github_token='<token>'
+printf '%s' '<token>' | gcloud secrets versions add arc-github-token \
+  --project=teampasx-cloudnative-dev --data-file=-
 ```
 
-The token needs the `repo` scope. To rotate it, create a new token, replace the secret
-(`kubectl delete secret`, then the command above) and revoke the old token. A cluster that is
-destroyed and rebuilt starts without the secret: create it again.
+To rotate it, create a new token, add it as a new version (same command), then revoke the old
+token. The cluster picks it up within the hour; to force it now:
+
+```bash
+kubectl annotate externalsecret arc-github --namespace arc-runners force-sync=$(date +%s) --overwrite
+```
+
+A cluster that is destroyed and rebuilt finds its secret by itself: the value stays in Secret
+Manager. Check the copy with `kubectl get externalsecret --namespace arc-runners` (status
+`SecretSynced`).
 
 ### Clean Teardown
 

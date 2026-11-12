@@ -21,6 +21,11 @@ resource "google_container_cluster" "primary" {
     services_secondary_range_name = "services-range"
   }
 
+  # Lets a Kubernetes service account act as a Google identity, with no key (ADR-0016).
+  workload_identity_config {
+    workload_pool = "${var.project_id}.svc.id.goog"
+  }
+
   depends_on = [
     google_project_service.container,
     google_project_service.compute,
@@ -43,6 +48,10 @@ resource "google_container_node_pool" "system" {
 
     labels = {
       role = "system"
+    }
+
+    workload_metadata_config {
+      mode = "GKE_METADATA"
     }
   }
 
@@ -69,6 +78,10 @@ resource "google_container_node_pool" "runners" {
 
     labels = {
       role = "runner"
+    }
+
+    workload_metadata_config {
+      mode = "GKE_METADATA"
     }
 
     taint {

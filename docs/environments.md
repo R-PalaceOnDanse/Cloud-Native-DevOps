@@ -64,6 +64,7 @@ Defined in `infra/foundation`, applied on 2026-10-23. The design is in
 | GKE Cluster (`google_container_cluster`) | `teampasx-dev-vpc-gke` | `teampasx-prd-vpc-gke` | Private GKE cluster in `europe-west1-b` for CI/CD runners |
 | System Node Pool (`google_container_node_pool`) | `system-pool` (1 × `e2-small`) | `system-pool` (1 × `e2-small`) | Dedicated pool for controllers and cluster services |
 | Runner Node Pool (`google_container_node_pool`) | `runner-pool` (0-2 × `e2-medium` Spot) | `runner-pool` (0-2 × `e2-medium` Spot) | Autoscaling Spot pool with `runner=true:NoSchedule` taint |
+| Workload Identity and External Secrets Operator (`helm_release`) | in the code, not applied yet | in the code, not applied yet | Copies the runner token from Secret Manager into the cluster ([ADR-0016](adr/0016-external-secrets-operator.md)) |
 
 ### Access stack, in both projects
 
@@ -82,6 +83,7 @@ is in [ADR-0011](adr/0011-workload-identity-in-the-access-stack.md) and the beha
 | State bucket role | `roles/storage.objectAdmin` on the bucket, for both accounts | Terraform writes a lock even for a plan |
 | Impersonation bindings | `roles/iam.workloadIdentityUser` on each account | Who may use each account, as described above |
 | Enabled APIs | Cloud Resource Manager, IAM, IAM Credentials, Security Token Service | Required by the federation; left enabled on destroy |
+| Secret `arc-github-token` and the Secret Manager API | Secret Manager | GitHub token of the runner controller, value added by hand, `prevent_destroy`. In the code since [ADR-0016](adr/0016-external-secrets-operator.md), **not applied yet** (the counts above are those of 2026-10-23) |
 
 The full names of the provider and of the two accounts are the outputs of the stack
 (`terraform -chdir=infra/access output`).
