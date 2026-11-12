@@ -29,7 +29,8 @@ by IAM: a call that does not carry an ID token of the `api-gateway` account gets
 ## Add the secret value (once per environment)
 
 Terraform creates the secret but not its value, so the value is in neither the repository nor the
-state. After the first apply of the stack in an environment:
+state (rules in [infra.md](infra.md#secrets)). After the first apply of the stack in an
+environment:
 
 ```bash
 printf 'any demo value' | gcloud secrets versions add hello-greeting \

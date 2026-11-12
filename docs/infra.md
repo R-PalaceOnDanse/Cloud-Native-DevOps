@@ -56,6 +56,20 @@ descriptions live in [environments.md](environments.md).
   applies, the destroy workflow destroys. Do not run them from a laptop. The `access` stack is the
   exception: it is applied by hand by a project Owner, after its pull request is approved.
 
+## Secrets
+
+One place per kind of secret ([ADR-0015](adr/0015-secrets-in-secret-manager.md)). Terraform creates
+a secret but never its value, because it would be written in the state.
+
+| Kind | Where it lives | Who adds the value | Rotation |
+|---|---|---|---|
+| Runtime secret (function, runner) | Secret Manager | a team member: `gcloud secrets versions add <name> --data-file=-` | add a new version, then disable the old one |
+| Pipeline configuration | GitHub repository variables | an Owner, from the `access` outputs ([ci.md](ci.md)) | `gh variable set` |
+| Secret needed in the cluster | Kubernetes secret synced from Secret Manager | nobody | rotate it in Secret Manager |
+
+No Terraform variable holds a secret. gitleaks scans the whole history on every pull request
+(`secret-scan`), and before a commit once the hooks are active.
+
 ## Network topology
 
 The `foundation` stack manages the networking resources for each environment. Both environments

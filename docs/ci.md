@@ -19,6 +19,7 @@ The choices are in [ADR-0012](adr/0012-terraform-pipelines.md); the identities a
 | `terraform-run` | called by the two above | `github-apply` | Plans, then applies the saved plan, for the stack it is given. Not started by hand |
 | `functions-ci` | a pull request changes `app/functions/**` | none (no cloud access) | `npm ci` and `npm run build` (strict TypeScript) for each function |
 | `auth-check` | a pull request changes `infra/access/**` or this workflow, or by hand | both | Proves the keyless authentication behaves as designed (see below) |
+| `secret-scan` | a pull request, or a push to `main` | none (no cloud access) | gitleaks on the whole history, same version as `mise.lock` ([ADR-0015](adr/0015-secrets-in-secret-manager.md)) |
 | `docs-check` | see [development.md](development.md) | none | Documentation check |
 
 One composite action, `.github/actions/terraform-init`, installs Terraform, authenticates and runs
