@@ -52,6 +52,7 @@ jobs:
   foundation-prd:
     needs: serverless-dev
     uses: ./.github/workflows/terraform-run.yml
+    secrets: inherit
     with:
       stack: foundation
       environment: prd
@@ -60,6 +61,7 @@ jobs:
   serverless-prd:
     needs: foundation-prd
     uses: ./.github/workflows/terraform-run.yml
+    secrets: inherit
     with:
       stack: serverless
       environment: prd

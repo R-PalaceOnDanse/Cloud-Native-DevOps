@@ -56,6 +56,7 @@ jobs:
   destroy-foundation:
     needs: destroy-serverless
     uses: ./.github/workflows/terraform-run.yml
+    secrets: inherit
     with:
       stack: foundation
       environment: ${{ inputs.environment }}
