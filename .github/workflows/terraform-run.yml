@@ -49,7 +49,6 @@ jobs:
         env:
           ACTION: ${{ inputs.action }}
           ENVIRONMENT: ${{ inputs.environment }}
-          TF_VAR_github_token: ${{ secrets.TF_VAR_github_token }}
         run: |
           {
             echo "### $ACTION: foundation in $ENVIRONMENT"
