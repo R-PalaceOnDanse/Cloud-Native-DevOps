@@ -23,3 +23,8 @@ output "demo_api_key" {
   description = "API key for the demo calls through the gateway."
   sensitive   = true
 }
+
+output "firestore_database" {
+  value       = google_firestore_database.canvas.name
+  description = "Firestore database used for the pixel grid and rate-limit counters."
+}
