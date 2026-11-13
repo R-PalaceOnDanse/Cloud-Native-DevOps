@@ -22,7 +22,7 @@ concurrency:
 jobs:
   static:
     name: static (${{ matrix.stack }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -48,7 +48,7 @@ jobs:
   plan:
     name: plan (${{ matrix.stack }}, ${{ matrix.environment }})
     needs: static
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
