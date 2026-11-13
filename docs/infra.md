@@ -137,6 +137,7 @@ Compute resources are separated into two specialized node pools:
 - **Cost Safeguard (Spot VMs)**: Configured with `spot = true` to use Google Cloud Spot VMs, slashing compute costs by 60% to 91% compared to standard on-demand VMs.
 - **Taint Isolation**: Configured with `taint { key = "runner", value = "true", effect = "NO_SCHEDULE" }` and label `role = "runner"`. This guarantees that system pods never schedule on runner nodes, allowing the pool to scale down to 0 instances when idle.
 - **Management**: `auto_repair = true` and `auto_upgrade = true`.
+- **Runner label**: the runners of dev are `arc-dev` and those of prd `arc-prd` (`runnerScaleSetName` in `values/runners-<env>.yaml`). A job reaches them with `runs-on: arc-dev`; how the workflows choose is in [ci.md](ci.md#where-the-jobs-run).
 
 ### Connecting & Operating the Cluster
 
