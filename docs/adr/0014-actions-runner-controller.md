@@ -23,6 +23,11 @@ scale through node autoscaling. This records a choice already made in `infra/fou
 Option 1, charts `gha-runner-scale-set-controller` and `gha-runner-scale-set`, version 0.9.3,
 installed by Terraform (`helm-arc.tf`).
 
+Each environment has its own runner set, `arc-dev` and `arc-prd`: the name is the label a job
+puts in `runs-on`, and two sets of the same name on one repository clash (GitHub allows one
+listener session per set). The workflows choose the label with a repository variable
+([ci.md](../ci.md#where-the-jobs-run)).
+
 Runners are capped at 2 per environment. They run on a dedicated node pool (`runner-pool`, spot
 `e2-medium`, 0 to 2 nodes, tainted `runner=true`), so waiting runner pods make the pool grow and
 an idle pool shrinks to zero. The system pool stays at one small node.
@@ -32,5 +37,7 @@ an idle pool shrinks to zero. The system pool stays at one small node.
 - Positive: no scaling code of our own, and nodes cost nothing when no job runs.
 - Trade-offs: a runner waits a few minutes when the pool starts from zero, and a spot node can be
   taken back while a job runs.
-- Known gaps: the GitHub token goes through Terraform, so it sits in the state (issue #72); the
-  runner image is `latest`; no job has run on these runners yet (issue #73).
+- The GitHub token is not in Terraform: it comes from Secret Manager through External Secrets
+  Operator ([ADR-0016](0016-external-secrets-operator.md)).
+- Known gaps: the runner image is `latest`; the token belongs to a person (a GitHub App would not);
+  the scaling under load is still to be proved (issue #75).
