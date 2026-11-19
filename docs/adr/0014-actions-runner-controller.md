@@ -15,7 +15,7 @@ scale through node autoscaling. This records a choice already made in `infra/fou
 1. **Actions Runner Controller, runner scale sets** — the chart GitHub maintains. Runners are
    ephemeral, created when a job waits and removed after it.
 2. **A community controller** — the older ARC variants and others. Less tied to GitHub, but they
-   are not the supported path and are harder to justify.
+   are not the supported path and are harder to justify.he scaling under
 3. **Plain runner deployments** — simple at first, but we would write the scaling ourselves.
 
 ## Decision
@@ -39,5 +39,4 @@ an idle pool shrinks to zero. The system pool stays at one small node.
   taken back while a job runs.
 - The GitHub token is not in Terraform: it comes from Secret Manager through External Secrets
   Operator ([ADR-0016](0016-external-secrets-operator.md)).
-- Known gaps: the runner image is `latest`; the token belongs to a person (a GitHub App would not);
-  the scaling under load is still to be proved (issue #75).
+- the scaling under load is demonstrated in runner-auto-scaling-demo.md
