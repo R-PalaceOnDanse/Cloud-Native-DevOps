@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       jobs:
-        description: Number of jobs started at the same time. Above runner_max_count, the extra jobs wait, which shows the ceiling.
+        description: Number of jobs started at the same time. Above 2 (maxRunners in values/runners-<env>.yaml), the extra jobs wait in the queue, which shows the ceiling.
         required: true
         default: '3'
         type: choice
@@ -19,50 +19,51 @@ on:
         type: choice
         options: ['1', '3', '5', '10']
       runner:
-        description: runs-on label of the runner scale set (the Helm release name in helm-arc.tf).
+        description: Runner scale set to load (runnerScaleSetName in values/runners-<env>.yaml)
         required: true
-        default: arc-runner-set
-        type: string
-  
+        default: arc-dev
+        type: choice
+        options: ['arc-dev', 'arc-prd']
+
 permissions:
   contents: read
 
-# One burst at at time, so two runs cannot add up
+# One burst at a time, so two runs cannot add up.
 concurrency:
   group: runner-load-test
   cancel-in-progress: false
 
 jobs:
   prepare:
-    name: prepare burst
+    name: Prepare burst
     runs-on: ubuntu-latest
     outputs:
-      indexes: ${{  steps.list.outputs.indexes  }}
+      indexes: ${{ steps.list.outputs.indexes }}
     steps:
-      - name: Built list of jobs
+      - name: Build the list of jobs
         id: list
         env:
-          JOBS: ${{  inputs.jobs  }}
+          JOBS: ${{ inputs.jobs }}
         run: echo "indexes=$(jq -cn --argjson n "$JOBS" '[range(1; $n + 1)]')" >> "$GITHUB_OUTPUT"
 
   burst:
-    name: Hold a runner (${{  matrix.index  }}/${{ inputs.jobs  }})
+    name: Hold a runner (${{ matrix.index }}/${{ inputs.jobs }})
     needs: prepare
     runs-on: ${{ inputs.runner }}
-    #protection: job cannot hold frunner for more than 20minutes
+    # Safeguard: a job cannot hold a runner (and its node) for more than 20 minutes.
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        index: ${{ fromJSON(needs.prepare.outputs.indexes)  }}
+        index: ${{ fromJSON(needs.prepare.outputs.indexes) }}
     steps:
-      - name: Show ere the job run
+      - name: Show where the job runs
         run: |
-          echo "job ${{ matrix.index  }} started at $(date -u  +%H:%M:%SZ)"
+          echo "job ${{ matrix.index }} started at $(date -u +%H:%M:%SZ)"
           echo "runner: ${RUNNER_NAME}, pod: $(hostname)"
-      - name:
+      - name: Keep the runner busy
         env:
-          MINUTES: ${{  inputs.minutes  }}
+          MINUTES: ${{ inputs.minutes }}
         run: |
           sleep $((MINUTES * 60))
-          echo "job ${{ matrix.index  }} finished at $(date -u  +%H:%M:%SZ)"
+          echo "job ${{ matrix.index }} finished at $(date -u +%H:%M:%SZ)"
