@@ -95,16 +95,37 @@ Keep, for each recorded run, in the pull request or the defense material:
   time series per node: the line goes from 1 (the system node) to 3 and back to 1. Cloud Monitoring
   shows it with a delay of a few minutes.
 
-## Recorded runs
+## Recorded run
 
-| Date | Environment | Inputs | Peak runner nodes | First node ready after | Back to 0 after last job | Evidence |
-|---|---|---|---|---|---|---|
-| 2026-11-13 | prd | 4 jobs × 5 min | 2 | ~40 s | ~1 min to drain, nodes gone within ~2 min | `kubectl -w` captures of nodes and pods |
+| | |
+|---|---|
+| Date | 2026-11-19 |
+| Environment / runner set | dev / `arc-dev` |
+| Inputs | `jobs = 3`, `minutes = 3` |
+| Workflow run | [runner-load-test #1](https://github.com/R-PalaceOnDanse/Cloud-Native-DevOps/actions/runs/44508208356), success, 8 min 14 s |
+| CSV | [`docs/evidence/runner-scaling-dev.csv`](evidence/runner-scaling-dev.csv), one sample every 15 s |
+| Peak runner nodes | 2 (ceiling reached) |
+| Peak runner pods | 2 (`maxRunners`); the third job waited in the GitHub queue |
+| Runner pods Pending → nodes Ready | under 1 minute (10:43:14 → 10:44:01) |
+| Last job done → 0 nodes | <from the last scaleDown in the autoscaler log> |
 
-The 2026-11-13 run used a temporary push-triggered workflow, before `runner-load-test` was on
-`main`. It ran on prd because the dev listener could not open its session (see the 409 case below).
-At most 2 runner pods ran at once: jobs 3 and 4 waited in GitHub, then reused the two nodes. Each job
-got its own ephemeral runner pod, deleted when the job ended.
+Timeline (UTC, ±15 s from the sampling interval):
+
+| Time | Event |
+|---|---|
+| 10:43:14 | 2 runner pods `Pending`, 0 runner node: the autoscaler must add nodes |
+| <hh:mm:ss> | `scaleUp` decision in the cluster autoscaler log |
+| 10:44:01 | 2 runner nodes `Ready` |
+| 10:44:47 | 2 runner pods `Running` (image pulled); job 3 queued on GitHub |
+| 10:48:11 | jobs 1 and 2 done; job 3 takes a runner at once: 1 pod `Running` |
+| 10:49:14 | the idle node goes `NotReady`: it is being removed |
+| 10:50:01 | 1 runner node left, job 3 still running on it |
+| 10:51:18 | job 3 done, 0 runner pod |
+| <hh:mm:ss> | `scaleDown` of the last node: 0 runner node |
+
+What it shows: the pool grows from 0 to its ceiling of 2 nodes when jobs wait, extra jobs queue
+instead of adding nodes beyond the cap, and nodes are removed one by one as the load drops, back to
+zero once no job runs.
 
 ## At the defense
 
