@@ -4,7 +4,7 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "npm run build && node --test 'dist/**/*.test.js'",
     "build": "tsc",
     "gcp-build": "npm run build",
     "start": "functions-framework --target=discordProxy"
