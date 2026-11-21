@@ -64,6 +64,8 @@ Defined in `infra/foundation`, applied on 2026-10-23. The design is in
 | GKE Cluster (`google_container_cluster`) | `teampasx-dev-vpc-gke` | `teampasx-prd-vpc-gke` | Private GKE cluster in `europe-west1-b` for CI/CD runners |
 | System Node Pool (`google_container_node_pool`) | `system-pool` (1 × `e2-small`) | `system-pool` (1 × `e2-small`) | Dedicated pool for controllers and cluster services |
 | Runner Node Pool (`google_container_node_pool`) | `runner-pool` (0-2 × `e2-medium` Spot) | `runner-pool` (0-2 × `e2-medium` Spot) | Autoscaling Spot pool with `runner=true:NoSchedule` taint |
+| Monitoring Dashboard (`google_monitoring_dashboard`) | `teampasx-dev-vpc-gke-overview` | `teampasx-prd-vpc-gke-overview` | Cloud Monitoring dashboard for cluster nodes, pods, and runners |
+| Alert Policies (`google_monitoring_alert_policy`) | Node CPU/Memory high, container restarts | Node CPU/Memory high, container restarts | Automated threshold alerts on resource pressure and container failures |
 | Workload Identity and External Secrets Operator (`helm_release`) | in the code, not applied yet | in the code, not applied yet | Copies the runner token from Secret Manager into the cluster ([ADR-0016](adr/0016-external-secrets-operator.md)) |
 
 ### Access stack, in both projects
@@ -79,7 +81,7 @@ is in [ADR-0011](adr/0011-workload-identity-in-the-access-stack.md) and the beha
 | Service account | `github-plan` | Read-only identity for `terraform plan`, usable by any workflow of the repository |
 | Service account | `github-apply` | Identity for apply and destroy, usable only by the GitHub environment of the same name as the project's environment |
 | Project roles of `github-plan` | Viewer, Security Reviewer | Refresh the state and read IAM policies |
-| Project roles of `github-apply` | Editor, Project IAM Admin | Create resources and their IAM bindings |
+| Project roles of `github-apply` | Scoped least-privilege roles (Compute Network Admin, Container Admin, Service Usage Admin, IAM Service Account Admin/User, Project IAM Admin, Secret Manager Admin, Run Admin, Storage Admin, Monitoring Admin, Logging Admin) | Create resources and their IAM bindings without broad Editor permissions |
 | State bucket role | `roles/storage.objectAdmin` on the bucket, for both accounts | Terraform writes a lock even for a plan |
 | Impersonation bindings | `roles/iam.workloadIdentityUser` on each account | Who may use each account, as described above |
 | Enabled APIs | Cloud Resource Manager, IAM, IAM Credentials, Security Token Service | Required by the federation; left enabled on destroy |

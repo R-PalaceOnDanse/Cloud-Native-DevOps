@@ -26,9 +26,34 @@ resource "google_container_cluster" "primary" {
     workload_pool = "${var.project_id}.svc.id.goog"
   }
 
+  # Cloud Operations (Monitoring and Logging) with Managed Service for Prometheus (ADR-0010)
+  monitoring_config {
+    enable_components = [
+      "SYSTEM_COMPONENTS",
+      "APISERVER",
+      "CONTROLLER_MANAGER",
+      "SCHEDULER"
+    ]
+    managed_prometheus {
+      enabled = true
+    }
+  }
+
+  logging_config {
+    enable_components = [
+      "SYSTEM_COMPONENTS",
+      "WORKLOADS",
+      "APISERVER",
+      "CONTROLLER_MANAGER",
+      "SCHEDULER"
+    ]
+  }
+
   depends_on = [
     google_project_service.container,
     google_project_service.compute,
+    google_project_service.monitoring,
+    google_project_service.logging,
   ]
 
   cluster_autoscaling {
