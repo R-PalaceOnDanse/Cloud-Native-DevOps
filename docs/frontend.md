@@ -54,3 +54,19 @@ npm run dev
 # Build production bundle (dist/)
 npm run build
 ```
+
+---
+
+## 4. Real-time Updates & Event Subscriptions (Issue #81, C07 §3.3)
+
+In accordance with [ADR-0008](adr/0008-firestore-listeners-for-realtime.md) and module requirements:
+- **ZERO Polling**: No `setInterval`, no polling loops, and no manual "Rafraîchir" button exist anywhere in the application.
+- **Viewport-Driven Chunk Subscriptions**:
+  - The client calculates which 64×64 chunks intersect the current viewport (`getVisibleChunkIds`).
+  - As the user pans and zooms, newly visible chunks are subscribed to in real time (`onSnapshot`), while chunks moving out of the viewport are immediately unsubscribed.
+  - When zoomed far out, subscriptions are capped to the closest chunks to the center (max 64) to prevent exceeding connection quotas.
+- **In-Place Delta Application**:
+  - Incremental chunk updates (written by backend workers upon Discord `/draw` or web draws) are pushed to the client and applied directly to the `CanvasRenderer` in place.
+- **Discord OAuth2 Client Integration** (Issue #17 / [ADR-0009](adr/0009-firebase-hosting-and-discord-oauth.md)):
+  - Top-right Discord login button initiates OAuth2 authorization code flow with scope `identify`.
+  - Authenticated session tags the user's Discord handle and snowflake ID on drawn pixels.

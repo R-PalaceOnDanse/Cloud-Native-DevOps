@@ -1,11 +1,14 @@
 /**
  * Main Frontend Application Entry Point.
- * Coordinates Viewport, User Input, Palette, and Canvas Renderer.
+ * Coordinates Viewport, User Input, Palette, Canvas Renderer, Discord Auth, and Real-time Listeners.
+ * Fulfills C07 §3.1–§3.6 (Issues #77, #80, #81, #82, #83).
  */
 
 import { createDefaultViewport, screenToWorld, zoomAtPoint, panViewport, ViewportState } from './viewport.js';
 import { CanvasRenderer } from './canvas.js';
 import { getBrushPixels } from './brush.js';
+import { RealtimeManager, MockRealtimeProvider } from './realtime.js';
+import { authManager, UserProfile } from './auth.js';
 
 // 16 Standard Palette Colors
 const PALETTE_COLORS = [
@@ -31,6 +34,7 @@ let viewport: ViewportState = createDefaultViewport(window.innerWidth, window.in
 
 const coordDisplay = document.getElementById('coord-display') as HTMLElement;
 const zoomDisplay = document.getElementById('zoom-display') as HTMLElement;
+const streamStatus = document.getElementById('stream-status') as HTMLElement;
 const paletteContainer = document.getElementById('palette-grid') as HTMLElement;
 const customColorInput = document.getElementById('custom-color') as HTMLInputElement;
 const colorHexLabel = document.getElementById('color-hex-label') as HTMLElement;
@@ -38,11 +42,30 @@ const toolDrawBtn = document.getElementById('tool-draw') as HTMLButtonElement;
 const toolPanBtn = document.getElementById('tool-pan') as HTMLButtonElement;
 const resetViewBtn = document.getElementById('btn-reset-view') as HTMLButtonElement;
 
+// Auth DOM Elements
+const btnDiscordLogin = document.getElementById('btn-discord-login') as HTMLButtonElement;
+const userDisplay = document.getElementById('user-display') as HTMLElement;
+const userName = document.getElementById('user-name') as HTMLElement;
+const btnLogout = document.getElementById('btn-logout') as HTMLButtonElement;
+
 // Inspector elements
 const inspectCoords = document.getElementById('inspect-coords') as HTMLElement;
 const inspectAuthor = document.getElementById('inspect-author') as HTMLElement;
 const inspectTime = document.getElementById('inspect-time') as HTMLElement;
 const inspectColor = document.getElementById('inspect-color') as HTMLElement;
+
+// Real-time Provider & Manager (Zero polling, strictly event-driven)
+const realtimeProvider = new MockRealtimeProvider();
+const realtimeManager = new RealtimeManager(
+  realtimeProvider,
+  renderer,
+  () => requestRender(),
+  (count) => {
+    if (streamStatus) {
+      streamStatus.textContent = `⚡ ${count} tuiles`;
+    }
+  }
+);
 
 function resizeCanvas(): void {
   const dpr = window.devicePixelRatio || 1;
@@ -50,6 +73,7 @@ function resizeCanvas(): void {
   canvas.height = window.innerHeight * dpr;
   viewport.screenWidth = canvas.width;
   viewport.screenHeight = canvas.height;
+  realtimeManager.updateViewport(viewport);
   requestRender();
 }
 
@@ -124,6 +148,7 @@ toolPanBtn.addEventListener('click', () => {
 
 resetViewBtn.addEventListener('click', () => {
   viewport = createDefaultViewport(canvas.width, canvas.height);
+  realtimeManager.updateViewport(viewport);
   requestRender();
 });
 
@@ -132,12 +157,34 @@ customColorInput.addEventListener('input', (e) => {
   selectColor(val);
 });
 
+// Discord Auth Event Listeners
+authManager.onAuthStateChanged((user: UserProfile | null) => {
+  if (user) {
+    btnDiscordLogin.classList.add('hidden');
+    userDisplay.classList.remove('hidden');
+    userName.textContent = user.username;
+  } else {
+    btnDiscordLogin.classList.remove('hidden');
+    userDisplay.classList.add('hidden');
+    userName.textContent = '';
+  }
+});
+
+btnDiscordLogin.addEventListener('click', () => {
+  authManager.loginWithDiscord();
+});
+
+btnLogout.addEventListener('click', () => {
+  authManager.logout();
+});
+
 // Canvas Interaction Listeners
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
   const dpr = window.devicePixelRatio || 1;
   const factor = e.deltaY < 0 ? 1.25 : 0.8;
   viewport = zoomAtPoint(e.clientX * dpr, e.clientY * dpr, factor, viewport);
+  realtimeManager.updateViewport(viewport);
   requestRender();
 }, { passive: false });
 
@@ -188,6 +235,7 @@ window.addEventListener('mousemove', (e) => {
     const dx = mouseX - lastMouseX;
     const dy = mouseY - lastMouseY;
     viewport = panViewport(dx, dy, viewport);
+    realtimeManager.updateViewport(viewport);
     requestRender();
   } else if (currentTool === 'draw') {
     handleDraw(mouseX, mouseY);
@@ -212,9 +260,11 @@ function handleDraw(screenX: number, screenY: number): void {
   const world = screenToWorld(screenX, screenY, viewport);
   const batch = getBrushPixels(world.x, world.y, currentBrushSize, currentColor);
   if (batch.length > 0) {
-    renderer.applyBatch(batch, 'Local User');
+    const author = authManager.getCurrentUser()?.username || 'Anonyme';
+    renderer.applyBatch(batch, author);
     requestRender();
     inspectPixel(world.x, world.y);
+    void realtimeManager.publishDraw(batch, author);
   }
 }
 
