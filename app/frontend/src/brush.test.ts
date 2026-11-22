@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getBrushPixels } from './brush.js';
+import { getBrushPixels, validateBrushStroke } from './brush.js';
 
 test('brush size 1 returns exactly the single center pixel', () => {
   const pixels = getBrushPixels(50, 50, 1, '#ff0000');
@@ -29,4 +29,34 @@ test('brush clamps to grid boundary and omits out-of-bounds coordinates', () => 
 test('returns empty array if center is completely outside canvas', () => {
   const pixels = getBrushPixels(-5, -5, 3, '#ffffff');
   assert.equal(pixels.length, 0);
+});
+
+test('validateBrushStroke rejects when canvas is paused', () => {
+  const result = validateBrushStroke(1, 20, 20, true);
+  assert.equal(result.allowed, false);
+  assert.equal(result.reason, 'paused');
+  assert.match(result.message || '', /en pause/i);
+});
+
+test('validateBrushStroke rejects strokes larger than max capacity with explanation rather than cutting', () => {
+  // 5x5 brush produces 25 pixels, max capacity is 20
+  const result = validateBrushStroke(25, 20, 20, false);
+  assert.equal(result.allowed, false);
+  assert.equal(result.reason, 'exceeds_max_capacity');
+  assert.match(result.message || '', /supérieur à la capacité maximale/i);
+  assert.match(result.message || '', /pas tronqué/i);
+});
+
+test('validateBrushStroke rejects when current tokens are insufficient', () => {
+  // 3x3 brush produces 9 pixels, but user has only 5 tokens left
+  const result = validateBrushStroke(9, 5, 20, false);
+  assert.equal(result.allowed, false);
+  assert.equal(result.reason, 'insufficient_tokens');
+  assert.match(result.message || '', /Quota temporairement insuffisant/i);
+});
+
+test('validateBrushStroke allows stroke within tokens and max capacity', () => {
+  const result = validateBrushStroke(9, 10, 20, false);
+  assert.equal(result.allowed, true);
+  assert.equal(result.reason, undefined);
 });

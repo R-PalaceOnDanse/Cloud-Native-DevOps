@@ -350,3 +350,68 @@ body, html {
     transform: translateY(0);
   }
 }
+
+/* Global Pause Banner */
+.hud-banner {
+  position: absolute;
+  top: 68px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(185, 28, 28, 0.95);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 18px;
+  border-radius: 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: toastFadeIn 0.2s ease;
+}
+
+.hud-banner.hidden {
+  display: none;
+}
+
+/* Brush hint & warning indicator */
+.brush-hint {
+  font-size: 11px;
+  color: #8d8d99;
+  margin-top: 2px;
+}
+
+.brush-hint.warning {
+  color: #fbbf24;
+}
+
+.btn-brush .brush-warn {
+  font-size: 10px;
+  margin-left: 2px;
+}
+
+/* Clear inspection button */
+.btn-clear-inspect {
+  width: 100%;
+  margin-top: 8px;
+  background: #202024;
+  border: 1px solid #323238;
+  color: #a8a8b3;
+  padding: 4px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-clear-inspect:hover {
+  background: #29292e;
+  color: #ffffff;
+}
+
+.btn-clear-inspect.hidden {
+  display: none;
+}
+

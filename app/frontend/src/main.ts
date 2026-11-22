@@ -1,16 +1,17 @@
 /**
  * Main Frontend Application Entry Point.
  * Coordinates Viewport, User Input, Palette, Canvas Renderer, Discord Auth,
- * Real-time Listeners, and API Proxy client.
+ * Real-time Listeners, Pixel Inspector, and API Proxy client.
  * Fulfills C07 §3.1–§3.6 (Issues #77, #80, #81, #82, #83, #76).
  */
 
 import { createDefaultViewport, screenToWorld, zoomAtPoint, panViewport, ViewportState } from './viewport.js';
 import { CanvasRenderer } from './canvas.js';
-import { getBrushPixels } from './brush.js';
-import { RealtimeManager, MockRealtimeProvider } from './realtime.js';
+import { getBrushPixels, validateBrushStroke, BRUSH_PIXEL_COUNTS, BrushSize } from './brush.js';
+import { RealtimeManager, MockRealtimeProvider, SystemState } from './realtime.js';
 import { authManager, UserProfile } from './auth.js';
 import { drawApiClient } from './api.js';
+import { formatPixelInspection } from './inspector.js';
 
 // 16 Standard Palette Colors
 const PALETTE_COLORS = [
@@ -22,12 +23,13 @@ const PALETTE_COLORS = [
 
 // App State
 let currentColor = '#ff0000';
-let currentBrushSize = 1;
+let currentBrushSize: BrushSize = 1;
 let currentTool: 'draw' | 'pan' = 'draw';
 let isMouseDown = false;
 let isSpacePressed = false;
 let lastMouseX = 0;
 let lastMouseY = 0;
+let isCanvasPaused = false;
 
 // Rate Limit Token Bucket State (20 tokens max, refills continuously)
 let userTokens = 20;
@@ -44,6 +46,8 @@ const zoomDisplay = document.getElementById('zoom-display') as HTMLElement;
 const streamStatus = document.getElementById('stream-status') as HTMLElement;
 const tokensDisplay = document.getElementById('tokens-display') as HTMLElement;
 const toastContainer = document.getElementById('toast-container') as HTMLElement;
+const pauseBanner = document.getElementById('pause-banner') as HTMLElement;
+const brushHint = document.getElementById('brush-hint') as HTMLElement;
 const paletteContainer = document.getElementById('palette-grid') as HTMLElement;
 const customColorInput = document.getElementById('custom-color') as HTMLInputElement;
 const colorHexLabel = document.getElementById('color-hex-label') as HTMLElement;
@@ -62,6 +66,7 @@ const inspectCoords = document.getElementById('inspect-coords') as HTMLElement;
 const inspectAuthor = document.getElementById('inspect-author') as HTMLElement;
 const inspectTime = document.getElementById('inspect-time') as HTMLElement;
 const inspectColor = document.getElementById('inspect-color') as HTMLElement;
+const btnClearInspect = document.getElementById('btn-clear-inspect') as HTMLButtonElement;
 
 // Real-time Provider & Manager (Zero polling, strictly event-driven)
 const realtimeProvider = new MockRealtimeProvider();
@@ -75,6 +80,19 @@ const realtimeManager = new RealtimeManager(
     }
   }
 );
+
+// Subscribe to global system state (pause / resume)
+realtimeManager.subscribeSystemState((state: SystemState) => {
+  isCanvasPaused = state.paused;
+  if (pauseBanner) {
+    if (isCanvasPaused) {
+      pauseBanner.classList.remove('hidden');
+      showToast('⏸️ Le canevas est en pause : les modifications sont temporairement suspendues.', 'error');
+    } else {
+      pauseBanner.classList.add('hidden');
+    }
+  }
+});
 
 function updateTokensDisplay(): void {
   const now = Date.now();
@@ -155,13 +173,26 @@ function rgbToHex(rgbStr: string): string {
   return '#' + ((1 << 24) + (r! << 16) + (g! << 8) + b!).toString(16).slice(1);
 }
 
+function updateBrushHint(): void {
+  if (!brushHint) return;
+  const count = BRUSH_PIXEL_COUNTS[currentBrushSize] || 1;
+  if (count > MAX_TOKENS) {
+    brushHint.textContent = `${count} pixels / coup ⚠️ (Dépasse la réserve max de ${MAX_TOKENS})`;
+    brushHint.classList.add('warning');
+  } else {
+    brushHint.textContent = `${count} pixel${count > 1 ? 's' : ''} / coup (${count} token${count > 1 ? 's' : ''})`;
+    brushHint.classList.remove('warning');
+  }
+}
+
 // Brush selectors
 document.querySelectorAll('.btn-brush').forEach((btn) => {
   btn.addEventListener('click', (e) => {
     document.querySelectorAll('.btn-brush').forEach((b) => b.classList.remove('active'));
     const target = e.currentTarget as HTMLElement;
     target.classList.add('active');
-    currentBrushSize = Number(target.dataset.size || '1');
+    currentBrushSize = Number(target.dataset.size || '1') as BrushSize;
+    updateBrushHint();
   });
 });
 
@@ -292,14 +323,21 @@ canvas.addEventListener('click', (e) => {
   inspectPixel(world.x, world.y);
 });
 
+if (btnClearInspect) {
+  btnClearInspect.addEventListener('click', () => {
+    clearInspect();
+  });
+}
+
 async function handleDraw(screenX: number, screenY: number): Promise<void> {
   updateTokensDisplay();
   const world = screenToWorld(screenX, screenY, viewport);
   const batch = getBrushPixels(world.x, world.y, currentBrushSize, currentColor);
   if (batch.length === 0) return;
 
-  if (userTokens < batch.length) {
-    showToast(`Rate limit : ${Math.floor(userTokens)}/${batch.length} pixels disponibles. Patientez quelques secondes.`, 'error');
+  const validation = validateBrushStroke(batch.length, userTokens, MAX_TOKENS, isCanvasPaused);
+  if (!validation.allowed) {
+    showToast(validation.message || 'Action impossible.', 'error');
     return;
   }
 
@@ -326,27 +364,35 @@ async function handleDraw(screenX: number, screenY: number): Promise<void> {
 }
 
 function inspectPixel(x: number, y: number): void {
-  if (x < 0 || x >= 10000 || y < 0 || y >= 10000) {
-    inspectCoords.textContent = 'Hors champ';
-    inspectAuthor.textContent = '—';
-    inspectTime.textContent = '—';
-    inspectColor.textContent = '—';
-    return;
-  }
+  renderer.setSelectedPixel({ x, y });
+  requestRender();
 
-  inspectCoords.textContent = `(${x}, ${y})`;
   const pixel = renderer.getPixel(x, y);
+  const info = formatPixelInspection(pixel, x, y);
 
-  if (pixel) {
-    inspectAuthor.textContent = pixel.author;
-    inspectTime.textContent = new Date(pixel.timestamp).toLocaleTimeString();
-    inspectColor.textContent = pixel.color;
-    inspectColor.style.color = pixel.color;
-  } else {
-    inspectAuthor.textContent = 'Vide';
-    inspectTime.textContent = '—';
-    inspectColor.textContent = '#ffffff (défaut)';
-    inspectColor.style.color = '#ffffff';
+  inspectCoords.textContent = info.coordsText;
+  inspectAuthor.textContent = info.authorText;
+  inspectTime.textContent = info.timeText;
+  inspectColor.textContent = info.colorText;
+  inspectColor.style.color = info.hexColor;
+
+  if (btnClearInspect) {
+    btnClearInspect.classList.remove('hidden');
+  }
+}
+
+function clearInspect(): void {
+  renderer.setSelectedPixel(null);
+  requestRender();
+
+  inspectCoords.textContent = '—';
+  inspectAuthor.textContent = 'Vide';
+  inspectTime.textContent = '—';
+  inspectColor.textContent = '—';
+  inspectColor.style.color = '#e1e1e6';
+
+  if (btnClearInspect) {
+    btnClearInspect.classList.add('hidden');
   }
 }
 
@@ -355,3 +401,4 @@ window.addEventListener('resize', resizeCanvas);
 initPalette();
 resizeCanvas();
 updateTokensDisplay();
+updateBrushHint();
