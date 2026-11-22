@@ -17,6 +17,13 @@ export interface DrawnPixel {
 export const ALLOWED_BRUSH_SIZES = [1, 3, 5, 9] as const;
 export type BrushSize = (typeof ALLOWED_BRUSH_SIZES)[number];
 
+export const BRUSH_PIXEL_COUNTS: Record<BrushSize, number> = {
+  1: 1,
+  3: 9,
+  5: 25,
+  9: 81,
+};
+
 /**
  * Calculates all valid canvas pixels covered by a brush stroke centered on (centerX, centerY).
  * Clamps coordinates strictly within [0..CANVAS_SIZE - 1].
@@ -50,4 +57,48 @@ export function getBrushPixels(
   }
 
   return pixels;
+}
+
+export interface StrokeValidationResult {
+  allowed: boolean;
+  reason?: 'paused' | 'exceeds_max_capacity' | 'insufficient_tokens';
+  message?: string;
+}
+
+/**
+ * Validates a brush stroke attempt against canvas pause state and token limits.
+ * Requirement (Issue #83):
+ * "A stroke larger than the limit is explained, not cut."
+ */
+export function validateBrushStroke(
+  batchLength: number,
+  currentTokens: number,
+  maxCapacity: number = 20,
+  isPaused: boolean = false
+): StrokeValidationResult {
+  if (isPaused) {
+    return {
+      allowed: false,
+      reason: 'paused',
+      message: 'Le canevas est en pause : les modifications sont temporairement suspendues.',
+    };
+  }
+
+  if (batchLength > maxCapacity) {
+    return {
+      allowed: false,
+      reason: 'exceeds_max_capacity',
+      message: `Trait supérieur à la capacité maximale (${batchLength} pixels requis, réserve max de ${maxCapacity} pixels). Réduisez la taille du pinceau (1px ou 3px). Le trait n'est pas tronqué pour préserver l'intégrité du dessin.`,
+    };
+  }
+
+  if (currentTokens < batchLength) {
+    return {
+      allowed: false,
+      reason: 'insufficient_tokens',
+      message: `Quota temporairement insuffisant : ${Math.floor(currentTokens)}/${batchLength} tokens disponibles. Recharge en cours (+1 toutes les 3s).`,
+    };
+  }
+
+  return { allowed: true };
 }

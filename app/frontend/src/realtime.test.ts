@@ -165,4 +165,27 @@ describe('Real-time Viewport & Chunk Subscription Engine (Issue #81 / C07 §3.3)
 
     manager.destroy();
   });
+
+  it('notifies listeners when system state changes (pause / resume)', () => {
+    const mockCanvas = new MockCanvasElement() as unknown as HTMLCanvasElement;
+    const renderer = new CanvasRenderer(mockCanvas);
+    const provider = new MockRealtimeProvider();
+    const manager = new RealtimeManager(provider, renderer, () => {});
+
+    let receivedPaused = false;
+    const unsubscribe = manager.subscribeSystemState((state) => {
+      receivedPaused = state.paused;
+    });
+
+    assert.strictEqual(receivedPaused, false);
+
+    provider.setSystemState({ paused: true });
+    assert.strictEqual(receivedPaused, true);
+
+    provider.setSystemState({ paused: false });
+    assert.strictEqual(receivedPaused, false);
+
+    unsubscribe();
+    manager.destroy();
+  });
 });

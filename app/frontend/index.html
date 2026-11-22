@@ -41,6 +41,12 @@
       </div>
     </header>
 
+    <!-- Global Pause Banner -->
+    <div id="pause-banner" class="hud-banner hidden">
+      <span>⏸️</span>
+      <span>Canevas en pause — Dessin temporairement suspendu par un administrateur</span>
+    </div>
+
     <!-- Left Toolbar -->
     <aside class="hud-toolbar" id="toolbar">
       <div class="tool-section">
@@ -54,11 +60,12 @@
       <div class="tool-section">
         <label class="section-label">Taille du pinceau</label>
         <div class="brush-selector" id="brush-selector">
-          <button class="btn-brush active" data-size="1">1px</button>
-          <button class="btn-brush" data-size="3">3px</button>
-          <button class="btn-brush" data-size="5">5px</button>
-          <button class="btn-brush" data-size="9">9px</button>
+          <button class="btn-brush active" data-size="1" title="Taille 1x1 (1 pixel)">1px</button>
+          <button class="btn-brush" data-size="3" title="Taille 3x3 (9 pixels)">3px</button>
+          <button class="btn-brush" data-size="5" title="Taille 5x5 (25 pixels) — Dépasse la réserve max (20)">5px <span class="brush-warn">⚠️</span></button>
+          <button class="btn-brush" data-size="9" title="Taille 9x9 (81 pixels) — Dépasse la réserve max (20)">9px <span class="brush-warn">⚠️</span></button>
         </div>
+        <div class="brush-hint" id="brush-hint">1 pixel / coup (1 token)</div>
       </div>
 
       <div class="tool-section">
@@ -97,6 +104,7 @@
           <span class="info-label">Couleur :</span>
           <span class="info-value" id="inspect-color">—</span>
         </div>
+        <button id="btn-clear-inspect" class="btn-clear-inspect hidden" title="Fermer la sélection">✕ Désélectionner</button>
       </div>
     </section>
 

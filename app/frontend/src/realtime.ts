@@ -7,6 +7,7 @@
  * 2. Only listens to chunks intersecting the active viewport.
  * 3. Immediately unsubscribes from chunks that leave the viewport.
  * 4. Applies incoming deltas in place on the CanvasRenderer.
+ * 5. Listens to global system state (pause, clear).
  */
 
 import { ViewportState, getVisibleWorldBounds } from './viewport.js';
@@ -31,11 +32,19 @@ export interface ChunkPayload {
   updatedAt: number;
 }
 
+export interface SystemState {
+  paused: boolean;
+  lastClearedAt?: number | null;
+  updatedAt?: number;
+}
+
 export type ChunkUpdateCallback = (payload: ChunkPayload) => void;
+export type SystemStateCallback = (state: SystemState) => void;
 export type UnsubscribeCallback = () => void;
 
 export interface RealtimeSubscriptionProvider {
   subscribe(chunkId: string, onUpdate: ChunkUpdateCallback): UnsubscribeCallback;
+  subscribeSystemState?(onUpdate: SystemStateCallback): UnsubscribeCallback;
   publishDraw?(batch: DrawnPixel[], author: string): Promise<boolean>;
 }
 
@@ -95,6 +104,7 @@ export class RealtimeManager {
   private readonly onSubscriptionsChanged?: ((count: number) => void) | undefined;
 
   private activeSubscriptions: Map<string, UnsubscribeCallback> = new Map();
+  private systemUnsubscribe: UnsubscribeCallback | null = null;
 
   constructor(
     provider: RealtimeSubscriptionProvider,
@@ -166,6 +176,17 @@ export class RealtimeManager {
   }
 
   /**
+   * Subscribes to global system state changes (pause, clear).
+   */
+  public subscribeSystemState(onUpdate: SystemStateCallback): UnsubscribeCallback {
+    if (this.provider.subscribeSystemState) {
+      return this.provider.subscribeSystemState(onUpdate);
+    }
+    onUpdate({ paused: false });
+    return () => {};
+  }
+
+  /**
    * Publishes a local draw to the backend proxy.
    */
   public async publishDraw(batch: DrawnPixel[], author: string): Promise<boolean> {
@@ -188,6 +209,10 @@ export class RealtimeManager {
       unsubscribe();
     }
     this.activeSubscriptions.clear();
+    if (this.systemUnsubscribe) {
+      this.systemUnsubscribe();
+      this.systemUnsubscribe = null;
+    }
     if (this.onSubscriptionsChanged) {
       this.onSubscriptionsChanged(0);
     }
@@ -196,11 +221,13 @@ export class RealtimeManager {
 
 /**
  * In-memory Mock Provider for local testing, demo, and CI verification.
- * Allows simulating bidirectional real-time draws (e.g. Discord bot events).
+ * Allows simulating bidirectional real-time draws (e.g. Discord bot events) and system pause.
  */
 export class MockRealtimeProvider implements RealtimeSubscriptionProvider {
   private listeners: Map<string, Set<ChunkUpdateCallback>> = new Map();
   private chunkState: Map<string, Record<string, RemotePixel>> = new Map();
+  private systemState: SystemState = { paused: false };
+  private systemListeners: Set<SystemStateCallback> = new Set();
 
   public subscribe(chunkId: string, onUpdate: ChunkUpdateCallback): UnsubscribeCallback {
     if (!this.listeners.has(chunkId)) {
@@ -230,6 +257,21 @@ export class MockRealtimeProvider implements RealtimeSubscriptionProvider {
         this.listeners.delete(chunkId);
       }
     };
+  }
+
+  public subscribeSystemState(onUpdate: SystemStateCallback): UnsubscribeCallback {
+    this.systemListeners.add(onUpdate);
+    onUpdate(this.systemState);
+    return () => {
+      this.systemListeners.delete(onUpdate);
+    };
+  }
+
+  public setSystemState(state: Partial<SystemState>): void {
+    this.systemState = { ...this.systemState, ...state };
+    for (const listener of this.systemListeners) {
+      listener(this.systemState);
+    }
   }
 
   /**

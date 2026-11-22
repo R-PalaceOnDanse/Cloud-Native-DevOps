@@ -24,16 +24,21 @@ This document describes the reactive web frontend for the collaborative pixel ca
 - **Dynamic Pixel Grid**: When zoomed in ($\ge 8\times$), subtle grid lines appear to assist precision drawing.
 
 ### B. Pixel Inspection (Issue #82, C07 §3.5)
-- Clicking or hovering over any pixel updates the bottom-right Inspector HUD:
-  - Exact coordinates: `(X, Y)`.
-  - Author: Discord user identifier or "Vide" if unpainted.
-  - Timestamp: Formatted time of last update.
-  - Color: Hex color code and visual swatch.
+- Clicking on any pixel selects it and updates the bottom-right Inspector HUD:
+  - **Visual Selection Reticle**: A cyan bounding highlight (`#06b6d4`) is drawn directly around the selected pixel in the viewport.
+  - **Empty Pixels**: Explicitly identifies unpainted pixels ("Vide (pixel vierge)", "Jamais modifié", default `#ffffff`).
+  - **Painted Pixels**: Displays the exact author Discord handle/ID, formatted timestamp of last update, and hex color code.
+  - **Deselection**: A "Désélectionner" action or clicking out-of-bounds clears the active selection reticle.
 
-### C. Configurable Brush Tool (Issue #83, C07 §3.6)
-- **Brush sizes**: `1px` (single pixel), `3px`, `5px`, `9px`.
-- **Batching**: Calculates all pixels within the brush radius, clamps strictly to canvas bounds `[0..9999]`, and applies them in an atomic batch.
-- **Palette**: Quick-selection of 16 standard colors (matching `@teampasx/common`) or arbitrary hex input via native color picker.
+### C. Configurable Brush Tool & Stroke Validation (Issue #83, C07 §3.6)
+- **Brush sizes**: `1px` (1 pixel), `3px` (9 pixels), `5px` (25 pixels), `9px` (81 pixels).
+- **Stroke Larger Than Limit Explained, Not Cut**:
+  - The client token bucket maintains a reserve capacity of 20 tokens (refilling continuously at 1 token / 3s).
+  - When selecting a brush requiring more pixels than the maximum reserve capacity (e.g., 5px requiring 25 pixels or 9px requiring 81 pixels), the HUD highlights a warning.
+  - If a stroke attempt requires more than the maximum capacity, the client rejects the stroke with an explanatory toast (`Trait supérieur à la capacité maximale (25 pixels > 20 max). Réduisez la taille du pinceau. Le trait n'est pas tronqué pour préserver l'intégrité du dessin.`), rather than silently cutting or clipping the stroke shape.
+- **Canvas Pause State (Admin Override)**:
+  - The client subscribes to global system configuration (`config/system`).
+  - When an admin executes `/admin pause`, a persistent red banner appears (`⏸️ Canevas en pause`), and any draw attempt is refused immediately with an explanatory toast notification until resumed by `/admin resume`.
 
 ---
 

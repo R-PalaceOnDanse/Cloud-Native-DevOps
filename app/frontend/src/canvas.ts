@@ -1,7 +1,7 @@
 /**
  * Canvas Rendering Engine for the 10,000 x 10,000 Grid.
  * Only draws visible tiles/pixels in the viewport (Frustum Culling).
- * Fulfills Issue #80 (C07 §3.4).
+ * Fulfills Issue #80, #82 (C07 §3.4, §3.5).
  */
 
 import { ViewportState, getVisibleWorldBounds, worldToScreen, CANVAS_SIZE } from './viewport.js';
@@ -17,6 +17,7 @@ export class CanvasRenderer {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly canvas: HTMLCanvasElement;
   private readonly pixels: Map<string, PixelMetadata> = new Map();
+  private selectedPixel: { x: number; y: number } | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -42,6 +43,14 @@ export class CanvasRenderer {
 
   public getPixel(x: number, y: number): PixelMetadata | undefined {
     return this.pixels.get(`${x},${y}`);
+  }
+
+  public setSelectedPixel(coord: { x: number; y: number } | null): void {
+    this.selectedPixel = coord;
+  }
+
+  public getSelectedPixel(): { x: number; y: number } | null {
+    return this.selectedPixel;
   }
 
   public render(viewport: ViewportState): void {
@@ -86,6 +95,22 @@ export class CanvasRenderer {
         ctx.fillStyle = meta.color;
         // Ceil size to avoid sub-pixel gaps
         ctx.fillRect(screen.screenX, screen.screenY, Math.ceil(pixelSize), Math.ceil(pixelSize));
+      }
+    }
+
+    // 5. Draw selected pixel highlight (reticle)
+    if (this.selectedPixel) {
+      const { x, y } = this.selectedPixel;
+      if (x >= bounds.minX && x <= bounds.maxX && y >= bounds.minY && y <= bounds.maxY) {
+        const screen = worldToScreen(x, y, viewport);
+        ctx.strokeStyle = '#06b6d4'; // Cyan highlight
+        ctx.lineWidth = Math.max(1.5, Math.min(3, viewport.zoom * 0.2));
+        ctx.strokeRect(
+          screen.screenX - 1,
+          screen.screenY - 1,
+          Math.ceil(pixelSize) + 2,
+          Math.ceil(pixelSize) + 2
+        );
       }
     }
   }
