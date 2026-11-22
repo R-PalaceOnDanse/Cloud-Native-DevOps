@@ -1,5 +1,4 @@
 import { createPublicKey, verify } from "node:crypto";
-import { buffer } from "node:stream/consumers";
 
 // check if request is signed by discord
 // return true if yes, false for all other cases
@@ -17,7 +16,7 @@ export function verifyDiscordSignature(
             format: 'jwk',
         });
         const message = Buffer.concat([Buffer.from(timestamps, 'utf8'), rawBody]);
-        return verify(null, message, publicKey, Buffer.from(signatureHex, 'hex')); // null mean no Ed25519 so not discord
+        return verify(null, message, publicKey, Buffer.from(signatureHex, 'hex'));
     } catch {
         return false;
     }
