@@ -24,11 +24,11 @@ resource "google_secret_manager_secret" "discord_public_key" {
     auto {}
   }
 
-  depends_on = [ google_project_service.serverless ]
+  depends_on = [google_project_service.serverless]
 }
 
 resource "google_secret_manager_secret_iam_member" "discord_proxy_reads_public_key" {
   secret_id = google_secret_manager_secret.discord_public_key.id
-  role = "roles/secretmanager.secretAccessor"
-  member ="serviceAccount:${google_service_account.discord_proxy.email}"
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.discord_proxy.email}"
 }

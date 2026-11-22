@@ -19,13 +19,13 @@ variable "hello_max_instances" {
   }
 }
 
-variable "discord-proxy_max_instance" {
-  type = number
+variable "discord_proxy_max_instance" {
+  type        = number
   description = "Maximum number of instances of the dicord proxy function, cost safegaurd"
-  default = 3
+  default     = 3
 
   validation {
-    condition = var.discord-proxy_max_instance >= 1 && var.discord-proxy_max_instance <= 10
-    error_message = "discord-proxy_max_instance must be between 1 and 10"
+    condition     = var.discord_proxy_max_instance >= 1 && var.discord_proxy_max_instance <= 10
+    error_message = "discord_proxy_max_instance must be between 1 and 10"
   }
 }

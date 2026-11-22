@@ -35,15 +35,15 @@ resource "google_project_iam_member" "hello_logs" {
 
 # Runtime identiy of the discord-proxy function
 resource "google_service_account" "discord_proxy" {
-  account_id = "fn-discord-proxy"
+  account_id   = "fn-discord-proxy"
   display_name = "Function discord-proxy: runtime"
-  description = "Runs the discord proxy function"
+  description  = "Runs the discord proxy function"
 }
 
-resource "google_project_iam_member" "discord-proxy-logs" {
+resource "google_project_iam_member" "discord_proxy_logs" {
   project = var.project_id
-  role = "roles/logging.logWriter"
-  member ="serviceAccount:${google_service_account.discord_proxy.email}"
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${google_service_account.discord_proxy.email}"
 
 }
 
