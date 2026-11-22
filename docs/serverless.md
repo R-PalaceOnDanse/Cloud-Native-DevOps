@@ -78,6 +78,21 @@ then prd ([ci.md](ci.md)). The destroy workflow destroys it before `foundation`.
 apply account needs `roles/run.admin` and `roles/secretmanager.admin` in addition to Editor, and
 the plan account `roles/serviceusage.apiKeysViewer`; both are granted by the `access` stack.
 
+## Firestore database
+
+The stack provisions a Firestore database in Native mode (`europe-west1`), with `(default)` ID:
+
+| Resource | Name | Role |
+|---|---|---|
+| Firestore database | `(default)` (Native mode, `europe-west1`) | Stores the pixel grid state and user rate-limit counters. |
+
+Security and operational rules:
+
+- **Native mode**: Provides ACID transactions, document-level security rules, and real-time listeners.
+- **Region**: Set to `europe-west1`, matching the serverless stack region.
+- **Teardown**: Configured with `delete_protection_state = "DELETE_PROTECTION_DISABLED"` and `deletion_policy = "DELETE"` so `terraform destroy` tears down the stack cleanly without residual locks.
+- **Access control**: Dedicated service accounts (e.g. worker function SA) are granted explicit roles (`roles/datastore.user`) via IAM; no public access is permitted.
+
 ## Next (C06)
 
 The proxy pattern replaces `hello`: a Discord proxy that checks the Ed25519 signature and

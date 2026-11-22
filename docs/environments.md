@@ -23,6 +23,7 @@ day and drifts as people work, so re-read the project before relying on it.
 | Billing | enabled; one budget with alerts, in the access stack (`01A021-589B0D-8ED8BC`) | enabled; one budget with alerts, in the access stack (`01A021-589B0D-8ED8BC`) |
 | Foundation stack (Network & GKE) | applied (VPC, subnet, router, NAT, GKE cluster, system & runner node pools) | applied (VPC, subnet, router, NAT, GKE cluster, system & runner node pools) |
 | Access stack | applied 2026-10-23, 16 resources | applied 2026-10-23, 16 resources |
+| Serverless stack | applied (API Gateway, function hello, Firestore, Secret Manager) | applied (API Gateway, function hello, Firestore, Secret Manager) |
 
 ## Working with environments
 
@@ -88,6 +89,21 @@ is in [ADR-0011](adr/0011-workload-identity-in-the-access-stack.md) and the beha
 The full names of the provider and of the two accounts are the outputs of the stack
 (`terraform -chdir=infra/access output`).
 
+### Serverless stack, in both projects
+
+Defined in `infra/serverless`. The architecture is described in [serverless.md](serverless.md). Each project holds:
+
+| Resource | Name | Purpose |
+|---|---|---|
+| Firestore Database (`google_firestore_database`) | `(default)` (Native mode) | Stores the pixel grid state and user rate-limit counters |
+| API Gateway (`google_api_gateway_gateway`) | `canvas-gw` | Public HTTPS entry point |
+| Cloud Run Function (`google_cloudfunctions2_function`) | `hello` | Verification function behind API Gateway |
+| Sources Bucket (`google_storage_bucket`) | `<project_id>-fn-sources` | Staging bucket for zipped function sources |
+| Secret `hello-greeting` (`google_secret_manager_secret`) | `hello-greeting` | Secret read by the hello function |
+| Service Account `api-gateway` | `api-gateway` | Backend caller identity used by API Gateway |
+| Service Account `fn-hello` | `fn-hello` | Runtime identity of the hello function |
+| Service Account `fn-build` | `fn-build` | Cloud Build identity for function packaging |
+
 ## Not managed by Terraform
 
 Created by hand, or by someone else, and not described by any code in this repository.
@@ -127,6 +143,5 @@ Nothing beyond the access stack, the state bucket and the human access listed ab
 
 ## Not created yet
 
-- The GitHub Actions Runner Controller (ARC) Helm deployment (the GKE cluster and node pools are already provisioned in the foundation stack), the serverless components (Pub/Sub, API Gateway, functions,
-  Firestore, Secret Manager) and the monitoring. The Secret Manager API is not enabled in either
+- The remaining serverless components (Pub/Sub topics, worker functions, Discord proxy) and frontend. The GKE cluster, runners, API Gateway, hello function, Secret Manager, and Firestore database are already provisioned. The Secret Manager API is not enabled in either
   project.

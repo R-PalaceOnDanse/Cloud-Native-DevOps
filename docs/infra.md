@@ -9,7 +9,7 @@ Three stacks exist:
 - `foundation`: the foundational infrastructure of each environment: VPC network, subnets with GKE
   secondary ranges, Cloud Router, Cloud NAT, and the private GKE cluster dedicated to self-hosted
   GitHub Actions runners.
-- `serverless`: the application (API Gateway, Cloud Run functions, secrets), described in
+- `serverless`: the application (API Gateway, Cloud Run functions, Firestore database, secrets), described in
   [serverless.md](serverless.md).
 - `access`: how GitHub Actions authenticates to Google Cloud without a key (Workload Identity
   Federation), budget alerts, and human access (team and instructor). Human access to both projects

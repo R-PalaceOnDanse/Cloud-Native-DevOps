@@ -10,6 +10,7 @@ locals {
     "servicemanagement.googleapis.com", # required by API Gateway
     "servicecontrol.googleapis.com",    # required by API Gateway
     "apikeys.googleapis.com",           # API key checked by the gateway
+    "firestore.googleapis.com",         # pixel grid and rate-limit counters
   ]
 }
 
