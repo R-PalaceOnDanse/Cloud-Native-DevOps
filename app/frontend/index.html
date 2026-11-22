@@ -23,6 +23,8 @@
         <span id="zoom-display">100%</span>
         <span class="separator">|</span>
         <span class="badge badge-live" id="stream-status">⚡ 0 tuiles</span>
+        <span class="separator">|</span>
+        <span class="badge badge-tokens" id="tokens-display" title="Pixels disponibles (Rate Limit)">🪙 20/20</span>
       </div>
       <div class="hud-auth">
         <button id="btn-discord-login" class="btn-discord">
@@ -97,6 +99,9 @@
         </div>
       </div>
     </section>
+
+    <!-- Notification Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
 
     <script type="module" src="./src/main.ts"></script>
   </body>

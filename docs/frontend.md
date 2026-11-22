@@ -70,3 +70,11 @@ In accordance with [ADR-0008](adr/0008-firestore-listeners-for-realtime.md) and 
 - **Discord OAuth2 Client Integration** (Issue #17 / [ADR-0009](adr/0009-firebase-hosting-and-discord-oauth.md)):
   - Top-right Discord login button initiates OAuth2 authorization code flow with scope `identify`.
   - Authenticated session tags the user's Discord handle and snowflake ID on drawn pixels.
+
+---
+
+## 5. Web Draw Proxy & Client Rate Limiting (Issue #76, C07 §3.2)
+
+- **Asynchronous Pipeline**: The client never writes directly to storage or Firestore. All brush strokes are posted to the Web Draw Proxy (`/api/draw`).
+- **Token Bucket HUD Indicator**: The client displays a real-time token bucket indicator (`🪙 20/20`) that refills continuously (1 token every 3 seconds, up to 20 tokens per minute).
+- **Graceful Error Toasting**: If the user draws when tokens are exhausted or if the proxy returns HTTP 429, a floating toast notification informs the user of the retry cooldown without crashing the viewport.

@@ -1,7 +1,8 @@
 /**
  * Main Frontend Application Entry Point.
- * Coordinates Viewport, User Input, Palette, Canvas Renderer, Discord Auth, and Real-time Listeners.
- * Fulfills C07 §3.1–§3.6 (Issues #77, #80, #81, #82, #83).
+ * Coordinates Viewport, User Input, Palette, Canvas Renderer, Discord Auth,
+ * Real-time Listeners, and API Proxy client.
+ * Fulfills C07 §3.1–§3.6 (Issues #77, #80, #81, #82, #83, #76).
  */
 
 import { createDefaultViewport, screenToWorld, zoomAtPoint, panViewport, ViewportState } from './viewport.js';
@@ -9,6 +10,7 @@ import { CanvasRenderer } from './canvas.js';
 import { getBrushPixels } from './brush.js';
 import { RealtimeManager, MockRealtimeProvider } from './realtime.js';
 import { authManager, UserProfile } from './auth.js';
+import { drawApiClient } from './api.js';
 
 // 16 Standard Palette Colors
 const PALETTE_COLORS = [
@@ -27,6 +29,11 @@ let isSpacePressed = false;
 let lastMouseX = 0;
 let lastMouseY = 0;
 
+// Rate Limit Token Bucket State (20 tokens max, refills continuously)
+let userTokens = 20;
+const MAX_TOKENS = 20;
+let lastRefillTime = Date.now();
+
 // DOM Elements
 const canvas = document.getElementById('viewport-canvas') as HTMLCanvasElement;
 const renderer = new CanvasRenderer(canvas);
@@ -35,6 +42,8 @@ let viewport: ViewportState = createDefaultViewport(window.innerWidth, window.in
 const coordDisplay = document.getElementById('coord-display') as HTMLElement;
 const zoomDisplay = document.getElementById('zoom-display') as HTMLElement;
 const streamStatus = document.getElementById('stream-status') as HTMLElement;
+const tokensDisplay = document.getElementById('tokens-display') as HTMLElement;
+const toastContainer = document.getElementById('toast-container') as HTMLElement;
 const paletteContainer = document.getElementById('palette-grid') as HTMLElement;
 const customColorInput = document.getElementById('custom-color') as HTMLInputElement;
 const colorHexLabel = document.getElementById('color-hex-label') as HTMLElement;
@@ -67,6 +76,30 @@ const realtimeManager = new RealtimeManager(
   }
 );
 
+function updateTokensDisplay(): void {
+  const now = Date.now();
+  const elapsed = now - lastRefillTime;
+  if (elapsed >= 3000) {
+    const refilled = Math.floor(elapsed / 3000);
+    userTokens = Math.min(MAX_TOKENS, userTokens + refilled);
+    lastRefillTime = now - (elapsed % 3000);
+  }
+  if (tokensDisplay) {
+    tokensDisplay.textContent = `🪙 ${Math.floor(userTokens)}/${MAX_TOKENS}`;
+  }
+}
+
+function showToast(message: string, type: 'info' | 'error' | 'success' = 'info'): void {
+  if (!toastContainer) return;
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  toastContainer.appendChild(toast);
+  setTimeout(() => {
+    toast.remove();
+  }, 3500);
+}
+
 function resizeCanvas(): void {
   const dpr = window.devicePixelRatio || 1;
   canvas.width = window.innerWidth * dpr;
@@ -80,6 +113,7 @@ function resizeCanvas(): void {
 function requestRender(): void {
   renderer.render(viewport);
   zoomDisplay.textContent = `${Math.round(viewport.zoom * 100)}%`;
+  updateTokensDisplay();
 }
 
 // Build Palette UI
@@ -163,6 +197,7 @@ authManager.onAuthStateChanged((user: UserProfile | null) => {
     btnDiscordLogin.classList.add('hidden');
     userDisplay.classList.remove('hidden');
     userName.textContent = user.username;
+    showToast(`Connecté en tant que ${user.username}`, 'success');
   } else {
     btnDiscordLogin.classList.remove('hidden');
     userDisplay.classList.add('hidden');
@@ -176,6 +211,7 @@ btnDiscordLogin.addEventListener('click', () => {
 
 btnLogout.addEventListener('click', () => {
   authManager.logout();
+  showToast('Déconnecté', 'info');
 });
 
 // Canvas Interaction Listeners
@@ -214,7 +250,7 @@ canvas.addEventListener('mousedown', (e) => {
   }
 
   // Draw on click
-  handleDraw(e.clientX * dpr, e.clientY * dpr);
+  void handleDraw(e.clientX * dpr, e.clientY * dpr);
 });
 
 window.addEventListener('mousemove', (e) => {
@@ -238,7 +274,7 @@ window.addEventListener('mousemove', (e) => {
     realtimeManager.updateViewport(viewport);
     requestRender();
   } else if (currentTool === 'draw') {
-    handleDraw(mouseX, mouseY);
+    void handleDraw(mouseX, mouseY);
   }
 
   lastMouseX = mouseX;
@@ -256,15 +292,36 @@ canvas.addEventListener('click', (e) => {
   inspectPixel(world.x, world.y);
 });
 
-function handleDraw(screenX: number, screenY: number): void {
+async function handleDraw(screenX: number, screenY: number): Promise<void> {
+  updateTokensDisplay();
   const world = screenToWorld(screenX, screenY, viewport);
   const batch = getBrushPixels(world.x, world.y, currentBrushSize, currentColor);
-  if (batch.length > 0) {
-    const author = authManager.getCurrentUser()?.username || 'Anonyme';
-    renderer.applyBatch(batch, author);
-    requestRender();
-    inspectPixel(world.x, world.y);
-    void realtimeManager.publishDraw(batch, author);
+  if (batch.length === 0) return;
+
+  if (userTokens < batch.length) {
+    showToast(`Rate limit : ${Math.floor(userTokens)}/${batch.length} pixels disponibles. Patientez quelques secondes.`, 'error');
+    return;
+  }
+
+  userTokens -= batch.length;
+  updateTokensDisplay();
+
+  const user = authManager.getCurrentUser();
+  const author = user?.username || 'Anonyme';
+  const token = user?.id ? `user_${user.id}` : undefined;
+
+  // 1. Optimistic local rendering
+  renderer.applyBatch(batch, author);
+  requestRender();
+  inspectPixel(world.x, world.y);
+
+  // 2. Broadcast via local provider
+  void realtimeManager.publishDraw(batch, author);
+
+  // 3. Dispatch to Web Draw Proxy backend pipeline
+  const result = await drawApiClient.submitDraw(batch, token);
+  if ('error' in result && result.error) {
+    showToast(result.error, 'error');
   }
 }
 
@@ -297,3 +354,4 @@ function inspectPixel(x: number, y: number): void {
 window.addEventListener('resize', resizeCanvas);
 initPalette();
 resizeCanvas();
+updateTokensDisplay();
