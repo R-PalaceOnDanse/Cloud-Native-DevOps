@@ -84,14 +84,72 @@ The stack provisions a Firestore database in Native mode (`europe-west1`), with 
 
 | Resource | Name | Role |
 |---|---|---|
-| Firestore database | `(default)` (Native mode, `europe-west1`) | Stores the pixel grid state and user rate-limit counters. |
+| Firestore database (`google_firestore_database`) | `(default)` (Native mode, `europe-west1`) | Stores the pixel grid chunks, user rate-limit counters, and canvas session flags. |
 
 Security and operational rules:
 
-- **Native mode**: Provides ACID transactions, document-level security rules, and real-time listeners.
+- **Native mode**: Provides ACID transactions, document-level security rules, and real-time listeners (required for real-time frontend updates in C07).
 - **Region**: Set to `europe-west1`, matching the serverless stack region.
-- **Teardown**: Configured with `delete_protection_state = "DELETE_PROTECTION_DISABLED"` and `deletion_policy = "DELETE"` so `terraform destroy` tears down the stack cleanly without residual locks.
-- **Access control**: Dedicated service accounts (e.g. worker function SA) are granted explicit roles (`roles/datastore.user`) via IAM; no public access is permitted.
+- **Teardown**: Configured with `delete_protection_state = "DELETE_PROTECTION_DISABLED"` and `deletion_policy = "DELETE"` so `terraform destroy` tears down the stack cleanly without residual locks (mandated by C02 §6).
+- **Access control**: Dedicated service accounts (e.g. worker function SA) are granted explicit roles (`roles/datastore.user`) via IAM; no public or unauthenticated access is permitted.
+
+### Data model design (C06 §4.3)
+
+To efficiently support a large grid of at least 10,000x10,000 pixels without storing one giant document (a common pitfall flagged in past defenses), the data layout is partitioned into tiles/chunks:
+
+1. **Grid chunks collection (`chunks/`)**:
+   - Document ID: `chunk_{chunk_x}_{chunk_y}` (e.g., `chunk_0_0` for coordinates `[0..63, 0..63]` with 64x64 tiling).
+   - Document contents: map of painted pixels `pixels: { "x_y": { "color": "#RRGGBB", "author": "discord_user_id", "updated_at": "ISO8601_TIMESTAMP" } }`. Unpainted pixels are omitted to keep storage sparse and lightweight.
+2. **Rate limits collection (`rate_limits/`)**:
+   - Document ID: `{user_id}`.
+   - Document contents: `{ "tokens": 20, "last_refill": "ISO8601_TIMESTAMP", "override_limit": null }`.
+3. **Session state collection (`session/state`)**:
+   - Singleton document: `{ "paused": false, "updated_by": "admin_user_id", "updated_at": "ISO8601_TIMESTAMP" }`.
+
+### Testing and validation
+
+#### 1. Terraform code validation
+Run from repository root:
+```bash
+terraform -chdir=infra/serverless fmt -check
+terraform -chdir=infra/serverless init -backend=false
+terraform -chdir=infra/serverless validate
+```
+
+#### 2. Plan check against dev / prd
+```bash
+terraform -chdir=infra/serverless init -reconfigure -backend-config=backends/dev.hcl
+terraform -chdir=infra/serverless plan -var-file=dev.tfvars
+```
+Verify the output indicates:
+`# google_firestore_database.canvas will be created` with `name = "(default)"`, `type = "FIRESTORE_NATIVE"`, `location_id = "europe-west1"`.
+
+#### 3. Post-apply cloud verification (gcloud)
+Once deployed by CI/CD or applied manually on `dev`:
+```bash
+# Describe the database and verify it is ACTIVE in Native mode
+gcloud firestore databases describe --database="(default)" --project=teampasx-cloudnative-dev
+
+# Verify location and deletion settings
+gcloud firestore databases describe --database="(default)" --project=teampasx-cloudnative-dev \
+  --format="yaml(name, locationId, type, deleteProtectionState)"
+```
+Expected output:
+- `locationId: europe-west1`
+- `type: FIRESTORE_NATIVE`
+- `deleteProtectionState: DELETE_PROTECTION_DISABLED`
+
+#### 4. IAM and access test
+Verify that the default compute engine service account does not have write access and that only explicit service accounts (e.g. worker function identity with `roles/datastore.user`) can interact with documents:
+```bash
+# Verify IAM policy bindings on the project or database
+gcloud projects get-iam-policy teampasx-cloudnative-dev \
+  --flatten="bindings[].members" \
+  --filter="bindings.role:roles/datastore.user"
+```
+
+#### 5. Teardown test
+During `terraform destroy -var-file=dev.tfvars`, verify that `google_firestore_database.canvas` is destroyed cleanly without requiring manual console overrides.
 
 ## Next (C06)
 
