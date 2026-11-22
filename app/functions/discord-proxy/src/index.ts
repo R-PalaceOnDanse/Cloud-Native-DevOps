@@ -30,7 +30,6 @@ ff.http('discordProxy', async (req: ff.Request, res: ff.Response) => {
         return;
     }
 
-    // no public key, no check
     // read the Discord public key from Secret Manager (cached after the first call)
     let publicKey: string;
     try {
@@ -48,7 +47,8 @@ ff.http('discordProxy', async (req: ff.Request, res: ff.Response) => {
     //keep a complete copy of incoming buffer
 
     //check for discord signature
-    if (!signature || !timestamp || !rawBody || !verifyDiscordSignature(SECRET_VERSION, signature, timestamp, rawBody)) {
+    if (!signature || !timestamp || !rawBody || !verifyDiscordSignature(publicKey, signature, timestamp, rawBody)) {
+        console.error(JSON.stringify({ severity: 'ERROR', message: 'Invalid Discord request signature', function: 'discord-proxy', }));
         res.status(401).send('invalid request signature');
         return;
     }
