@@ -29,6 +29,7 @@ resource "google_container_cluster" "primary" {
   depends_on = [
     google_project_service.container,
     google_project_service.compute,
+    google_compute_router_nat.nat,
   ]
 
   cluster_autoscaling {
