@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Collaborative Pixel Canvas — r/place</title>
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <!-- Canvas display -->
+    <canvas id="viewport-canvas"></canvas>
+
+    <!-- Top floating HUD -->
+    <header class="hud-top">
+      <div class="hud-title">
+        <span class="hud-logo">🎨</span>
+        <strong>Pixel Canvas</strong>
+        <span class="badge" id="canvas-size">10,000 × 10,000</span>
+      </div>
+      <div class="hud-info">
+        <span id="coord-display">X: — , Y: —</span>
+        <span class="separator">|</span>
+        <span id="zoom-display">100%</span>
+      </div>
+    </header>
+
+    <!-- Left Toolbar -->
+    <aside class="hud-toolbar" id="toolbar">
+      <div class="tool-section">
+        <label class="section-label">Outil</label>
+        <div class="tool-group">
+          <button id="tool-draw" class="btn-tool active" title="Mode Dessin">✏️ Dessin</button>
+          <button id="tool-pan" class="btn-tool" title="Mode Déplacement (ou maintenir Espace)">✋ Pan</button>
+        </div>
+      </div>
+
+      <div class="tool-section">
+        <label class="section-label">Taille du pinceau</label>
+        <div class="brush-selector" id="brush-selector">
+          <button class="btn-brush active" data-size="1">1px</button>
+          <button class="btn-brush" data-size="3">3px</button>
+          <button class="btn-brush" data-size="5">5px</button>
+          <button class="btn-brush" data-size="9">9px</button>
+        </div>
+      </div>
+
+      <div class="tool-section">
+        <label class="section-label">Palette de couleurs</label>
+        <div class="palette-grid" id="palette-grid">
+          <!-- Populated by main.ts with 16 standard colors -->
+        </div>
+        <div class="custom-color-row">
+          <input type="color" id="custom-color" value="#ff0000" />
+          <span id="color-hex-label">#ff0000</span>
+        </div>
+      </div>
+
+      <div class="tool-section">
+        <button id="btn-reset-view" class="btn-action">Centrer la vue</button>
+      </div>
+    </aside>
+
+    <!-- Bottom-right Inspector Panel -->
+    <section class="hud-inspector" id="inspector">
+      <div class="inspector-header">Informations du Pixel</div>
+      <div class="inspector-body">
+        <div class="info-row">
+          <span class="info-label">Position :</span>
+          <span class="info-value" id="inspect-coords">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Auteur :</span>
+          <span class="info-value" id="inspect-author">Vide</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Date :</span>
+          <span class="info-value" id="inspect-time">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Couleur :</span>
+          <span class="info-value" id="inspect-color">—</span>
+        </div>
+      </div>
+    </section>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
