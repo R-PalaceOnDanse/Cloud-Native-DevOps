@@ -63,6 +63,7 @@ resource "helm_release" "grafana" {
         "datasources.yaml" = {
           apiVersion = 1
           datasources = [{
+            uid       = "gcm" # the dashboards point to it
             name      = "Google Cloud Monitoring"
             type      = "stackdriver"
             access    = "proxy"
@@ -72,6 +73,24 @@ resource "helm_release" "grafana" {
               defaultProject     = var.project_id
             }
           }]
+        }
+      }
+      # The dashboards are the files of dashboards/, with the project of the environment filled in.
+      dashboardProviders = {
+        "dashboardproviders.yaml" = {
+          apiVersion = 1
+          providers = [{
+            name            = "default"
+            orgId           = 1
+            type            = "file"
+            disableDeletion = true
+            options         = { path = "/var/lib/grafana/dashboards/default" }
+          }]
+        }
+      }
+      dashboards = {
+        default = {
+          cluster = { json = replace(file("dashboards/cluster.json"), "__PROJECT_ID__", var.project_id) }
         }
       }
     }),

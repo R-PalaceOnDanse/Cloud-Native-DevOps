@@ -238,6 +238,19 @@ kubectl port-forward --namespace monitoring service/grafana 3000:80
 To change the password, add a new version with the first command; the cluster picks it up within the
 hour.
 
+The dashboards are files in `infra/foundation/dashboards/`, loaded by Terraform with the project of the
+environment filled in. **Cluster and runners** (`cluster.json`) shows:
+
+- the nodes by pool, so the runner pool going from 0 up and back to 0 is visible, and the containers
+  per namespace (the `arc-runners` line is the runners);
+- CPU and memory, per node and per namespace, and the container restarts;
+- the runner activity from the controller's metrics: jobs assigned and running (the difference is the
+  jobs waiting) and runners registered, busy and wanted.
+
+The queries were checked against the Managed Prometheus API of dev, except the runner activity ones
+(`gha_*`), which exist once the metrics of the controller are on. To change a dashboard, edit it in
+Grafana, export its JSON and replace the file; a change made only in Grafana is lost at the next deploy.
+
 ### Clean Teardown
 
 The cluster and its node pools are declared without `prevent_destroy` or `deletion_protection`. Running `terraform destroy` on `infra/foundation` removes the runner node pool, system node pool, GKE cluster, subnets, and Cloud NAT cleanly in dependency order without leaving orphan cloud resources.
