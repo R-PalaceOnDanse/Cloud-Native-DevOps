@@ -19,6 +19,32 @@ resource "helm_release" "arc_controller" {
     google_container_node_pool.system,
     google_compute_router_nat.nat,
   ]
+
+  # Switches on the Prometheus metrics of the controller and of the listeners: jobs waiting, runners
+  # busy and registered. They are off by default.
+  set {
+    name  = "metrics.controllerManagerAddr"
+    value = ":8080"
+  }
+
+  set {
+    name  = "metrics.listenerAddr"
+    value = ":8080"
+  }
+
+  set {
+    name  = "metrics.listenerEndpoint"
+    value = "/metrics"
+  }
+}
+
+# Tells Managed Prometheus to scrape those metrics. A local chart, as for arc-secret: the custom
+# resource does not exist yet when Terraform plans.
+resource "helm_release" "arc_metrics" {
+  name       = "arc-metrics"
+  namespace  = "arc-systems"
+  chart      = "${path.module}/charts/arc-metrics"
+  depends_on = [helm_release.arc_controller]
 }
 
 resource "helm_release" "arc_runner" {

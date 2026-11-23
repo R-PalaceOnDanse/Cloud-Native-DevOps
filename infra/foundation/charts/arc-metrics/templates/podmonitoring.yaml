@@ -1,0 +1,16 @@
+apiVersion: monitoring.googleapis.com/v1
+kind: PodMonitoring
+metadata:
+  name: arc
+spec:
+  selector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values:
+          - controller-manager
+          - runner-scale-set-listener
+  endpoints:
+    - port: 8080
+      path: /metrics
+      interval: 30s

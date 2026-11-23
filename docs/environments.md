@@ -62,7 +62,7 @@ Defined in `infra/foundation`, applied on 2026-10-23. The design is in
 | Cloud Router (`google_compute_router`) | `teampasx-dev-vpc-router` | `teampasx-prd-vpc-router` | Regional router in `europe-west1` |
 | Cloud NAT (`google_compute_router_nat`) | `teampasx-dev-vpc-nat` | `teampasx-prd-vpc-nat` | Egress NAT for private nodes and runners |
 | GKE Cluster (`google_container_cluster`) | `teampasx-dev-vpc-gke` | `teampasx-prd-vpc-gke` | Private GKE cluster in `europe-west1-b` for CI/CD runners |
-| System Node Pool (`google_container_node_pool`) | `system-pool` (1 × `e2-small`) | `system-pool` (1 × `e2-small`) | Dedicated pool for controllers and cluster services |
+| System Node Pool (`google_container_node_pool`) | `system-pool` (1 × `e2-medium`) | `system-pool` (1 × `e2-medium`) | Dedicated pool for controllers and cluster services |
 | Runner Node Pool (`google_container_node_pool`) | `runner-pool` (0-2 × `e2-medium` Spot) | `runner-pool` (0-2 × `e2-medium` Spot) | Autoscaling Spot pool with `runner=true:NoSchedule` taint |
 | Monitoring Dashboard (`google_monitoring_dashboard`) | `teampasx-dev-vpc-gke-overview` | `teampasx-prd-vpc-gke-overview` | Cloud Monitoring dashboard for cluster nodes, pods, and runners |
 | Alert Policies (`google_monitoring_alert_policy`) | Node CPU/Memory high, container restarts | Node CPU/Memory high, container restarts | Automated threshold alerts on resource pressure and container failures |
