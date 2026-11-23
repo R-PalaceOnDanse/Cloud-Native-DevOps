@@ -79,11 +79,11 @@ This document describes the reactive web frontend for the collaborative pixel ca
   - Highlights the current viewport frustum bounding box in cyan (`#06b6d4`).
   - Interactive: clicking or dragging on the radar immediately centers the main canvas to that location.
   - Collapsible via the header toggle `▾`.
-- **Coordinate Jump ("Aller à X, Y") & URL Hash Deep Linking**:
-  - Top HUD coordinate label or `📍 Aller à` button opens a modal to jump directly to any `(X, Y)` position and zoom level.
+- **Coordinate Jump ("Jump to X, Y") & URL Hash Deep Linking**:
+  - Top HUD coordinate label or `📍 Jump` button opens a modal to jump directly to any `(X, Y)` position and zoom level.
   - Viewport automatically syncs with the URL hash (`#x=5000&y=5000&z=1`), enabling instant deep linking and coordinate sharing across teams and Discord.
 - **Canvas View PNG Export**:
-  - A toolbar action `📷 Exporter vue` enables one-click download of the active viewport render as a PNG image file.
+  - A toolbar action `📷 Export View` enables one-click download of the active viewport render as a PNG image file.
 
 ### F. Quality-of-Life Tools (Eyedropper, Recent Colors, Gridlines & Offline Mode)
 - **Pipette / Eyedropper Tool (`I` or `Alt + Click`)**:
@@ -95,7 +95,7 @@ This document describes the reactive web frontend for the collaborative pixel ca
 - **Quick Eraser (`E` key or toolbar button)**:
   - Instantly switches the drawing color to blank white (`#ffffff`) to allow erasing or cleaning up pixels.
 - **Network Offline Detection & Local Graceful Degradation**:
-  - Native listener for `online` / `offline` events displaying a warning badge `⚠️ Hors-ligne` in the top HUD. Optimistic drawing continues locally without throwing errors.
+  - Native listener for `online` / `offline` events displaying a warning badge `⚠️ Offline` in the top HUD. Optimistic drawing continues locally without throwing errors.
 - **Personal Contribution Counter (`🎯 N px`)**:
   - Real-time counter in the top HUD tracking total pixels placed by the user, persisted in `localStorage`.
 
