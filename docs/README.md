@@ -40,7 +40,12 @@ Welcome to the Cloud Native DevOps documentation hub. This directory contains al
 
 ## 5. Defense Preparation & Auditing
 
+- **[defense-presentation-slides.md](defense-presentation-slides.md)**: Official oral defense slide deck (20 Marp slides ready to present on Teams).
+- **[defense-evidence-book.md](defense-evidence-book.md)**: Verifiable offline evidence catalog of logs, curl commands, trace waterfalls, and benchmark data.
+- **[defense-team-roles.md](defense-team-roles.md)**: Team speaking schedule, minute-by-minute timeline, screen sharing, and vocal transitions.
+- **[intermediate-review-deliverables.md](intermediate-review-deliverables.md)**: Dedicated audit sheet and verification guide for the Intermediate Review (Milestone 0, C01–C04).
 - **[defense-checklist.md](defense-checklist.md)**: Official subject deliverables audit (§5.6) with evidence links for all requirements (Issue #94).
 - **[defense-demonstration-script.md](defense-demonstration-script.md)**: Live demonstration script covering IDE, GitFlow, runner autoscaling, Discord bot, real-time web, and fallback runbook (Issue #92).
 - **[security-walkthrough.md](security-walkthrough.md)**: Security architecture walk-through sheet detailing least privilege IAM, private functions, secrets, and cryptographic verification (Issue #93).
 - **[defense-rehearsal.md](defense-rehearsal.md)**: Oral defense preparation guide, 3-minute executive pitch, and answers to 20+ technical jury questions (Issue #95).
+
