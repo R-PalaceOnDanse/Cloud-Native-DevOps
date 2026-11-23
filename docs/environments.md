@@ -83,7 +83,7 @@ is in [ADR-0011](adr/0011-workload-identity-in-the-access-stack.md) and the beha
 | State bucket role | `roles/storage.objectAdmin` on the bucket, for both accounts | Terraform writes a lock even for a plan |
 | Impersonation bindings | `roles/iam.workloadIdentityUser` on each account | Who may use each account, as described above |
 | Enabled APIs | Cloud Resource Manager, IAM, IAM Credentials, Security Token Service | Required by the federation; left enabled on destroy |
-| Secret `arc-github-token` and the Secret Manager API | Secret Manager | GitHub token of the runner controller, value added by hand, `prevent_destroy`. In the code since [ADR-0016](adr/0016-external-secrets-operator.md), **not applied yet** (the counts above are those of 2026-10-23) |
+| Secrets `arc-github-app-id`, `arc-github-app-installation-id`, `arc-github-app-private-key` and Secret Manager API | Secret Manager | GitHub App credentials for ARC runner controller, values added by hand, `prevent_destroy` (Issue #151, [ADR-0016](adr/0016-external-secrets-operator.md)). Legacy `arc-github-token` retained for fallback/transition |
 
 The full names of the provider and of the two accounts are the outputs of the stack
 (`terraform -chdir=infra/access output`).

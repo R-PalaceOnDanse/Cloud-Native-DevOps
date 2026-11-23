@@ -20,6 +20,18 @@ spec:
     name: arc-github
     creationPolicy: Owner
   data:
+{{- if eq .Values.authType "app" }}
+    - secretKey: github_app_id
+      remoteRef:
+        key: {{ .Values.appIdSecretName | default "arc-github-app-id" | quote }}
+    - secretKey: github_app_installation_id
+      remoteRef:
+        key: {{ .Values.appInstallationIdSecretName | default "arc-github-app-installation-id" | quote }}
+    - secretKey: github_app_private_key
+      remoteRef:
+        key: {{ .Values.appPrivateKeySecretName | default "arc-github-app-private-key" | quote }}
+{{- else }}
     - secretKey: github_token
       remoteRef:
         key: {{ required "secretName is required" .Values.secretName | quote }}
+{{- end }}

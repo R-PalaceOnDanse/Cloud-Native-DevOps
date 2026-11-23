@@ -52,3 +52,14 @@ variable "environment" {
     error_message = "environment must be dev or prd."
   }
 }
+
+variable "runner_auth_type" {
+  type        = string
+  description = "Authentication mode for ARC runners: 'app' (GitHub App) or 'token' (Personal Access Token)."
+  default     = "app"
+
+  validation {
+    condition     = contains(["app", "token"], var.runner_auth_type)
+    error_message = "runner_auth_type must be either 'app' or 'token'."
+  }
+}
