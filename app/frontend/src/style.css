@@ -51,6 +51,8 @@ body, html {
   height: 100%;
   image-rendering: pixelated;
   cursor: crosshair;
+  user-select: none;
+  touch-action: none;
 }
 
 /* ==========================================================================

@@ -36,7 +36,7 @@ const PALETTE_COLORS = [
 // App State
 let currentColor = '#ff0000';
 let currentBrushSize: BrushSize = 1;
-let currentTool: 'draw' | 'pan' | 'pipette' = 'draw';
+let currentTool: 'draw' | 'pan' | 'pipette' | 'inspect' = 'draw';
 let isMouseDown = false;
 let isSpacePressed = false;
 let lastMouseX = 0;
@@ -81,6 +81,7 @@ const colorHexLabel = document.getElementById('color-hex-label') as HTMLElement;
 const toolDrawBtn = document.getElementById('tool-draw') as HTMLButtonElement;
 const toolPanBtn = document.getElementById('tool-pan') as HTMLButtonElement;
 const toolPipetteBtn = document.getElementById('tool-pipette') as HTMLButtonElement | null;
+const toolInspectBtn = document.getElementById('tool-inspect') as HTMLButtonElement | null;
 const btnToggleGrid = document.getElementById('btn-toggle-grid') as HTMLButtonElement | null;
 const btnQuickEraser = document.getElementById('btn-quick-eraser') as HTMLButtonElement | null;
 const recentPaletteGrid = document.getElementById('recent-palette-grid') as HTMLElement | null;
@@ -453,16 +454,19 @@ document.querySelectorAll('.btn-brush').forEach((btn) => {
 });
 
 // Tools switch & management
-function setTool(tool: 'draw' | 'pan' | 'pipette'): void {
+function setTool(tool: 'draw' | 'pan' | 'pipette' | 'inspect'): void {
   currentTool = tool;
   toolDrawBtn.classList.toggle('active', tool === 'draw');
   toolPanBtn.classList.toggle('active', tool === 'pan');
   toolPipetteBtn?.classList.toggle('active', tool === 'pipette');
+  toolInspectBtn?.classList.toggle('active', tool === 'inspect');
 
   if (tool === 'pan') {
     canvas.style.cursor = 'grab';
   } else if (tool === 'pipette') {
     canvas.style.cursor = 'copy';
+  } else if (tool === 'inspect') {
+    canvas.style.cursor = 'help';
   } else {
     canvas.style.cursor = 'crosshair';
   }
@@ -479,6 +483,11 @@ toolPanBtn.addEventListener('click', () => {
 toolPipetteBtn?.addEventListener('click', () => {
   setTool('pipette');
   showToast('💉 Eyedropper mode active: click a pixel to sample its color (or hold Alt while drawing)', 'info');
+});
+
+toolInspectBtn?.addEventListener('click', () => {
+  setTool('inspect');
+  showToast('🔍 Inspect mode active: click any pixel to view its author & timestamp', 'info');
 });
 
 // Palette Popover Toggle & Close
@@ -727,6 +736,9 @@ window.addEventListener('keydown', (e) => {
     canvas.style.cursor = 'grab';
   } else if (e.key === 'b' || e.key === 'B') {
     setTool('draw');
+  } else if (e.key === 'v' || e.key === 'V') {
+    setTool('inspect');
+    showToast('🔍 Inspect mode active: click any pixel to view its details', 'info');
   } else if (e.key === 'h' || e.key === 'H') {
     setTool('pan');
   } else if (e.key === 'i' || e.key === 'I') {
@@ -787,8 +799,12 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => {
   if (e.code === 'Space') {
     isSpacePressed = false;
-    canvas.style.cursor = currentTool === 'pan' ? 'grab' : (currentTool === 'pipette' ? 'copy' : 'crosshair');
+    canvas.style.cursor = currentTool === 'pan' ? 'grab' : (currentTool === 'pipette' ? 'copy' : (currentTool === 'inspect' ? 'help' : 'crosshair'));
   }
+});
+
+canvas.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
 });
 
 canvas.addEventListener('mousedown', (e) => {
@@ -798,28 +814,48 @@ canvas.addEventListener('mousedown', (e) => {
   lastMouseX = e.clientX * dpr;
   lastMouseY = e.clientY * dpr;
 
+  const world = screenToWorld(lastMouseX, lastMouseY, viewport);
+
+  // Right-click: inspect pixel directly without modifying canvas
+  if (e.button === 2) {
+    if (world.x >= 0 && world.x < 10000 && world.y >= 0 && world.y < 10000) {
+      inspectPixel(world.x, world.y);
+    }
+    return;
+  }
+
+  // Middle-click or Space held -> Pan view
   if (isSpacePressed || currentTool === 'pan' || e.button === 1) {
     canvas.style.cursor = 'grabbing';
     return;
   }
 
-  const world = screenToWorld(lastMouseX, lastMouseY, viewport);
-
-  // Pipette mode or Alt + click eyedropper
-  if (currentTool === 'pipette' || e.altKey) {
-    if (world.x >= 0 && world.x < 10000 && world.y >= 0 && world.y < 10000) {
-      const pickedColor = renderer.getPixelColor(world.x, world.y);
-      selectColor(pickedColor);
-      addRecentColor(pickedColor);
-      setTool('draw');
-      showToast(`💉 Color sampled: ${pickedColor} at (${world.x}, ${world.y})`, 'info');
+  // Left-click actions (strictly on press down, never on release):
+  if (e.button === 0) {
+    // Pipette mode or Alt + click eyedropper
+    if (currentTool === 'pipette' || e.altKey) {
+      if (world.x >= 0 && world.x < 10000 && world.y >= 0 && world.y < 10000) {
+        const pickedColor = renderer.getPixelColor(world.x, world.y);
+        selectColor(pickedColor);
+        addRecentColor(pickedColor);
+        setTool('draw');
+        showToast(`💉 Color sampled: ${pickedColor} at (${world.x}, ${world.y})`, 'info');
+      }
+      return;
     }
-    return;
-  }
 
-  // Draw strictly 1 pixel/stroke per click (no drawing on hold/drag)
-  if (currentTool === 'draw' && e.button === 0) {
-    void handleDraw(lastMouseX, lastMouseY);
+    // Inspect mode
+    if (currentTool === 'inspect') {
+      if (world.x >= 0 && world.x < 10000 && world.y >= 0 && world.y < 10000) {
+        inspectPixel(world.x, world.y);
+      }
+      return;
+    }
+
+    // Draw strictly 1 pixel/stroke per click (no drawing on hold/drag)
+    if (currentTool === 'draw') {
+      void handleDraw(lastMouseX, lastMouseY);
+    }
   }
 });
 
@@ -844,7 +880,7 @@ window.addEventListener('mousemove', (e) => {
     realtimeManager.updateViewport(viewport);
     requestRender();
   }
-  // In draw mode: strictly no drawing on mousemove (1 pixel per click)
+  // In draw or inspect mode: strictly no actions on mousemove (1 action per click)
 
   lastMouseX = mouseX;
   lastMouseY = mouseY;
@@ -853,7 +889,7 @@ window.addEventListener('mousemove', (e) => {
 window.addEventListener('mouseup', () => {
   isMouseDown = false;
   lastDrawnCoord = null;
-  canvas.style.cursor = (isSpacePressed || currentTool === 'pan') ? 'grab' : 'crosshair';
+  canvas.style.cursor = (isSpacePressed || currentTool === 'pan') ? 'grab' : (currentTool === 'pipette' ? 'copy' : (currentTool === 'inspect' ? 'help' : 'crosshair'));
   syncUrlHash();
 });
 
@@ -862,7 +898,6 @@ let initialPinchDistance = 0;
 let initialPinchMidpoint = { x: 0, y: 0 };
 let lastTouchX = 0;
 let lastTouchY = 0;
-let touchStartTime = 0;
 
 canvas.addEventListener('touchstart', (e) => {
   const dpr = window.devicePixelRatio || 1;
@@ -870,8 +905,24 @@ canvas.addEventListener('touchstart', (e) => {
     const touch = e.touches[0]!;
     lastTouchX = touch.clientX * dpr;
     lastTouchY = touch.clientY * dpr;
-    touchStartTime = Date.now();
     lastDrawnCoord = null;
+
+    const world = screenToWorld(lastTouchX, lastTouchY, viewport);
+    if (currentTool === 'draw') {
+      void handleDraw(lastTouchX, lastTouchY);
+    } else if (currentTool === 'pipette') {
+      if (world.x >= 0 && world.x < 10000 && world.y >= 0 && world.y < 10000) {
+        const pickedColor = renderer.getPixelColor(world.x, world.y);
+        selectColor(pickedColor);
+        addRecentColor(pickedColor);
+        setTool('draw');
+        showToast(`💉 Color sampled: ${pickedColor} at (${world.x}, ${world.y})`, 'info');
+      }
+    } else if (currentTool === 'inspect') {
+      if (world.x >= 0 && world.x < 10000 && world.y >= 0 && world.y < 10000) {
+        inspectPixel(world.x, world.y);
+      }
+    }
   } else if (e.touches.length === 2) {
     const t1 = e.touches[0]!;
     const t2 = e.touches[1]!;
@@ -916,37 +967,15 @@ canvas.addEventListener('touchmove', (e) => {
       realtimeManager.updateViewport(viewport);
       requestRender();
     }
-    // In draw mode: strictly no drawing on touchmove (1 pixel per tap)
+    // In draw or inspect mode: strictly no action on touchmove
 
     lastTouchX = touchX;
     lastTouchY = touchY;
   }
 }, { passive: false });
 
-canvas.addEventListener('touchend', (e) => {
-  const dpr = window.devicePixelRatio || 1;
-  if (e.touches.length === 0 && e.changedTouches.length === 1) {
-    const touch = e.changedTouches[0]!;
-    const elapsed = Date.now() - touchStartTime;
-    const touchX = touch.clientX * dpr;
-    const touchY = touch.clientY * dpr;
-    const dist = Math.hypot(touchX - lastTouchX, touchY - lastTouchY);
-
-    if (elapsed < 350 && dist < 15 * dpr) {
-      const world = screenToWorld(touchX, touchY, viewport);
-      inspectPixel(world.x, world.y);
-      if (currentTool === 'draw') {
-        void handleDraw(touchX, touchY);
-      }
-    }
-  }
+canvas.addEventListener('touchend', () => {
   lastDrawnCoord = null;
-});
-
-canvas.addEventListener('click', (e) => {
-  const dpr = window.devicePixelRatio || 1;
-  const world = screenToWorld(e.clientX * dpr, e.clientY * dpr, viewport);
-  inspectPixel(world.x, world.y);
 });
 
 if (btnClearInspect) {
@@ -982,7 +1011,6 @@ async function handleDraw(screenX: number, screenY: number): Promise<void> {
   // 1. Optimistic local rendering
   renderer.applyBatch(batch, author);
   requestRender();
-  inspectPixel(world.x, world.y);
   addRecentColor(currentColor);
   updateUserPixelsCount(batch.length);
 
