@@ -245,6 +245,23 @@ btnLogout.addEventListener('click', () => {
   showToast('Déconnecté', 'info');
 });
 
+// Check for OAuth return parameters (?code=...&state=...)
+if (typeof window !== 'undefined' && window.location.search) {
+  const urlParams = new URLSearchParams(window.location.search);
+  const authCode = urlParams.get('code');
+  const authState = urlParams.get('state');
+  if (authCode && authState) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+    void authManager.handleOAuthReturn(authCode, authState).then((res) => {
+      if (res.success) {
+        showToast('Connexion Discord réussie !', 'success');
+      } else {
+        showToast(`Échec connexion Discord : ${res.error || 'Erreur'}`, 'error');
+      }
+    });
+  }
+}
+
 // Canvas Interaction Listeners
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
@@ -346,7 +363,7 @@ async function handleDraw(screenX: number, screenY: number): Promise<void> {
 
   const user = authManager.getCurrentUser();
   const author = user?.username || 'Anonyme';
-  const token = user?.id ? `user_${user.id}` : undefined;
+  const token = authManager.getSessionToken() || (user?.id ? `user_${user.id}` : undefined);
 
   // 1. Optimistic local rendering
   renderer.applyBatch(batch, author);
