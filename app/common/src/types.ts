@@ -13,6 +13,8 @@ export interface Pixel {
   readonly author: string;
   /** Unix timestamp in milliseconds when the pixel was updated */
   readonly timestamp: number;
+  /** Grid epoch (increments on admin clear, defaults to 0) */
+  readonly epoch?: number;
 }
 
 /**
@@ -52,6 +54,10 @@ export interface ChunkDocument {
   readonly pixels: Record<string, Pixel>;
   /** Timestamp in milliseconds of the latest write to this chunk */
   readonly updatedAt: number;
+  /** Grid epoch (increments on admin clear, defaults to 0) */
+  readonly epoch?: number;
+  /** List of recent processed event IDs for idempotency */
+  readonly processedEvents?: string[];
 }
 
 /**

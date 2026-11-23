@@ -97,11 +97,42 @@ Implemented and tested in `app/common/src/coordinates.ts`.
   - Controlled by `/admin pause` and `/admin resume`.
   - When `paused: true`, all `/draw` and frontend write operations are rejected immediately.
 
+### D. Subcollection `deltas` (Real-time Stream with TTL — Issue #58)
+- **Path**: `chunks/{chunkId}/deltas/{deltaId}` (e.g. `chunks/chunk_0_0/deltas/delta_1700000000000_abc123`)
+- **Document Schema**:
+  ```json
+  {
+    "deltaId": "delta_1700000000000_abc123",
+    "chunkId": "chunk_0_0",
+    "eventId": "event-uuid-456",
+    "pixels": {
+      "12,34": {
+        "color": "#00ff00",
+        "author": "987654321098765432",
+        "timestamp": 1700000005000,
+        "epoch": 0
+      }
+    },
+    "createdAt": 1700000005000,
+    "expiresAt": 1700000305000
+  }
+  ```
+- **Rules**:
+  - Emitted by workers on each write.
+  - Carries a TTL (`expiresAt = createdAt + 300s`) for automatic Firestore document deletion.
+  - Read-only for authenticated web clients (`firestore.rules`).
+
+### E. Tile Image Renderer & Cloud Storage Caching (Issue #54)
+- **Path**: `gs://<snapshot-bucket>/tiles/{chunkId}.png`
+- **Output**: 64 × 64 PNG image (standard standard IHDR + IDAT deflate + IEND).
+- **Delivery**: Cloud Storage bucket (private) fronted by Cloud CDN with pre-authenticated caching.
+- **Rules**: Regenerated on chunk modification (`renderTileToPng`) to enable instant visual hydration upon viewport initialization before attaching Firestore `onSnapshot` listeners.
+
 ---
 
 ## 4. Local Testing & Verification ($0 Cloud Spend)
 
-The entire data model and coordinate translation logic is fully unit-tested with 0 cloud dependencies:
+The entire data model, coordinate translation, transactional mutation, delta TTL, and tile image rendering logic is fully unit-tested with 0 cloud dependencies:
 
 ```bash
 cd app/common
