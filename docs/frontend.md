@@ -46,7 +46,10 @@ This document describes the reactive web frontend for the collaborative pixel ca
 ### D. Keyboard Shortcuts & Touch Gestures
 - **Keyboard Shortcuts (Power-User & Defense)**:
   - `B` : Switch to Brush / Draw tool
+  - `I` : Switch to Eyedropper / Pipette tool (or hold `Alt` while in Draw mode)
   - `H` : Switch to Hand / Pan tool
+  - `E` : Quick Eraser (switches color to canvas blank `#ffffff`)
+  - `G` : Toggle pixel gridlines on/off
   - `Space` (held) : Temporary pan mode
   - `1`, `2`, `3`, `4` : Quick-select brush size (1px, 3px, 5px, 9px)
   - `+` / `-` : Smooth zoom in / out
@@ -70,6 +73,20 @@ This document describes the reactive web frontend for the collaborative pixel ca
   - Viewport automatically syncs with the URL hash (`#x=5000&y=5000&z=1`), enabling instant deep linking and coordinate sharing across teams and Discord.
 - **Canvas View PNG Export**:
   - A toolbar action `📷 Exporter vue` enables one-click download of the active viewport render as a PNG image file.
+
+### F. Quality-of-Life Tools (Eyedropper, Recent Colors, Gridlines & Offline Mode)
+- **Pipette / Eyedropper Tool (`I` or `Alt + Click`)**:
+  - Clicking on any painted or blank canvas pixel samples its exact color (`renderer.getPixelColor(x, y)`), updates the active palette, adds it to recent colors, and automatically switches back to the brush tool with an instant toast notification.
+- **Recent Colors Palette**:
+  - Maintains the 6 most recently used custom colors in `localStorage` (`pixel_canvas_recent_colors`), rendered as quick-select swatches beneath the main 16-color palette.
+- **Gridlines Toggle (`G` key or toolbar button)**:
+  - Toggles the subtle pixel alignment grid when zoomed in ($\ge 8\times$) on or off with instant UI feedback.
+- **Quick Eraser (`E` key or toolbar button)**:
+  - Instantly switches the drawing color to blank white (`#ffffff`) to allow erasing or cleaning up pixels.
+- **Network Offline Detection & Local Graceful Degradation**:
+  - Native listener for `online` / `offline` events displaying a warning badge `⚠️ Hors-ligne` in the top HUD. Optimistic drawing continues locally without throwing errors.
+- **Personal Contribution Counter (`🎯 N px`)**:
+  - Real-time counter in the top HUD tracking total pixels placed by the user, persisted in `localStorage`.
 
 ---
 

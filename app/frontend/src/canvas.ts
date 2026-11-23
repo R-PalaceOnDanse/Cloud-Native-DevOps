@@ -18,6 +18,7 @@ export class CanvasRenderer {
   private readonly canvas: HTMLCanvasElement;
   private readonly pixels: Map<string, PixelMetadata> = new Map();
   private selectedPixel: { x: number; y: number } | null = null;
+  private showGridLines: boolean = true;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -26,6 +27,19 @@ export class CanvasRenderer {
       throw new Error('Unable to obtain Canvas 2D context.');
     }
     this.ctx = ctx;
+  }
+
+  public setShowGridLines(enabled: boolean): void {
+    this.showGridLines = enabled;
+  }
+
+  public isGridLinesEnabled(): boolean {
+    return this.showGridLines;
+  }
+
+  public getPixelColor(x: number, y: number): string {
+    const meta = this.getPixel(x, y);
+    return meta ? meta.color : '#ffffff';
   }
 
   public setPixel(x: number, y: number, color: string, author: string = 'Local User', timestamp: number = Date.now()): void {
@@ -85,7 +99,7 @@ export class CanvasRenderer {
     ctx.strokeRect(origin.screenX, origin.screenY, canvasPxWidth, canvasPxHeight);
 
     // 3. Optional: draw subtle grid lines when zoomed in
-    if (viewport.zoom >= 8) {
+    if (this.showGridLines && viewport.zoom >= 8) {
       this.renderGridLines(viewport);
     }
 

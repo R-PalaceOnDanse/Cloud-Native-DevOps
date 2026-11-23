@@ -31,6 +31,9 @@
             <div class="token-progress-fill" id="token-progress-fill"></div>
           </div>
         </div>
+        <span class="separator">|</span>
+        <span class="badge badge-stat" id="stat-pixels-painted" title="Pixels peints par vous dans cette session">🎯 0 px</span>
+        <span class="badge badge-network hidden" id="network-status" title="État de la connexion réseau">⚠️ Hors-ligne</span>
       </div>
       <div class="hud-auth">
         <button id="btn-discord-login" class="btn-discord">
@@ -58,8 +61,9 @@
       <div class="tool-section">
         <label class="section-label">Outil</label>
         <div class="tool-group">
-          <button id="tool-draw" class="btn-tool active" title="Mode Dessin">✏️ Dessin</button>
-          <button id="tool-pan" class="btn-tool" title="Mode Déplacement (ou maintenir Espace)">✋ Pan</button>
+          <button id="tool-draw" class="btn-tool active" title="Mode Dessin (B)">✏️ Dessin</button>
+          <button id="tool-pipette" class="btn-tool" title="Mode Pipette / Prélever une couleur (I ou Alt+Clic)">💉 Pipette</button>
+          <button id="tool-pan" class="btn-tool" title="Mode Déplacement (H ou maintenir Espace)">✋ Pan</button>
         </div>
       </div>
 
@@ -83,19 +87,27 @@
           <input type="color" id="custom-color" value="#ff0000" />
           <span id="color-hex-label">#ff0000</span>
         </div>
+        <div class="recent-colors-section" id="recent-colors-section">
+          <label class="section-sublabel">Couleurs récentes</label>
+          <div class="recent-palette-grid" id="recent-palette-grid">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
       </div>
 
       <div class="tool-section">
         <button id="btn-reset-view" class="btn-action">Centrer la vue</button>
+        <button id="btn-toggle-grid" class="btn-action btn-secondary" title="Activer / Désactiver la grille pixel (G)">Grille : ON</button>
+        <button id="btn-quick-eraser" class="btn-action btn-secondary" title="Gomme rapide / Couleur blanche (E)">🧹 Gomme (Blanc)</button>
         <button id="btn-export-view" class="btn-action btn-secondary" title="Télécharger la vue visible en image PNG">📷 Exporter vue</button>
       </div>
 
       <div class="tool-section shortcuts-section">
         <label class="section-label">Raccourcis</label>
         <div class="shortcuts-list">
-          <div><kbd>B</kbd> Dessin &bull; <kbd>H</kbd> Pan</div>
-          <div><kbd>1</kbd>-<kbd>4</kbd> Pinceaux</div>
-          <div><kbd>+</kbd>/<kbd>-</kbd> Zoom &bull; <kbd>0</kbd> Reset</div>
+          <div><kbd>B</kbd> Dessin &bull; <kbd>I</kbd> Pipette &bull; <kbd>H</kbd> Pan</div>
+          <div><kbd>E</kbd> Gomme &bull; <kbd>G</kbd> Grille &bull; <kbd>1</kbd>-<kbd>4</kbd> Pinceaux</div>
+          <div><kbd>+</kbd>/<kbd>-</kbd> Zoom &bull; <kbd>0</kbd> Reset &bull; <kbd>Space</kbd> Pan</div>
           <div><kbd>Échap</kbd> Déselection</div>
         </div>
       </div>

@@ -36,7 +36,7 @@ const PALETTE_COLORS = [
 // App State
 let currentColor = '#ff0000';
 let currentBrushSize: BrushSize = 1;
-let currentTool: 'draw' | 'pan' = 'draw';
+let currentTool: 'draw' | 'pan' | 'pipette' = 'draw';
 let isMouseDown = false;
 let isSpacePressed = false;
 let lastMouseX = 0;
@@ -44,6 +44,12 @@ let lastMouseY = 0;
 let isCanvasPaused = false;
 let lastClearedAtTimestamp: number | null = null;
 let lastDrawnCoord: { x: number; y: number } | null = null;
+let userPixelsCount = 0;
+try {
+  userPixelsCount = Number(localStorage.getItem('pixel_canvas_user_pixels_drawn') || '0');
+} catch {
+  userPixelsCount = 0;
+}
 
 // Rate Limit Token Bucket State (20 tokens max, refills continuously)
 let userTokens = 20;
@@ -67,6 +73,12 @@ const customColorInput = document.getElementById('custom-color') as HTMLInputEle
 const colorHexLabel = document.getElementById('color-hex-label') as HTMLElement;
 const toolDrawBtn = document.getElementById('tool-draw') as HTMLButtonElement;
 const toolPanBtn = document.getElementById('tool-pan') as HTMLButtonElement;
+const toolPipetteBtn = document.getElementById('tool-pipette') as HTMLButtonElement | null;
+const btnToggleGrid = document.getElementById('btn-toggle-grid') as HTMLButtonElement | null;
+const btnQuickEraser = document.getElementById('btn-quick-eraser') as HTMLButtonElement | null;
+const recentPaletteGrid = document.getElementById('recent-palette-grid') as HTMLElement | null;
+const statPixelsPainted = document.getElementById('stat-pixels-painted') as HTMLElement | null;
+const networkStatus = document.getElementById('network-status') as HTMLElement | null;
 const resetViewBtn = document.getElementById('btn-reset-view') as HTMLButtonElement;
 const exportViewBtn = document.getElementById('btn-export-view') as HTMLButtonElement | null;
 
@@ -194,7 +206,7 @@ function updateTokensDisplay(): void {
   }
 }
 
-function showToast(message: string, type: 'info' | 'error' | 'success' = 'info'): void {
+function showToast(message: string, type: 'info' | 'error' | 'success' | 'warning' = 'info'): void {
   if (!toastContainer) return;
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
@@ -224,7 +236,52 @@ function requestRender(): void {
   updateTokensDisplay();
 }
 
-// Build Palette UI
+// Build Palette UI & Recent Colors
+const MAX_RECENT_COLORS = 6;
+
+function loadRecentColors(): string[] {
+  try {
+    const raw = localStorage.getItem('pixel_canvas_recent_colors');
+    if (!raw) return [];
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? list.filter((c) => typeof c === 'string' && c.startsWith('#')) : [];
+  } catch {
+    return [];
+  }
+}
+
+let recentColors = loadRecentColors();
+
+function addRecentColor(hex: string): void {
+  const normalized = hex.toLowerCase();
+  recentColors = [normalized, ...recentColors.filter((c) => c.toLowerCase() !== normalized)].slice(0, MAX_RECENT_COLORS);
+  try {
+    localStorage.setItem('pixel_canvas_recent_colors', JSON.stringify(recentColors));
+  } catch {
+    // Ignore storage quota errors
+  }
+  renderRecentColors();
+}
+
+function renderRecentColors(): void {
+  if (!recentPaletteGrid) return;
+  recentPaletteGrid.innerHTML = '';
+  for (const hex of recentColors) {
+    const swatch = document.createElement('div');
+    swatch.className = 'recent-color-swatch';
+    swatch.style.backgroundColor = hex;
+    swatch.title = `Couleur récente : ${hex}`;
+    if (hex.toLowerCase() === currentColor.toLowerCase()) {
+      swatch.classList.add('selected');
+    }
+    swatch.addEventListener('click', () => {
+      selectColor(hex);
+      setTool('draw');
+    });
+    recentPaletteGrid.appendChild(swatch);
+  }
+}
+
 function initPalette(): void {
   paletteContainer.innerHTML = '';
   PALETTE_COLORS.forEach((hex) => {
@@ -235,10 +292,12 @@ function initPalette(): void {
 
     swatch.addEventListener('click', () => {
       selectColor(hex);
+      addRecentColor(hex);
     });
 
     paletteContainer.appendChild(swatch);
   });
+  renderRecentColors();
 }
 
 function selectColor(hex: string): void {
@@ -254,7 +313,21 @@ function selectColor(hex: string): void {
       div.classList.remove('selected');
     }
   });
+
+  document.querySelectorAll('.recent-color-swatch').forEach((el) => {
+    const div = el as HTMLElement;
+    if (div.style.backgroundColor === hex || rgbToHex(div.style.backgroundColor) === hex) {
+      div.classList.add('selected');
+    } else {
+      div.classList.remove('selected');
+    }
+  });
 }
+
+customColorInput.addEventListener('change', () => {
+  selectColor(customColorInput.value);
+  addRecentColor(customColorInput.value);
+});
 
 function rgbToHex(rgbStr: string): string {
   const match = rgbStr.match(/\d+/g);
@@ -286,19 +359,49 @@ document.querySelectorAll('.btn-brush').forEach((btn) => {
   });
 });
 
-// Tools switch
+// Tools switch & management
+function setTool(tool: 'draw' | 'pan' | 'pipette'): void {
+  currentTool = tool;
+  toolDrawBtn.classList.toggle('active', tool === 'draw');
+  toolPanBtn.classList.toggle('active', tool === 'pan');
+  toolPipetteBtn?.classList.toggle('active', tool === 'pipette');
+
+  if (tool === 'pan') {
+    canvas.style.cursor = 'grab';
+  } else if (tool === 'pipette') {
+    canvas.style.cursor = 'copy';
+  } else {
+    canvas.style.cursor = 'crosshair';
+  }
+}
+
 toolDrawBtn.addEventListener('click', () => {
-  currentTool = 'draw';
-  toolDrawBtn.classList.add('active');
-  toolPanBtn.classList.remove('active');
-  canvas.style.cursor = 'crosshair';
+  setTool('draw');
 });
 
 toolPanBtn.addEventListener('click', () => {
-  currentTool = 'pan';
-  toolPanBtn.classList.add('active');
-  toolDrawBtn.classList.remove('active');
-  canvas.style.cursor = 'grab';
+  setTool('pan');
+});
+
+toolPipetteBtn?.addEventListener('click', () => {
+  setTool('pipette');
+  showToast('💉 Mode Pipette actif : cliquez sur un pixel pour prélever sa couleur (ou maintenez Alt en mode dessin)', 'info');
+});
+
+// Gridlines toggle
+btnToggleGrid?.addEventListener('click', () => {
+  const newEnabled = !renderer.isGridLinesEnabled();
+  renderer.setShowGridLines(newEnabled);
+  btnToggleGrid.textContent = `Grille : ${newEnabled ? 'ON' : 'OFF'}`;
+  requestRender();
+  showToast(`Grille pixel : ${newEnabled ? 'Activée' : 'Désactivée'}`, 'info');
+});
+
+// Quick Eraser (Blanc)
+btnQuickEraser?.addEventListener('click', () => {
+  selectColor('#ffffff');
+  setTool('draw');
+  showToast('🧹 Gomme activée (Couleur blanche #ffffff)', 'info');
 });
 
 resetViewBtn.addEventListener('click', () => {
@@ -449,15 +552,16 @@ window.addEventListener('keydown', (e) => {
     isSpacePressed = true;
     canvas.style.cursor = 'grab';
   } else if (e.key === 'b' || e.key === 'B') {
-    currentTool = 'draw';
-    toolDrawBtn.classList.add('active');
-    toolPanBtn.classList.remove('active');
-    canvas.style.cursor = 'crosshair';
+    setTool('draw');
   } else if (e.key === 'h' || e.key === 'H') {
-    currentTool = 'pan';
-    toolPanBtn.classList.add('active');
-    toolDrawBtn.classList.remove('active');
-    canvas.style.cursor = 'grab';
+    setTool('pan');
+  } else if (e.key === 'i' || e.key === 'I') {
+    setTool('pipette');
+    showToast('💉 Mode Pipette actif : cliquez sur un pixel pour prélever sa couleur', 'info');
+  } else if (e.key === 'e' || e.key === 'E') {
+    btnQuickEraser?.click();
+  } else if (e.key === 'g' || e.key === 'G') {
+    btnToggleGrid?.click();
   } else if (['1', '2', '3', '4'].includes(e.key)) {
     const sizeMap: Record<string, BrushSize> = { '1': 1, '2': 3, '3': 5, '4': 9 };
     const size = sizeMap[e.key];
@@ -494,7 +598,7 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => {
   if (e.code === 'Space') {
     isSpacePressed = false;
-    canvas.style.cursor = currentTool === 'pan' ? 'grab' : 'crosshair';
+    canvas.style.cursor = currentTool === 'pan' ? 'grab' : (currentTool === 'pipette' ? 'copy' : 'crosshair');
   }
 });
 
@@ -507,6 +611,20 @@ canvas.addEventListener('mousedown', (e) => {
 
   if (isSpacePressed || currentTool === 'pan' || e.button === 1) {
     canvas.style.cursor = 'grabbing';
+    return;
+  }
+
+  const world = screenToWorld(lastMouseX, lastMouseY, viewport);
+
+  // Pipette mode or Alt + click eyedropper
+  if (currentTool === 'pipette' || e.altKey) {
+    if (world.x >= 0 && world.x < 10000 && world.y >= 0 && world.y < 10000) {
+      const pickedColor = renderer.getPixelColor(world.x, world.y);
+      selectColor(pickedColor);
+      addRecentColor(pickedColor);
+      setTool('draw');
+      showToast(`💉 Couleur prélevée : ${pickedColor} en (${world.x}, ${world.y})`, 'info');
+    }
     return;
   }
 
@@ -676,15 +794,53 @@ async function handleDraw(screenX: number, screenY: number): Promise<void> {
   renderer.applyBatch(batch, author);
   requestRender();
   inspectPixel(world.x, world.y);
+  addRecentColor(currentColor);
+  updateUserPixelsCount(batch.length);
 
   // 2. Broadcast via local provider
   void realtimeManager.publishDraw(batch, author);
 
   // 3. Dispatch to Web Draw Proxy backend pipeline
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    showToast('⚠️ Hors-ligne : le pixel est dessiné localement et sera synchronisé au retour du réseau.', 'warning');
+    return;
+  }
+
   const result = await drawApiClient.submitDraw(batch, token);
   if ('error' in result && result.error) {
     showToast(result.error, 'error');
   }
+}
+
+function updateUserPixelsCount(added: number): void {
+  userPixelsCount += added;
+  try {
+    localStorage.setItem('pixel_canvas_user_pixels_drawn', String(userPixelsCount));
+  } catch {
+    // Ignore storage errors
+  }
+  if (statPixelsPainted) {
+    statPixelsPainted.textContent = `🎯 ${userPixelsCount} px`;
+  }
+}
+
+function updateNetworkStatus(): void {
+  const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+  if (networkStatus) {
+    networkStatus.classList.toggle('hidden', isOnline);
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    updateNetworkStatus();
+    showToast('✅ Connexion réseau rétablie.', 'success');
+  });
+
+  window.addEventListener('offline', () => {
+    updateNetworkStatus();
+    showToast('⚠️ Connexion réseau perdue. Mode hors-ligne actif.', 'error');
+  });
 }
 
 function inspectPixel(x: number, y: number): void {
@@ -734,10 +890,16 @@ function loadFromUrlHash(): void {
 }
 
 // Initial setup
-window.addEventListener('resize', resizeCanvas);
-window.addEventListener('hashchange', loadFromUrlHash);
-initPalette();
-resizeCanvas();
-loadFromUrlHash();
-updateTokensDisplay();
-updateBrushHint();
+if (typeof window !== 'undefined') {
+  window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('hashchange', loadFromUrlHash);
+  initPalette();
+  resizeCanvas();
+  loadFromUrlHash();
+  updateTokensDisplay();
+  updateBrushHint();
+  updateNetworkStatus();
+  if (statPixelsPainted) {
+    statPixelsPainted.textContent = `🎯 ${userPixelsCount} px`;
+  }
+}

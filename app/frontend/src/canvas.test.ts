@@ -94,3 +94,24 @@ test('CanvasRenderer clearAll removes all pixels and selections', () => {
   assert.equal(renderer.getSelectedPixel(), null);
 });
 
+test('CanvasRenderer manages grid lines toggle state', () => {
+  const canvas = createMockCanvas();
+  const renderer = new CanvasRenderer(canvas);
+
+  assert.equal(renderer.isGridLinesEnabled(), true);
+  renderer.setShowGridLines(false);
+  assert.equal(renderer.isGridLinesEnabled(), false);
+  renderer.setShowGridLines(true);
+  assert.equal(renderer.isGridLinesEnabled(), true);
+});
+
+test('CanvasRenderer getPixelColor returns painted color or blank canvas white (#ffffff)', () => {
+  const canvas = createMockCanvas();
+  const renderer = new CanvasRenderer(canvas);
+
+  assert.equal(renderer.getPixelColor(100, 200), '#ffffff');
+  renderer.setPixel(100, 200, '#3b82f6');
+  assert.equal(renderer.getPixelColor(100, 200), '#3b82f6');
+});
+
+
