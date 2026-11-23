@@ -80,7 +80,7 @@ export function validateBrushStroke(
     return {
       allowed: false,
       reason: 'paused',
-      message: 'Le canevas est en pause : les modifications sont temporairement suspendues.',
+      message: 'Canvas is paused: drawing is temporarily suspended by an administrator.',
     };
   }
 
@@ -88,7 +88,7 @@ export function validateBrushStroke(
     return {
       allowed: false,
       reason: 'exceeds_max_capacity',
-      message: `Trait supérieur à la capacité maximale (${batchLength} pixels requis, réserve max de ${maxCapacity} pixels). Réduisez la taille du pinceau (1px ou 3px). Le trait n'est pas tronqué pour préserver l'intégrité du dessin.`,
+      message: `Stroke exceeds max capacity (${batchLength} pixels requested, max capacity is ${maxCapacity} pixels). Reduce brush size (1px or 3px). The stroke is not truncated to preserve artwork integrity.`,
     };
   }
 
@@ -96,7 +96,7 @@ export function validateBrushStroke(
     return {
       allowed: false,
       reason: 'insufficient_tokens',
-      message: `Quota temporairement insuffisant : ${Math.floor(currentTokens)}/${batchLength} tokens disponibles. Recharge en cours (+1 toutes les 3s).`,
+      message: `Temporarily insufficient tokens: ${Math.floor(currentTokens)}/${batchLength} available. Refilling (+1 every 3s).`,
     };
   }
 

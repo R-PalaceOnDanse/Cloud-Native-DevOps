@@ -35,7 +35,7 @@ test('validateBrushStroke rejects when canvas is paused', () => {
   const result = validateBrushStroke(1, 20, 20, true);
   assert.equal(result.allowed, false);
   assert.equal(result.reason, 'paused');
-  assert.match(result.message || '', /en pause/i);
+  assert.match(result.message || '', /paused/i);
 });
 
 test('validateBrushStroke rejects strokes larger than max capacity with explanation rather than cutting', () => {
@@ -43,8 +43,8 @@ test('validateBrushStroke rejects strokes larger than max capacity with explanat
   const result = validateBrushStroke(25, 20, 20, false);
   assert.equal(result.allowed, false);
   assert.equal(result.reason, 'exceeds_max_capacity');
-  assert.match(result.message || '', /supérieur à la capacité maximale/i);
-  assert.match(result.message || '', /pas tronqué/i);
+  assert.match(result.message || '', /exceeds max capacity/i);
+  assert.match(result.message || '', /not truncated/i);
 });
 
 test('validateBrushStroke rejects when current tokens are insufficient', () => {
@@ -52,7 +52,7 @@ test('validateBrushStroke rejects when current tokens are insufficient', () => {
   const result = validateBrushStroke(9, 5, 20, false);
   assert.equal(result.allowed, false);
   assert.equal(result.reason, 'insufficient_tokens');
-  assert.match(result.message || '', /Quota temporairement insuffisant/i);
+  assert.match(result.message || '', /insufficient tokens/i);
 });
 
 test('validateBrushStroke allows stroke within tokens and max capacity', () => {

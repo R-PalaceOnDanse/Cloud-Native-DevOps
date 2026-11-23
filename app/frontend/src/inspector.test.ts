@@ -5,8 +5,8 @@ import { formatPixelInspection } from './inspector.js';
 test('formatPixelInspection returns empty pixel description for unpainted coordinates', () => {
   const info = formatPixelInspection(undefined, 100, 200);
   assert.equal(info.coordsText, '(100, 200)');
-  assert.equal(info.authorText, 'Vide (pixel vierge)');
-  assert.equal(info.timeText, 'Jamais modifié');
+  assert.equal(info.authorText, 'Empty (unpainted)');
+  assert.equal(info.timeText, 'Never modified');
   assert.equal(info.isEmpty, true);
   assert.equal(info.isOutOfBounds, false);
 });
@@ -33,12 +33,12 @@ test('formatPixelInspection returns author and formatted timestamp for painted p
 
 test('formatPixelInspection handles out-of-bounds coordinates', () => {
   const info = formatPixelInspection(undefined, -1, 500);
-  assert.equal(info.coordsText, 'Hors champ');
+  assert.equal(info.coordsText, 'Out of bounds');
   assert.equal(info.authorText, '—');
   assert.equal(info.isOutOfBounds, true);
   assert.equal(info.isEmpty, false);
 
   const infoOver = formatPixelInspection(undefined, 10000, 10000);
-  assert.equal(infoOver.coordsText, 'Hors champ');
+  assert.equal(infoOver.coordsText, 'Out of bounds');
   assert.equal(infoOver.isOutOfBounds, true);
 });

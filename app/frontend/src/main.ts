@@ -63,12 +63,18 @@ let viewport: ViewportState = createDefaultViewport(window.innerWidth, window.in
 
 const coordDisplay = document.getElementById('coord-display') as HTMLElement;
 const zoomDisplay = document.getElementById('zoom-display') as HTMLElement;
+const btnZoomIn = document.getElementById('btn-zoom-in') as HTMLButtonElement | null;
+const btnZoomOut = document.getElementById('btn-zoom-out') as HTMLButtonElement | null;
 const streamStatus = document.getElementById('stream-status') as HTMLElement;
 const tokensDisplay = document.getElementById('tokens-display') as HTMLElement;
 const toastContainer = document.getElementById('toast-container') as HTMLElement;
 const pauseBanner = document.getElementById('pause-banner') as HTMLElement;
 const brushHint = document.getElementById('brush-hint') as HTMLElement;
 const paletteContainer = document.getElementById('palette-grid') as HTMLElement;
+const palettePopover = document.getElementById('palette-popover') as HTMLElement | null;
+const btnTogglePalette = document.getElementById('btn-toggle-palette') as HTMLButtonElement | null;
+const btnClosePalette = document.getElementById('btn-close-palette') as HTMLButtonElement | null;
+const activeColorIndicator = document.getElementById('active-color-indicator') as HTMLElement | null;
 const customColorInput = document.getElementById('custom-color') as HTMLInputElement;
 const colorHexLabel = document.getElementById('color-hex-label') as HTMLElement;
 const toolDrawBtn = document.getElementById('tool-draw') as HTMLButtonElement;
@@ -81,6 +87,12 @@ const statPixelsPainted = document.getElementById('stat-pixels-painted') as HTML
 const networkStatus = document.getElementById('network-status') as HTMLElement | null;
 const resetViewBtn = document.getElementById('btn-reset-view') as HTMLButtonElement;
 const exportViewBtn = document.getElementById('btn-export-view') as HTMLButtonElement | null;
+
+// Shortcuts Modal Elements
+const btnShortcuts = document.getElementById('btn-shortcuts') as HTMLButtonElement | null;
+const modalShortcuts = document.getElementById('modal-shortcuts') as HTMLElement | null;
+const btnCloseShortcuts = document.getElementById('btn-close-shortcuts') as HTMLButtonElement | null;
+const btnOkShortcuts = document.getElementById('btn-ok-shortcuts') as HTMLButtonElement | null;
 
 // Minimap DOM Elements
 const minimapCanvas = document.getElementById('minimap-canvas') as HTMLCanvasElement | null;
@@ -107,6 +119,7 @@ const userName = document.getElementById('user-name') as HTMLElement;
 const btnLogout = document.getElementById('btn-logout') as HTMLButtonElement;
 
 // Inspector elements
+const inspectSwatch = document.getElementById('inspect-swatch') as HTMLElement | null;
 const inspectCoords = document.getElementById('inspect-coords') as HTMLElement;
 const inspectAuthor = document.getElementById('inspect-author') as HTMLElement;
 const inspectTime = document.getElementById('inspect-time') as HTMLElement;
@@ -121,7 +134,7 @@ const realtimeManager = new RealtimeManager(
   () => requestRender(),
   (count) => {
     if (streamStatus) {
-      streamStatus.textContent = `⚡ ${count} tuiles`;
+      streamStatus.textContent = `⚡ ${count} tiles`;
     }
   }
 );
@@ -132,7 +145,7 @@ realtimeManager.subscribeSystemState((state: SystemState) => {
   if (pauseBanner) {
     if (isCanvasPaused) {
       pauseBanner.classList.remove('hidden');
-      showToast('⏸️ Le canevas est en pause : les modifications sont temporairement suspendues.', 'error');
+      showToast('⏸️ Canvas is paused: edits are temporarily suspended.', 'error');
     } else {
       pauseBanner.classList.add('hidden');
     }
@@ -144,7 +157,7 @@ realtimeManager.subscribeSystemState((state: SystemState) => {
     renderer.clearAll();
     clearInspect();
     requestRender();
-    showToast('🧹 Le canevas a été réinitialisé par un administrateur.', 'info');
+    showToast('🧹 Canvas has been cleared by an administrator.', 'info');
   }
 });
 
@@ -270,7 +283,7 @@ function renderRecentColors(): void {
     const swatch = document.createElement('div');
     swatch.className = 'recent-color-swatch';
     swatch.style.backgroundColor = hex;
-    swatch.title = `Couleur récente : ${hex}`;
+    swatch.title = `Recent color: ${hex}`;
     if (hex.toLowerCase() === currentColor.toLowerCase()) {
       swatch.classList.add('selected');
     }
@@ -297,6 +310,9 @@ function initPalette(): void {
 
     paletteContainer.appendChild(swatch);
   });
+  if (activeColorIndicator) {
+    activeColorIndicator.style.backgroundColor = currentColor;
+  }
   renderRecentColors();
 }
 
@@ -304,6 +320,10 @@ function selectColor(hex: string): void {
   currentColor = hex;
   customColorInput.value = hex;
   colorHexLabel.textContent = hex;
+
+  if (activeColorIndicator) {
+    activeColorIndicator.style.backgroundColor = hex;
+  }
 
   document.querySelectorAll('.palette-color').forEach((el) => {
     const div = el as HTMLElement;
@@ -340,10 +360,10 @@ function updateBrushHint(): void {
   if (!brushHint) return;
   const count = BRUSH_PIXEL_COUNTS[currentBrushSize] || 1;
   if (count > MAX_TOKENS) {
-    brushHint.textContent = `${count} pixels / coup ⚠️ (Dépasse la réserve max de ${MAX_TOKENS})`;
+    brushHint.textContent = `${count} pixels / stroke ⚠️ (Exceeds max capacity of ${MAX_TOKENS})`;
     brushHint.classList.add('warning');
   } else {
-    brushHint.textContent = `${count} pixel${count > 1 ? 's' : ''} / coup (${count} token${count > 1 ? 's' : ''})`;
+    brushHint.textContent = `${count} pixel${count > 1 ? 's' : ''} / stroke (${count} token${count > 1 ? 's' : ''})`;
     brushHint.classList.remove('warning');
   }
 }
@@ -385,23 +405,65 @@ toolPanBtn.addEventListener('click', () => {
 
 toolPipetteBtn?.addEventListener('click', () => {
   setTool('pipette');
-  showToast('💉 Mode Pipette actif : cliquez sur un pixel pour prélever sa couleur (ou maintenez Alt en mode dessin)', 'info');
+  showToast('💉 Eyedropper mode active: click a pixel to sample its color (or hold Alt while drawing)', 'info');
 });
+
+// Palette Popover Toggle & Close
+if (btnTogglePalette && palettePopover) {
+  btnTogglePalette.addEventListener('click', (e) => {
+    e.stopPropagation();
+    palettePopover.classList.toggle('hidden');
+  });
+}
+
+if (btnClosePalette && palettePopover) {
+  btnClosePalette.addEventListener('click', () => {
+    palettePopover.classList.add('hidden');
+  });
+}
+
+document.addEventListener('click', (e) => {
+  if (palettePopover && !palettePopover.classList.contains('hidden')) {
+    const target = e.target as HTMLElement;
+    if (!palettePopover.contains(target) && !btnTogglePalette?.contains(target)) {
+      palettePopover.classList.add('hidden');
+    }
+  }
+});
+
+// Zoom In & Out Buttons
+if (btnZoomIn) {
+  btnZoomIn.addEventListener('click', () => {
+    viewport = zoomAtPoint(canvas.width / 2, canvas.height / 2, 1.25, viewport);
+    realtimeManager.updateViewport(viewport);
+    requestRender();
+    syncUrlHash();
+  });
+}
+
+if (btnZoomOut) {
+  btnZoomOut.addEventListener('click', () => {
+    viewport = zoomAtPoint(canvas.width / 2, canvas.height / 2, 0.8, viewport);
+    realtimeManager.updateViewport(viewport);
+    requestRender();
+    syncUrlHash();
+  });
+}
 
 // Gridlines toggle
 btnToggleGrid?.addEventListener('click', () => {
   const newEnabled = !renderer.isGridLinesEnabled();
   renderer.setShowGridLines(newEnabled);
-  btnToggleGrid.textContent = `Grille : ${newEnabled ? 'ON' : 'OFF'}`;
+  btnToggleGrid.textContent = `Grid: ${newEnabled ? 'ON' : 'OFF'}`;
   requestRender();
-  showToast(`Grille pixel : ${newEnabled ? 'Activée' : 'Désactivée'}`, 'info');
+  showToast(`Grid: ${newEnabled ? 'Enabled' : 'Disabled'}`, 'info');
 });
 
-// Quick Eraser (Blanc)
+// Quick Eraser (White)
 btnQuickEraser?.addEventListener('click', () => {
   selectColor('#ffffff');
   setTool('draw');
-  showToast('🧹 Gomme activée (Couleur blanche #ffffff)', 'info');
+  showToast('🧹 Eraser active (Color set to white #ffffff)', 'info');
 });
 
 resetViewBtn.addEventListener('click', () => {
@@ -419,9 +481,9 @@ if (exportViewBtn) {
       link.download = `pixel-canvas-export-${Date.now()}.png`;
       link.href = dataUrl;
       link.click();
-      showToast('📷 Image de la vue exportée avec succès !', 'success');
+      showToast('📷 Viewport exported successfully as PNG!', 'success');
     } catch {
-      showToast('Échec de l\'exportation de l\'image.', 'error');
+      showToast('Failed to export image.', 'error');
     }
   });
 }
@@ -452,8 +514,19 @@ function executeGoto(): void {
   requestRender();
   syncUrlHash();
   closeGotoModal();
-  showToast(`📍 Vue déplacée vers (${Math.round(x)}, ${Math.round(y)})`, 'info');
+  showToast(`📍 View centered on (${Math.round(x)}, ${Math.round(y)})`, 'info');
 }
+
+// Quick Preset Chips in Goto Modal
+document.querySelectorAll('.preset-chip').forEach((chip) => {
+  chip.addEventListener('click', (e) => {
+    const target = e.currentTarget as HTMLElement;
+    const x = target.dataset.x;
+    const y = target.dataset.y;
+    if (x && inputGotoX) inputGotoX.value = x;
+    if (y && inputGotoY) inputGotoY.value = y;
+  });
+});
 
 if (btnGoto) {
   btnGoto.addEventListener('click', openGotoModal);
@@ -475,6 +548,12 @@ if (btnConfirmGoto) {
   btnConfirmGoto.addEventListener('click', executeGoto);
 }
 
+modalGoto?.addEventListener('click', (e) => {
+  if (e.target === modalGoto) {
+    closeGotoModal();
+  }
+});
+
 modalGoto?.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     executeGoto();
@@ -483,9 +562,31 @@ modalGoto?.addEventListener('keydown', (e) => {
   }
 });
 
-customColorInput.addEventListener('input', (e) => {
-  const val = (e.target as HTMLInputElement).value;
-  selectColor(val);
+// Shortcuts Modal Handlers
+function openShortcutsModal(): void {
+  modalShortcuts?.classList.remove('hidden');
+}
+
+function closeShortcutsModal(): void {
+  modalShortcuts?.classList.add('hidden');
+}
+
+if (btnShortcuts) {
+  btnShortcuts.addEventListener('click', openShortcutsModal);
+}
+
+if (btnCloseShortcuts) {
+  btnCloseShortcuts.addEventListener('click', closeShortcutsModal);
+}
+
+if (btnOkShortcuts) {
+  btnOkShortcuts.addEventListener('click', closeShortcutsModal);
+}
+
+modalShortcuts?.addEventListener('click', (e) => {
+  if (e.target === modalShortcuts) {
+    closeShortcutsModal();
+  }
 });
 
 // Discord Auth Event Listeners
@@ -494,7 +595,7 @@ authManager.onAuthStateChanged((user: UserProfile | null) => {
     btnDiscordLogin.classList.add('hidden');
     userDisplay.classList.remove('hidden');
     userName.textContent = user.username;
-    showToast(`Connecté en tant que ${user.username}`, 'success');
+    showToast(`Logged in as ${user.username}`, 'success');
     const token = authManager.getSessionToken();
     if (token) {
       void authenticateFirebase(token);
@@ -512,7 +613,7 @@ btnDiscordLogin.addEventListener('click', () => {
 
 btnLogout.addEventListener('click', () => {
   authManager.logout();
-  showToast('Déconnecté', 'info');
+  showToast('Logged out', 'info');
 });
 
 // Check for OAuth return parameters (?code=...&state=...)
@@ -524,9 +625,9 @@ if (typeof window !== 'undefined' && window.location.search) {
     window.history.replaceState({}, document.title, window.location.pathname);
     void authManager.handleOAuthReturn(authCode, authState).then((res) => {
       if (res.success) {
-        showToast('Connexion Discord réussie !', 'success');
+        showToast('Discord login successful!', 'success');
       } else {
-        showToast(`Échec connexion Discord : ${res.error || 'Erreur'}`, 'error');
+        showToast(`Discord login failed: ${res.error || 'Error'}`, 'error');
       }
     });
   }
@@ -557,11 +658,15 @@ window.addEventListener('keydown', (e) => {
     setTool('pan');
   } else if (e.key === 'i' || e.key === 'I') {
     setTool('pipette');
-    showToast('💉 Mode Pipette actif : cliquez sur un pixel pour prélever sa couleur', 'info');
+    showToast('💉 Eyedropper mode active: click a pixel to sample its color', 'info');
   } else if (e.key === 'e' || e.key === 'E') {
     btnQuickEraser?.click();
   } else if (e.key === 'g' || e.key === 'G') {
     btnToggleGrid?.click();
+  } else if (e.key === 'j' || e.key === 'J') {
+    openGotoModal();
+  } else if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+    openShortcutsModal();
   } else if (['1', '2', '3', '4'].includes(e.key)) {
     const sizeMap: Record<string, BrushSize> = { '1': 1, '2': 3, '3': 5, '4': 9 };
     const size = sizeMap[e.key];
@@ -576,22 +681,33 @@ window.addEventListener('keydown', (e) => {
         }
       });
       updateBrushHint();
-      showToast(`Pinceau : ${size}px`, 'info');
+      showToast(`Brush size: ${size}px`, 'info');
     }
   } else if (e.key === '+' || e.key === '=') {
     viewport = zoomAtPoint(canvas.width / 2, canvas.height / 2, 1.25, viewport);
     realtimeManager.updateViewport(viewport);
     requestRender();
+    syncUrlHash();
   } else if (e.key === '-' || e.key === '_') {
     viewport = zoomAtPoint(canvas.width / 2, canvas.height / 2, 0.8, viewport);
     realtimeManager.updateViewport(viewport);
     requestRender();
+    syncUrlHash();
   } else if (e.key === '0' || e.key === 'c' || e.key === 'C') {
     viewport = createDefaultViewport(canvas.width, canvas.height);
     realtimeManager.updateViewport(viewport);
     requestRender();
+    syncUrlHash();
   } else if (e.key === 'Escape') {
-    clearInspect();
+    if (modalGoto && !modalGoto.classList.contains('hidden')) {
+      closeGotoModal();
+    } else if (modalShortcuts && !modalShortcuts.classList.contains('hidden')) {
+      closeShortcutsModal();
+    } else if (palettePopover && !palettePopover.classList.contains('hidden')) {
+      palettePopover.classList.add('hidden');
+    } else {
+      clearInspect();
+    }
   }
 });
 
@@ -623,7 +739,7 @@ canvas.addEventListener('mousedown', (e) => {
       selectColor(pickedColor);
       addRecentColor(pickedColor);
       setTool('draw');
-      showToast(`💉 Couleur prélevée : ${pickedColor} en (${world.x}, ${world.y})`, 'info');
+      showToast(`💉 Color sampled: ${pickedColor} at (${world.x}, ${world.y})`, 'info');
     }
     return;
   }
@@ -778,7 +894,7 @@ async function handleDraw(screenX: number, screenY: number): Promise<void> {
 
   const validation = validateBrushStroke(batch.length, userTokens, MAX_TOKENS, isCanvasPaused);
   if (!validation.allowed) {
-    showToast(validation.message || 'Action impossible.', 'error');
+    showToast(validation.message || 'Unable to perform action.', 'error');
     return;
   }
 
@@ -787,7 +903,7 @@ async function handleDraw(screenX: number, screenY: number): Promise<void> {
   updateTokensDisplay();
 
   const user = authManager.getCurrentUser();
-  const author = user?.username || 'Anonyme';
+  const author = user?.username || 'Anonymous';
   const token = authManager.getSessionToken() || (user?.id ? `user_${user.id}` : undefined);
 
   // 1. Optimistic local rendering
@@ -802,7 +918,7 @@ async function handleDraw(screenX: number, screenY: number): Promise<void> {
 
   // 3. Dispatch to Web Draw Proxy backend pipeline
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    showToast('⚠️ Hors-ligne : le pixel est dessiné localement et sera synchronisé au retour du réseau.', 'warning');
+    showToast('⚠️ Offline: pixel drawn locally, will sync when reconnected.', 'warning');
     return;
   }
 
@@ -834,12 +950,12 @@ function updateNetworkStatus(): void {
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
     updateNetworkStatus();
-    showToast('✅ Connexion réseau rétablie.', 'success');
+    showToast('✅ Network connection restored.', 'success');
   });
 
   window.addEventListener('offline', () => {
     updateNetworkStatus();
-    showToast('⚠️ Connexion réseau perdue. Mode hors-ligne actif.', 'error');
+    showToast('⚠️ Network connection lost. Offline mode active.', 'error');
   });
 }
 
@@ -856,6 +972,10 @@ function inspectPixel(x: number, y: number): void {
   inspectColor.textContent = info.colorText;
   inspectColor.style.color = info.hexColor;
 
+  if (inspectSwatch) {
+    inspectSwatch.style.backgroundColor = info.hexColor;
+  }
+
   if (btnClearInspect) {
     btnClearInspect.classList.remove('hidden');
   }
@@ -866,10 +986,14 @@ function clearInspect(): void {
   requestRender();
 
   inspectCoords.textContent = '—';
-  inspectAuthor.textContent = 'Vide';
+  inspectAuthor.textContent = 'Empty';
   inspectTime.textContent = '—';
   inspectColor.textContent = '—';
   inspectColor.style.color = '#e1e1e6';
+
+  if (inspectSwatch) {
+    inspectSwatch.style.backgroundColor = '#38bdf8';
+  }
 
   if (btnClearInspect) {
     btnClearInspect.classList.add('hidden');

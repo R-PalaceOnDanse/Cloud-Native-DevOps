@@ -27,7 +27,7 @@ export function formatPixelInspection(
 ): PixelInspectionInfo {
   if (x < 0 || x >= CANVAS_SIZE || y < 0 || y >= CANVAS_SIZE) {
     return {
-      coordsText: 'Hors champ',
+      coordsText: 'Out of bounds',
       authorText: '—',
       timeText: '—',
       colorText: '—',
@@ -42,9 +42,9 @@ export function formatPixelInspection(
   if (!pixel) {
     return {
       coordsText,
-      authorText: 'Vide (pixel vierge)',
-      timeText: 'Jamais modifié',
-      colorText: '#ffffff (défaut)',
+      authorText: 'Empty (unpainted)',
+      timeText: 'Never modified',
+      colorText: '#ffffff (default)',
       hexColor: '#ffffff',
       isEmpty: true,
       isOutOfBounds: false,

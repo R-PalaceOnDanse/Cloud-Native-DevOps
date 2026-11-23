@@ -68,14 +68,14 @@ export class DrawApiClient {
         const retryAfter = response.headers.get('Retry-After');
         const json = (await response.json().catch(() => ({}))) as { error?: string };
         return {
-          error: json.error || 'Rate limit atteint. Veuillez patienter.',
+          error: json.error || 'Rate limit reached. Please wait a moment.',
           retryAfterSeconds: retryAfter ? parseInt(retryAfter, 10) : 5,
         };
       }
 
       const errJson = (await response.json().catch(() => ({}))) as { error?: string };
       return {
-        error: errJson.error || `Erreur serveur (${response.status}).`,
+        error: errJson.error || `Server error (${response.status}).`,
       };
     } catch {
       // In local dev without gateway running, acknowledge optimistically
