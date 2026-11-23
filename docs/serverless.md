@@ -38,6 +38,10 @@ project). A new function gets its own account and its own secret binding, as `he
 
 The function's ingress is `ALLOW_ALL` because API Gateway does not run in the VPC; it is protected
 by IAM: a call that does not carry an ID token of the `api-gateway` account gets 403.
+In addition, the Google-managed API Gateway Service Agent (`service-<PROJECT_NUMBER>@gcp-sa-apigateway.iam.gserviceaccount.com`)
+holds `roles/iam.serviceAccountTokenCreator` on `api-gateway` ([Issue #132](https://github.com/R-PalaceOnDanse/Cloud-Native-DevOps/issues/132)),
+and the OpenAPI template explicitly declares `jwt_audience: ${service_url}` under each backend path
+([Issue #133](https://github.com/R-PalaceOnDanse/Cloud-Native-DevOps/issues/133)) to ensure exact OIDC audience match and prevent HTTP 401 token rejections.
 
 ## Add the secret value (once per environment)
 

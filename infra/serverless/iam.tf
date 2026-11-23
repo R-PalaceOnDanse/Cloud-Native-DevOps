@@ -40,6 +40,22 @@ resource "google_service_account" "gateway" {
   description  = "Used by API Gateway to invoke the proxy functions."
 }
 
+# Google-managed API Gateway Service Agent (Issue #132).
+# Required to generate OIDC ID tokens when invoking backend Cloud Run services.
+resource "google_project_service_identity" "apigateway" {
+  provider = google-beta
+  project  = var.project_id
+  service  = "apigateway.googleapis.com"
+}
+
+# Grants the API Gateway Service Agent permission to impersonate the gateway service account
+# and mint JWT ID tokens for private backend functions (Issue #132).
+resource "google_service_account_iam_member" "gateway_token_creator" {
+  service_account_id = google_service_account.gateway.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_project_service_identity.apigateway.email}"
+}
+
 # Runtime identity of the draw worker function (Issue #136).
 resource "google_service_account" "draw_worker" {
   account_id   = "fn-draw-worker"
