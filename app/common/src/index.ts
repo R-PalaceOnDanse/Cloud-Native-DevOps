@@ -6,4 +6,5 @@ export * from './events.js';
 export * from './pixel-store.js';
 export * from './deltas.js';
 export * from './tile-renderer.js';
+export * from './logger.js';
 

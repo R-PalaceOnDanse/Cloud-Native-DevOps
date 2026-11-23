@@ -12,6 +12,9 @@ locals {
     "apikeys.googleapis.com",           # API key checked by the gateway
     "firestore.googleapis.com",         # Firestore NoSQL database
     "firebaserules.googleapis.com",     # Firestore security rules
+    "pubsub.googleapis.com",            # Pub/Sub message broker
+    "monitoring.googleapis.com",        # Cloud Monitoring
+    "logging.googleapis.com",           # Cloud Logging
   ]
 }
 

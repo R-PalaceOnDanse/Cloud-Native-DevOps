@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "node ./node_modules/typescript/bin/tsc",
-    "test": "node ./node_modules/typescript/bin/tsc && node --test dist/coordinates.test.js dist/color.test.js dist/ratelimit.test.js dist/events.test.js dist/pixel-store.test.js dist/deltas.test.js dist/tile-renderer.test.js"
+    "test": "node ./node_modules/typescript/bin/tsc && node --test dist/coordinates.test.js dist/color.test.js dist/ratelimit.test.js dist/events.test.js dist/pixel-store.test.js dist/deltas.test.js dist/tile-renderer.test.js dist/logger.test.js"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

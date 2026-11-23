@@ -108,3 +108,30 @@ Pipeline verification flow:
 3. **Draw Worker**: Decodes Base64 envelope, validates bounds (`0..9999`), enforces per-user rate limiting (20 tokens/min), and applies transactional updates to `chunks/{chunkId}`.
 4. **Real-time Deltas**: Generates delta documents (`chunks/{chunkId}/deltas/{deltaId}`) with 300s TTL for real-time Firestore listeners.
 5. **Correlation ID Tracing**: Verifies `correlation_id` is propagated end-to-end through structured JSON logs and response headers.
+
+## Discord Slash Commands Registration (Issue #49)
+
+All mandatory bot commands (`/draw`, `/get`, `/snapshot`, `/admin pause`, `/admin resume`, `/admin clear`, `/admin ratelimit`) are registered idempotently using Discord REST API v10 bulk overwrite endpoint (`PUT /applications/{app_id}/commands`).
+
+### Local Execution & Dry-Run
+
+```bash
+# Dry-run validation (no secrets required)
+node scripts/register-discord-commands.mjs --dry-run
+
+# Unit tests
+node --test scripts/register-discord-commands.test.mjs
+
+# Live registration with Discord credentials
+node scripts/register-discord-commands.mjs \
+  --app-id <DISCORD_APPLICATION_ID> \
+  --bot-token <DISCORD_BOT_TOKEN> \
+  [--guild-id <GUILD_ID>]
+```
+
+### CI/CD Pipeline
+
+The workflow `.github/workflows/register-discord-commands.yml` executes:
+1. Automatic validation and unit testing on pull requests targeting `scripts/register-discord-commands.*`.
+2. Manual idempotent deployment via `workflow_dispatch` with target environment (`dev` or `prd`) and optional instant guild scoping.
+
