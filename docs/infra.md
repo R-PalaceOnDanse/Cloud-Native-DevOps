@@ -192,6 +192,23 @@ A cluster that is destroyed and rebuilt finds its secret by itself: the value st
 Manager. Check the copy with `kubectl get externalsecret --namespace arc-runners` (status
 `SecretSynced`).
 
+### Cluster Monitoring & Observability
+
+Observability for the cluster and runners is integrated natively with Google Cloud Monitoring and
+Cloud Logging ([ADR-0010](adr/0010-native-gcp-observability.md)):
+
+- **Native GKE Metrics & Logs**:
+  - `monitoring_config`: System components, API server, controller manager, and scheduler metrics are collected automatically.
+  - `managed_prometheus`: Google Cloud Managed Service for Prometheus (GMP) is enabled on the cluster, scraping Prometheus metrics seamlessly without requiring an in-cluster Prometheus server.
+  - `logging_config`: System and workload logs (including runner pods) are streamed into Cloud Logging.
+- **Cluster Overview Dashboard** (`google_monitoring_dashboard.cluster`):
+  - Declared declaratively in `infra/foundation/monitoring.tf`.
+  - Visualizes active node count across node pools (verifying autoscaling and scale-to-zero of `runner-pool`), allocatable vs used CPU and memory, container resource usage per namespace (`arc-systems`, `arc-runners`, `external-secrets`), and container restart rates.
+- **Alert Policies** (`google_monitoring_alert_policy`):
+  - **Node High CPU**: Sustained allocatable CPU > 85% for 5 minutes.
+  - **Node High Memory**: Sustained allocatable memory > 85% for 5 minutes.
+  - **Container Restarts**: Elevated restart rates alerting operators to CrashLoopBackOff or runner failures.
+
 ### Clean Teardown
 
 The cluster and its node pools are declared without `prevent_destroy` or `deletion_protection`. Running `terraform destroy` on `infra/foundation` removes the runner node pool, system node pool, GKE cluster, subnets, and Cloud NAT cleanly in dependency order without leaving orphan cloud resources.
@@ -235,8 +252,10 @@ each project it creates:
   `github_repository`;
 - the service account `github-plan`, read-only (Viewer and Security Reviewer on the project), which
   any workflow of the repository may impersonate. Plans use it, including on pull requests;
-- the service account `github-apply`, which creates and changes resources (Editor and Project IAM
-  Admin on the project), and which only a job that runs in the GitHub environment of the same name
+- the service account `github-apply`, which creates and changes resources using least-privilege
+  predefined roles (Compute Network Admin, Container Admin, Service Usage Admin, IAM Service
+  Account Admin/User, Project IAM Admin, Secret Manager Admin, Run Admin, Storage Admin, Monitoring
+  Admin, Logging Admin), and which only a job that runs in the GitHub environment of the same name
   as the Terraform environment (`dev` or `prd`) may impersonate;
 - the write access of both accounts to the state bucket, because Terraform locks the state even
   for a plan.
