@@ -18,13 +18,19 @@
         <span class="badge" id="canvas-size">10,000 × 10,000</span>
       </div>
       <div class="hud-info">
-        <span id="coord-display">X: — , Y: —</span>
+        <span id="coord-display" class="clickable-coord" title="Cliquer pour aller à des coordonnées">X: — , Y: —</span>
+        <button id="btn-goto" class="btn-hud-action" title="Aller à des coordonnées précises">📍 Aller à</button>
         <span class="separator">|</span>
         <span id="zoom-display">100%</span>
         <span class="separator">|</span>
         <span class="badge badge-live" id="stream-status">⚡ 0 tuiles</span>
         <span class="separator">|</span>
-        <span class="badge badge-tokens" id="tokens-display" title="Pixels disponibles (Rate Limit)">🪙 20/20</span>
+        <div class="tokens-container" title="Pixels disponibles (Rate Limit : 20 tokens max, +1 / 3s)">
+          <span class="badge badge-tokens" id="tokens-display">🪙 20/20</span>
+          <div class="token-progress-bar">
+            <div class="token-progress-fill" id="token-progress-fill"></div>
+          </div>
+        </div>
       </div>
       <div class="hud-auth">
         <button id="btn-discord-login" class="btn-discord">
@@ -81,6 +87,7 @@
 
       <div class="tool-section">
         <button id="btn-reset-view" class="btn-action">Centrer la vue</button>
+        <button id="btn-export-view" class="btn-action btn-secondary" title="Télécharger la vue visible en image PNG">📷 Exporter vue</button>
       </div>
 
       <div class="tool-section shortcuts-section">
@@ -117,6 +124,45 @@
         <button id="btn-clear-inspect" class="btn-clear-inspect hidden" title="Fermer la sélection">✕ Désélectionner</button>
       </div>
     </section>
+
+    <!-- Bottom-left Minimap Radar -->
+    <aside class="hud-minimap" id="minimap-container">
+      <div class="minimap-header">
+        <span>Radar 10k × 10k</span>
+        <button id="btn-toggle-minimap" class="btn-minimap-toggle" title="Afficher/Masquer le radar">▾</button>
+      </div>
+      <div class="minimap-body" id="minimap-body">
+        <canvas id="minimap-canvas"></canvas>
+      </div>
+    </aside>
+
+    <!-- Go To Coordinates Modal -->
+    <div id="modal-goto" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>📍 Aller à des coordonnées</h3>
+          <button id="btn-close-goto" class="btn-icon-close" title="Fermer">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-row">
+            <label for="goto-x">Coordonnée X (0 – 9999) :</label>
+            <input type="number" id="goto-x" min="0" max="9999" placeholder="5000" />
+          </div>
+          <div class="form-row">
+            <label for="goto-y">Coordonnée Y (0 – 9999) :</label>
+            <input type="number" id="goto-y" min="0" max="9999" placeholder="5000" />
+          </div>
+          <div class="form-row">
+            <label for="goto-zoom">Zoom (%) :</label>
+            <input type="number" id="goto-zoom" min="5" max="5000" placeholder="100" />
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="btn-confirm-goto" class="btn-action">Naviguer</button>
+          <button id="btn-cancel-goto" class="btn-action btn-secondary">Annuler</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Notification Toast Container -->
     <div id="toast-container" class="toast-container"></div>

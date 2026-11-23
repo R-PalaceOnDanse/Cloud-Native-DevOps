@@ -122,3 +122,94 @@ export function panViewport(deltaX: number, deltaY: number, viewport: ViewportSt
     panY: viewport.panY + deltaY,
   };
 }
+
+/**
+ * Centers the viewport on a specific world coordinate (worldX, worldY) with a given zoom.
+ */
+export function centerAtWorld(
+  worldX: number,
+  worldY: number,
+  zoom: number,
+  viewport: ViewportState
+): ViewportState {
+  const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+  const clampedX = Math.max(0, Math.min(CANVAS_SIZE - 1, worldX));
+  const clampedY = Math.max(0, Math.min(CANVAS_SIZE - 1, worldY));
+
+  const panX = viewport.screenWidth / 2 - clampedX * clampedZoom;
+  const panY = viewport.screenHeight / 2 - clampedY * clampedZoom;
+
+  return {
+    ...viewport,
+    zoom: clampedZoom,
+    panX,
+    panY,
+  };
+}
+
+/**
+ * Parses URL hash containing coordinates and zoom level.
+ * Supports:
+ * - `#x=1234&y=5678&z=2.5`
+ * - `#1234,5678,2.5` or `#1234,5678`
+ */
+export function parseUrlHash(
+  hash: string
+): { x?: number; y?: number; zoom?: number } | null {
+  if (!hash || hash.length <= 1) return null;
+  const clean = hash.startsWith('#') ? hash.slice(1) : hash;
+
+  // Format 1: query-like #x=100&y=200&z=2
+  if (clean.includes('=')) {
+    const params = new URLSearchParams(clean);
+    const xStr = params.get('x');
+    const yStr = params.get('y');
+    const zStr = params.get('z') || params.get('zoom');
+
+    const result: { x?: number; y?: number; zoom?: number } = {};
+    if (xStr !== null && !isNaN(Number(xStr))) result.x = Math.round(Number(xStr));
+    if (yStr !== null && !isNaN(Number(yStr))) result.y = Math.round(Number(yStr));
+    if (zStr !== null && !isNaN(Number(zStr))) result.zoom = Number(zStr);
+
+    if (result.x !== undefined || result.y !== undefined || result.zoom !== undefined) {
+      return result;
+    }
+  }
+
+  // Format 2: comma-separated #100,200,2
+  const parts = clean.split(',').map((p) => p.trim());
+  if (parts.length >= 2) {
+    const x = Number(parts[0]);
+    const y = Number(parts[1]);
+    const z = parts.length >= 3 ? Number(parts[2]) : undefined;
+
+    if (!isNaN(x) && !isNaN(y)) {
+      const result: { x: number; y: number; zoom?: number } = {
+        x: Math.round(x),
+        y: Math.round(y),
+      };
+      if (z !== undefined && !isNaN(z)) {
+        result.zoom = z;
+      }
+      return result;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Formats current viewport center and zoom into a canonical URL hash string.
+ */
+export function formatUrlHash(viewport: ViewportState): string {
+  const center = screenToWorld(
+    viewport.screenWidth / 2,
+    viewport.screenHeight / 2,
+    viewport
+  );
+  const roundedZoom = Math.round(viewport.zoom * 100) / 100;
+  return `#x=${Math.max(0, Math.min(CANVAS_SIZE - 1, center.x))}&y=${Math.max(
+    0,
+    Math.min(CANVAS_SIZE - 1, center.y)
+  )}&z=${roundedZoom}`;
+}

@@ -5,8 +5,18 @@
  * Fulfills C07 §3.1–§3.6 (Issues #77, #80, #81, #82, #83, #76).
  */
 
-import { createDefaultViewport, screenToWorld, zoomAtPoint, panViewport, ViewportState } from './viewport.js';
+import {
+  createDefaultViewport,
+  screenToWorld,
+  zoomAtPoint,
+  panViewport,
+  centerAtWorld,
+  parseUrlHash,
+  formatUrlHash,
+  ViewportState,
+} from './viewport.js';
 import { CanvasRenderer } from './canvas.js';
+import { Minimap } from './minimap.js';
 import { getBrushPixels, validateBrushStroke, BRUSH_PIXEL_COUNTS, BrushSize } from './brush.js';
 import { RealtimeManager, SystemState } from './realtime.js';
 import { createRealtimeProvider } from './firestore-provider.js';
@@ -58,6 +68,25 @@ const colorHexLabel = document.getElementById('color-hex-label') as HTMLElement;
 const toolDrawBtn = document.getElementById('tool-draw') as HTMLButtonElement;
 const toolPanBtn = document.getElementById('tool-pan') as HTMLButtonElement;
 const resetViewBtn = document.getElementById('btn-reset-view') as HTMLButtonElement;
+const exportViewBtn = document.getElementById('btn-export-view') as HTMLButtonElement | null;
+
+// Minimap DOM Elements
+const minimapCanvas = document.getElementById('minimap-canvas') as HTMLCanvasElement | null;
+const minimapBody = document.getElementById('minimap-body') as HTMLElement | null;
+const btnToggleMinimap = document.getElementById('btn-toggle-minimap') as HTMLButtonElement | null;
+
+// Token progress fill
+const tokenProgressFill = document.getElementById('token-progress-fill') as HTMLElement | null;
+
+// Go-To Coordinates Modal Elements
+const btnGoto = document.getElementById('btn-goto') as HTMLButtonElement | null;
+const modalGoto = document.getElementById('modal-goto') as HTMLElement | null;
+const btnCloseGoto = document.getElementById('btn-close-goto') as HTMLButtonElement | null;
+const btnCancelGoto = document.getElementById('btn-cancel-goto') as HTMLButtonElement | null;
+const btnConfirmGoto = document.getElementById('btn-confirm-goto') as HTMLButtonElement | null;
+const inputGotoX = document.getElementById('goto-x') as HTMLInputElement | null;
+const inputGotoY = document.getElementById('goto-y') as HTMLInputElement | null;
+const inputGotoZoom = document.getElementById('goto-zoom') as HTMLInputElement | null;
 
 // Auth DOM Elements
 const btnDiscordLogin = document.getElementById('btn-discord-login') as HTMLButtonElement;
@@ -107,6 +136,37 @@ realtimeManager.subscribeSystemState((state: SystemState) => {
   }
 });
 
+// Minimap Radar Initialization
+let minimap: Minimap | null = null;
+if (minimapCanvas) {
+  try {
+    minimap = new Minimap(minimapCanvas, {
+      size: 140,
+      onNavigate: (worldX, worldY) => {
+        viewport = centerAtWorld(worldX, worldY, viewport.zoom, viewport);
+        realtimeManager.updateViewport(viewport);
+        requestRender();
+        syncUrlHash();
+      },
+    });
+  } catch (err) {
+    console.warn('Minimap initialization skipped:', err);
+  }
+}
+
+if (btnToggleMinimap && minimapBody) {
+  btnToggleMinimap.addEventListener('click', () => {
+    const isCollapsed = minimapBody.classList.toggle('collapsed');
+    btnToggleMinimap.textContent = isCollapsed ? '▸' : '▾';
+  });
+}
+
+function syncUrlHash(): void {
+  if (typeof window === 'undefined') return;
+  const hash = formatUrlHash(viewport);
+  window.history.replaceState(null, '', hash);
+}
+
 function updateTokensDisplay(): void {
   const now = Date.now();
   const elapsed = now - lastRefillTime;
@@ -117,6 +177,20 @@ function updateTokensDisplay(): void {
   }
   if (tokensDisplay) {
     tokensDisplay.textContent = `🪙 ${Math.floor(userTokens)}/${MAX_TOKENS}`;
+  }
+  if (tokenProgressFill) {
+    if (userTokens >= MAX_TOKENS) {
+      tokenProgressFill.style.width = '100%';
+      tokenProgressFill.classList.remove('empty');
+    } else {
+      const progressPercent = Math.min(100, Math.floor(((now - lastRefillTime) / 3000) * 100));
+      tokenProgressFill.style.width = `${progressPercent}%`;
+      if (userTokens < 1) {
+        tokenProgressFill.classList.add('empty');
+      } else {
+        tokenProgressFill.classList.remove('empty');
+      }
+    }
   }
 }
 
@@ -143,6 +217,9 @@ function resizeCanvas(): void {
 
 function requestRender(): void {
   renderer.render(viewport);
+  if (minimap) {
+    minimap.render(viewport, renderer);
+  }
   zoomDisplay.textContent = `${Math.round(viewport.zoom * 100)}%`;
   updateTokensDisplay();
 }
@@ -228,6 +305,79 @@ resetViewBtn.addEventListener('click', () => {
   viewport = createDefaultViewport(canvas.width, canvas.height);
   realtimeManager.updateViewport(viewport);
   requestRender();
+  syncUrlHash();
+});
+
+if (exportViewBtn) {
+  exportViewBtn.addEventListener('click', () => {
+    try {
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `pixel-canvas-export-${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+      showToast('📷 Image de la vue exportée avec succès !', 'success');
+    } catch {
+      showToast('Échec de l\'exportation de l\'image.', 'error');
+    }
+  });
+}
+
+// Go-To Coordinates Modal Handlers
+function openGotoModal(): void {
+  if (!modalGoto) return;
+  const center = screenToWorld(viewport.screenWidth / 2, viewport.screenHeight / 2, viewport);
+  if (inputGotoX) inputGotoX.value = String(Math.max(0, Math.min(9999, center.x)));
+  if (inputGotoY) inputGotoY.value = String(Math.max(0, Math.min(9999, center.y)));
+  if (inputGotoZoom) inputGotoZoom.value = String(Math.round(viewport.zoom * 100));
+  modalGoto.classList.remove('hidden');
+  inputGotoX?.focus();
+}
+
+function closeGotoModal(): void {
+  modalGoto?.classList.add('hidden');
+}
+
+function executeGoto(): void {
+  const x = Number(inputGotoX?.value || '5000');
+  const y = Number(inputGotoY?.value || '5000');
+  const zoomPct = Number(inputGotoZoom?.value || '100');
+  const targetZoom = Math.max(0.05, Math.min(50, zoomPct / 100));
+
+  viewport = centerAtWorld(x, y, targetZoom, viewport);
+  realtimeManager.updateViewport(viewport);
+  requestRender();
+  syncUrlHash();
+  closeGotoModal();
+  showToast(`📍 Vue déplacée vers (${Math.round(x)}, ${Math.round(y)})`, 'info');
+}
+
+if (btnGoto) {
+  btnGoto.addEventListener('click', openGotoModal);
+}
+
+if (coordDisplay) {
+  coordDisplay.addEventListener('click', openGotoModal);
+}
+
+if (btnCloseGoto) {
+  btnCloseGoto.addEventListener('click', closeGotoModal);
+}
+
+if (btnCancelGoto) {
+  btnCancelGoto.addEventListener('click', closeGotoModal);
+}
+
+if (btnConfirmGoto) {
+  btnConfirmGoto.addEventListener('click', executeGoto);
+}
+
+modalGoto?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    executeGoto();
+  } else if (e.key === 'Escape') {
+    closeGotoModal();
+  }
 });
 
 customColorInput.addEventListener('input', (e) => {
@@ -287,6 +437,7 @@ canvas.addEventListener('wheel', (e) => {
   viewport = zoomAtPoint(e.clientX * dpr, e.clientY * dpr, factor, viewport);
   realtimeManager.updateViewport(viewport);
   requestRender();
+  syncUrlHash();
 }, { passive: false });
 
 window.addEventListener('keydown', (e) => {
@@ -395,6 +546,7 @@ window.addEventListener('mouseup', () => {
   isMouseDown = false;
   lastDrawnCoord = null;
   canvas.style.cursor = (isSpacePressed || currentTool === 'pan') ? 'grab' : 'crosshair';
+  syncUrlHash();
 });
 
 // Touch and mobile gestures (pinch-to-zoom, touch pan, touch draw)
@@ -568,9 +720,24 @@ function clearInspect(): void {
   }
 }
 
+function loadFromUrlHash(): void {
+  if (typeof window === 'undefined' || !window.location.hash) return;
+  const parsed = parseUrlHash(window.location.hash);
+  if (parsed) {
+    const targetX = parsed.x ?? 5000;
+    const targetY = parsed.y ?? 5000;
+    const targetZoom = parsed.zoom !== undefined ? parsed.zoom : viewport.zoom;
+    viewport = centerAtWorld(targetX, targetY, targetZoom, viewport);
+    realtimeManager.updateViewport(viewport);
+    requestRender();
+  }
+}
+
 // Initial setup
 window.addEventListener('resize', resizeCanvas);
+window.addEventListener('hashchange', loadFromUrlHash);
 initPalette();
 resizeCanvas();
+loadFromUrlHash();
 updateTokensDisplay();
 updateBrushHint();

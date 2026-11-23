@@ -59,6 +59,18 @@ This document describes the reactive web frontend for the collaborative pixel ca
   - 2-finger pinch (pinch-to-zoom) : smooth zoom centered on touch midpoint.
   - 2-finger drag : simultaneous pan and zoom.
 
+### E. Minimap Radar, Coordinate Jump & URL Deep Linking
+- **Minimap Radar Widget (`140 × 140`)**:
+  - Positioned bottom-left, shows the complete 10,000 × 10,000 canvas in miniature.
+  - Highlights the current viewport frustum bounding box in cyan (`#06b6d4`).
+  - Interactive: clicking or dragging on the radar immediately centers the main canvas to that location.
+  - Collapsible via the header toggle `▾`.
+- **Coordinate Jump ("Aller à X, Y") & URL Hash Deep Linking**:
+  - Top HUD coordinate label or `📍 Aller à` button opens a modal to jump directly to any `(X, Y)` position and zoom level.
+  - Viewport automatically syncs with the URL hash (`#x=5000&y=5000&z=1`), enabling instant deep linking and coordinate sharing across teams and Discord.
+- **Canvas View PNG Export**:
+  - A toolbar action `📷 Exporter vue` enables one-click download of the active viewport render as a PNG image file.
+
 ---
 
 ## 3. Local Development & Testing

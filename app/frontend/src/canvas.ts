@@ -45,6 +45,10 @@ export class CanvasRenderer {
     return this.pixels.get(`${x},${y}`);
   }
 
+  public getAllPixels(): Map<string, PixelMetadata> {
+    return this.pixels;
+  }
+
   public setSelectedPixel(coord: { x: number; y: number } | null): void {
     this.selectedPixel = coord;
   }

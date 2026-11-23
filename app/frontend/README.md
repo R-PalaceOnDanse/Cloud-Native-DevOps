@@ -90,34 +90,38 @@ VITE_FIREBASE_APP_ID=
 L'interface se compose de quatre zones interactives épurées :
 
 ```
-+--------------------------------------------------------------------------------+
-| 🎨 Pixel Canvas [10k x 10k] | X: 5420, Y: 120 | 100% | ⚡ 4 tuiles | 🪙 20/20 | [👾 Discord] |
-+--------------------------------------------------------------------------------+
-| [Outil]        |                                                               |
-|  ✏️ Dessin     |                                                               |
-|  ✋ Pan        |                                                               |
-|                |                      CANVAS 2D PRINCIPAL                      |
-| [Pinceau]      |               (Grille 10 000 x 10 000 pixels)                 |
-|  1px | 3px     |                                                               |
-|  5px | 9px     |                                                               |
-|                |                                                               |
-| [Palette]      |                                                               |
-|  [■][■][■][■]  |                                           +-------------------+
-|  [■][■][■][■]  |                                           | INFO DU PIXEL     |
-|  [ColorPicker] |                                           | Pos: X 5420, Y 120|
-|                |                                           | Auteur: Alex#1234 |
-| [Centrer vue]  |                                           | Date: 12:04:15    |
-|                |                                           | Coul: #ff0000     |
-| [Raccourcis]   |                                           | [✕ Désélection]   |
-+------------------------------------------------------------+-------------------+
++-----------------------------------------------------------------------------------------------+
+| 🎨 Pixel Canvas [10k x 10k] | X: 5420, Y: 120 [📍 Aller à] | 100% | ⚡ 4 tuiles | 🪙 20/20 [■] | [👾 Discord] |
++-----------------------------------------------------------------------------------------------+
+| [Outil]        |                                                                              |
+|  ✏️ Dessin     |                                                                              |
+|  ✋ Pan        |                                                                              |
+|                |                      CANVAS 2D PRINCIPAL                                     |
+| [Pinceau]      |               (Grille 10 000 x 10 000 pixels)                                |
+|  1px | 3px     |                                                                              |
+|  5px | 9px     |                                                                              |
+|                |                                                                              |
+| [Palette]      |                                                                              |
+|  [■][■][■][■]  |                                                          +-------------------+
+|  [■][■][■][■]  |                                                          | INFO DU PIXEL     |
+|  [ColorPicker] |                                                          | Pos: X 5420, Y 120|
+|                |                                                          | Auteur: Alex#1234 |
+| [Centrer vue]  |                                                          | Date: 12:04:15    |
+| [📷 Exporter]  |                                                          | Coul: #ff0000     |
+| [Raccourcis]   |                                                          | [✕ Désélection]   |
++----------------+----------------------------------------------------------+-------------------+
+| [Radar 10k]    |
+| [Viewport Box] |
++----------------+
 ```
 
 ### HUD Supérieur
 - **Logo & Grille** : Indique la taille globale (`10,000 × 10,000`).
-- **Coordonnées (X, Y)** : Affiche en temps réel la position entière dans l'univers du canevas sous le pointeur.
+- **Coordonnées (X, Y) & Aller à** : Affiche la position sous le pointeur. Cliquer sur les coordonnées ou sur le bouton `📍 Aller à` ouvre un dialogue modal pour naviguer instantanément à n'importe quelle position `(X, Y)` et niveau de zoom.
+- **Deep Linking par URL Hash** : L'URL se synchronise automatiquement (`#x=5420&y=120&z=1`). Ouvrir ou partager ce lien centre directement le viewport sur ces coordonnées exactes.
 - **Zoom** : Facteur d'échelle actuel (de `5%` à `5000%`).
 - **Badge Live (`⚡ N tuiles`)** : Nombre exact de tuiles 64×64 actuellement souscrites via Firestore `onSnapshot`.
-- **Réserve de Jetons (`🪙 N/20`)** : Compteur de jetons disponibles du seau (Token Bucket) pour le dessin.
+- **Réserve de Jetons & Jauge de Recharge (`🪙 N/20`)** : Compteur de jetons disponibles assorti d'une barre de progression de recharge continue (+1 jeton toutes les 3 secondes).
 - **Bouton Discord** :
   - Non connecté : Bouton `Connexion Discord`.
   - Connecté : Avatar `👾`, pseudo de l'utilisateur, et bouton de déconnexion `✕`.
@@ -134,8 +138,16 @@ L'interface se compose de quatre zones interactives épurées :
 - **Palette de Couleurs** :
   - 16 teintes standards sélectionnables d'un clic.
   - Sélecteur de couleur personnalisé HTML5 (`<input type="color">`) avec affichage du code hexadécimal.
-- **Bouton "Centrer la vue"** : Réinitialise le viewport au centre exact de la grille avec un zoom 100%.
+- **Actions Rapides** :
+  - `Centrer la vue` : Réinitialise le viewport au centre exact de la grille avec un zoom 100%.
+  - `📷 Exporter vue` : Télécharge instantanément la portion visible du canevas en image PNG locale.
 - **Aide Raccourcis** : Mémo visuel des raccourcis clavier.
+
+### Radar Minimap (Bas Gauche)
+- Affiche en permanence une vue miniature (140×140 px) de l'ensemble de la grille de 10 000 × 10 000 pixels.
+- Matérialise les amas de pixels dessinés ainsi que le rectangle englobant du viewport actuel (frustum) surligné en cyan translucide.
+- **Navigation Interactive** : Cliquer ou glisser directement sur le radar déplace immédiatement le viewport vers cette zone de la carte.
+- **Réductible** : Bouton `▾` permettant d'enrouler ou dérouler le radar à tout moment.
 
 ### Panneau d'Inspection
 Situé en bas à droite, il réagit à chaque sélection de pixel :

@@ -7,6 +7,9 @@ import {
   getVisibleWorldBounds,
   zoomAtPoint,
   panViewport,
+  centerAtWorld,
+  parseUrlHash,
+  formatUrlHash,
   CANVAS_SIZE,
 } from './viewport.js';
 
@@ -77,4 +80,44 @@ test('zoomAtPoint keeps cursor world position stable', () => {
 
   assert.equal(worldBefore.x, worldAfter.x);
   assert.equal(worldBefore.y, worldAfter.y);
+});
+
+test('centerAtWorld places target coordinate precisely at screen center', () => {
+  const vp = createDefaultViewport(1000, 800);
+  const targetX = 2500;
+  const targetY = 7500;
+  const targetZoom = 2.0;
+
+  const centered = centerAtWorld(targetX, targetY, targetZoom, vp);
+  assert.equal(centered.zoom, targetZoom);
+
+  // Screen center (500, 400) should match world (2500, 7500)
+  const centerWorld = screenToWorld(500, 400, centered);
+  assert.equal(centerWorld.x, targetX);
+  assert.equal(centerWorld.y, targetY);
+});
+
+test('parseUrlHash correctly extracts coordinates and zoom level', () => {
+  // Query-style hash
+  const parsed1 = parseUrlHash('#x=1234&y=5678&z=2.5');
+  assert.deepEqual(parsed1, { x: 1234, y: 5678, zoom: 2.5 });
+
+  // Comma-separated hash
+  const parsed2 = parseUrlHash('#4000,6000,3');
+  assert.deepEqual(parsed2, { x: 4000, y: 6000, zoom: 3 });
+
+  // Partial hash
+  const parsed3 = parseUrlHash('#x=100');
+  assert.deepEqual(parsed3, { x: 100 });
+
+  // Empty or invalid hash
+  assert.equal(parseUrlHash(''), null);
+  assert.equal(parseUrlHash('#'), null);
+  assert.equal(parseUrlHash('#invalid'), null);
+});
+
+test('formatUrlHash creates canonical coordinate hash', () => {
+  const vp = createDefaultViewport(1000, 1000);
+  const hash = formatUrlHash(vp);
+  assert.ok(hash.startsWith('#x=5000&y=5000&z='));
 });
