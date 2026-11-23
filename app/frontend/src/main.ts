@@ -44,6 +44,12 @@ let lastMouseY = 0;
 let isCanvasPaused = false;
 let lastClearedAtTimestamp: number | null = null;
 let lastDrawnCoord: { x: number; y: number } | null = null;
+let lastAttemptedCoord: { x: number; y: number } | null = null;
+let lastDrawTime = 0;
+const DRAG_DRAW_INTERVAL_MS = 100; // Pacing throttle when dragging to avoid spraying tokens uncontrollably
+let lastErrorBlinkTime = 0;
+const ERROR_BLINK_COOLDOWN_MS = 250; // Throttle re-blink animation to 250ms during continuous drag
+
 let userPixelsCount = 0;
 try {
   userPixelsCount = Number(localStorage.getItem('pixel_canvas_user_pixels_drawn') || '0');
@@ -219,15 +225,87 @@ function updateTokensDisplay(): void {
   }
 }
 
+const activeToastTimers = new Map<HTMLElement, number>();
+
+function triggerTokenBatteryAlert(): void {
+  const container = document.querySelector('.tokens-container');
+  if (container) {
+    container.classList.remove('tokens-alert');
+    void (container as HTMLElement).offsetWidth;
+    container.classList.add('tokens-alert');
+  }
+}
+
 function showToast(message: string, type: 'info' | 'error' | 'success' | 'warning' = 'info'): void {
   if (!toastContainer) return;
+
+  // If this is an error, deduplicate with any existing error toast so we never stack errors
+  if (type === 'error') {
+    const existingErrorToast = toastContainer.querySelector('.toast-error') as HTMLElement | null;
+    if (existingErrorToast) {
+      existingErrorToast.textContent = message;
+
+      // Re-trigger the red blink animation
+      existingErrorToast.classList.remove('toast-blink-red');
+      void existingErrorToast.offsetWidth; // Force reflow
+      existingErrorToast.classList.add('toast-blink-red');
+
+      // Trigger token battery alert pulse in HUD
+      triggerTokenBatteryAlert();
+
+      // Reset auto-dismiss timer
+      const oldTimer = activeToastTimers.get(existingErrorToast);
+      if (oldTimer !== undefined) clearTimeout(oldTimer);
+
+      const newTimer = window.setTimeout(() => {
+        existingErrorToast.remove();
+        activeToastTimers.delete(existingErrorToast);
+      }, 3500);
+      activeToastTimers.set(existingErrorToast, newTimer);
+      return;
+    }
+  }
+
+  // Deduplicate exact same message if already showing
+  const existingSameToast = Array.from(toastContainer.querySelectorAll('.toast')).find(
+    (el) => el.textContent === message && el.classList.contains(`toast-${type}`)
+  ) as HTMLElement | undefined;
+
+  if (existingSameToast) {
+    if (type === 'error') {
+      existingSameToast.classList.remove('toast-blink-red');
+      void existingSameToast.offsetWidth;
+      existingSameToast.classList.add('toast-blink-red');
+      triggerTokenBatteryAlert();
+    }
+    const oldTimer = activeToastTimers.get(existingSameToast);
+    if (oldTimer !== undefined) clearTimeout(oldTimer);
+
+    const newTimer = window.setTimeout(() => {
+      existingSameToast.remove();
+      activeToastTimers.delete(existingSameToast);
+    }, 3500);
+    activeToastTimers.set(existingSameToast, newTimer);
+    return;
+  }
+
+  // Create new toast element
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
   toast.textContent = message;
+
+  if (type === 'error') {
+    toast.classList.add('toast-blink-red');
+    triggerTokenBatteryAlert();
+  }
+
   toastContainer.appendChild(toast);
-  setTimeout(() => {
+
+  const timer = window.setTimeout(() => {
     toast.remove();
+    activeToastTimers.delete(toast);
   }, 3500);
+  activeToastTimers.set(toast, timer);
 }
 
 function resizeCanvas(): void {
@@ -721,6 +799,7 @@ window.addEventListener('keyup', (e) => {
 canvas.addEventListener('mousedown', (e) => {
   isMouseDown = true;
   lastDrawnCoord = null;
+  lastAttemptedCoord = null;
   const dpr = window.devicePixelRatio || 1;
   lastMouseX = e.clientX * dpr;
   lastMouseY = e.clientY * dpr;
@@ -744,8 +823,8 @@ canvas.addEventListener('mousedown', (e) => {
     return;
   }
 
-  // Draw on click
-  void handleDraw(e.clientX * dpr, e.clientY * dpr);
+  // Draw on click (isDrag = false)
+  void handleDraw(e.clientX * dpr, e.clientY * dpr, false);
 });
 
 window.addEventListener('mousemove', (e) => {
@@ -769,7 +848,7 @@ window.addEventListener('mousemove', (e) => {
     realtimeManager.updateViewport(viewport);
     requestRender();
   } else if (currentTool === 'draw') {
-    void handleDraw(mouseX, mouseY);
+    void handleDraw(mouseX, mouseY, true);
   }
 
   lastMouseX = mouseX;
@@ -779,6 +858,7 @@ window.addEventListener('mousemove', (e) => {
 window.addEventListener('mouseup', () => {
   isMouseDown = false;
   lastDrawnCoord = null;
+  lastAttemptedCoord = null;
   canvas.style.cursor = (isSpacePressed || currentTool === 'pan') ? 'grab' : 'crosshair';
   syncUrlHash();
 });
@@ -798,6 +878,7 @@ canvas.addEventListener('touchstart', (e) => {
     lastTouchY = touch.clientY * dpr;
     touchStartTime = Date.now();
     lastDrawnCoord = null;
+    lastAttemptedCoord = null;
   } else if (e.touches.length === 2) {
     const t1 = e.touches[0]!;
     const t2 = e.touches[1]!;
@@ -842,7 +923,7 @@ canvas.addEventListener('touchmove', (e) => {
       realtimeManager.updateViewport(viewport);
       requestRender();
     } else if (currentTool === 'draw') {
-      void handleDraw(touchX, touchY);
+      void handleDraw(touchX, touchY, true);
     }
 
     lastTouchX = touchX;
@@ -863,11 +944,12 @@ canvas.addEventListener('touchend', (e) => {
       const world = screenToWorld(touchX, touchY, viewport);
       inspectPixel(world.x, world.y);
       if (currentTool === 'draw') {
-        void handleDraw(touchX, touchY);
+        void handleDraw(touchX, touchY, false);
       }
     }
   }
   lastDrawnCoord = null;
+  lastAttemptedCoord = null;
 });
 
 canvas.addEventListener('click', (e) => {
@@ -882,11 +964,25 @@ if (btnClearInspect) {
   });
 }
 
-async function handleDraw(screenX: number, screenY: number): Promise<void> {
+async function handleDraw(screenX: number, screenY: number, isDrag = false): Promise<void> {
   const world = screenToWorld(screenX, screenY, viewport);
   if (lastDrawnCoord && lastDrawnCoord.x === world.x && lastDrawnCoord.y === world.y) {
     return;
   }
+
+  const now = Date.now();
+  if (isDrag) {
+    // If cursor has not moved to a different coordinate while dragging, skip
+    if (lastAttemptedCoord && lastAttemptedCoord.x === world.x && lastAttemptedCoord.y === world.y) {
+      return;
+    }
+    // Controlled drag pacing: avoids dumping all tokens in 20ms during quick mouse motion
+    if (now - lastDrawTime < DRAG_DRAW_INTERVAL_MS) {
+      return;
+    }
+  }
+
+  lastAttemptedCoord = { x: world.x, y: world.y };
 
   updateTokensDisplay();
   const batch = getBrushPixels(world.x, world.y, currentBrushSize, currentColor);
@@ -894,10 +990,15 @@ async function handleDraw(screenX: number, screenY: number): Promise<void> {
 
   const validation = validateBrushStroke(batch.length, userTokens, MAX_TOKENS, isCanvasPaused);
   if (!validation.allowed) {
-    showToast(validation.message || 'Unable to perform action.', 'error');
+    // Distinct clicks always re-blink error toast immediately; continuous dragging throttles re-blink
+    if (!isDrag || now - lastErrorBlinkTime >= ERROR_BLINK_COOLDOWN_MS) {
+      lastErrorBlinkTime = now;
+      showToast(validation.message || 'Unable to perform action.', 'error');
+    }
     return;
   }
 
+  lastDrawTime = now;
   lastDrawnCoord = { x: world.x, y: world.y };
   userTokens -= batch.length;
   updateTokensDisplay();
