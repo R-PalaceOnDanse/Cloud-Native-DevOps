@@ -81,7 +81,7 @@ is in [ADR-0011](adr/0011-workload-identity-in-the-access-stack.md) and the beha
 | Service account | `github-plan` | Read-only identity for `terraform plan`, usable by any workflow of the repository |
 | Service account | `github-apply` | Identity for apply and destroy, usable only by the GitHub environment of the same name as the project's environment |
 | Project roles of `github-plan` | Viewer, Security Reviewer | Refresh the state and read IAM policies |
-| Project roles of `github-apply` | Scoped least-privilege roles (Compute Network Admin, Container Admin, Service Usage Admin, IAM Service Account Admin/User, Project IAM Admin, Secret Manager Admin, Run Admin, Storage Admin, Monitoring Admin, Logging Admin) | Create resources and their IAM bindings without broad Editor permissions |
+| Project roles of `github-apply` | Scoped least-privilege roles (Compute Network Admin, Container Admin, Service Usage Admin, IAM Service Account Admin/User, Project IAM Admin, Secret Manager Admin, Run Admin, Cloud Functions Admin, API Gateway Admin, API Keys Admin, Storage Admin, Monitoring Admin, Logging Admin) | Create resources and their IAM bindings without broad Editor permissions |
 | State bucket role | `roles/storage.objectAdmin` on the bucket, for both accounts | Terraform writes a lock even for a plan |
 | Impersonation bindings | `roles/iam.workloadIdentityUser` on each account | Who may use each account, as described above |
 | Enabled APIs | Cloud Resource Manager, IAM, IAM Credentials, Security Token Service | Required by the federation; left enabled on destroy |

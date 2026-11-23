@@ -36,6 +36,10 @@ locals {
     "roles/secretmanager.admin",
     # Cloud Run and serverless function administration
     "roles/run.admin",
+    "roles/cloudfunctions.admin",
+    # API Gateway and the API key the gateway checks (serverless stack)
+    "roles/apigateway.admin",
+    "roles/serviceusage.apiKeysAdmin",
     # Storage bucket management
     "roles/storage.admin",
     # Cloud Monitoring dashboards, metric descriptors, alert policies

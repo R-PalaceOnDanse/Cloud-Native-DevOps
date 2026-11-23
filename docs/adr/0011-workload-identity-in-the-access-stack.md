@@ -45,7 +45,8 @@ Option 3, in every project (dev and prd).
 - Negative / trade-offs accepted: `github-apply` was initially broad (Editor plus Project IAM Admin).
   It has now been narrowed to least-privilege predefined administrative roles (Compute Network Admin,
   Container Admin, Service Usage Admin, IAM Service Account Admin/User, Project IAM Admin, Secret
-  Manager Admin, Run Admin, Storage Admin, Monitoring Admin, Logging Admin), removing Editor and its
+  Manager Admin, Run Admin, Cloud Functions Admin, API Gateway Admin, API Keys Admin, Storage
+  Admin, Monitoring Admin, Logging Admin), removing Editor and its
   ~12,000 unneeded permissions. The first apply of the stack is
   done by hand, since the pipeline cannot authenticate before it exists.
 - To verify with the first real plan: that the Viewer and Security Reviewer roles are enough for

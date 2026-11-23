@@ -254,8 +254,8 @@ each project it creates:
   any workflow of the repository may impersonate. Plans use it, including on pull requests;
 - the service account `github-apply`, which creates and changes resources using least-privilege
   predefined roles (Compute Network Admin, Container Admin, Service Usage Admin, IAM Service
-  Account Admin/User, Project IAM Admin, Secret Manager Admin, Run Admin, Storage Admin, Monitoring
-  Admin, Logging Admin), and which only a job that runs in the GitHub environment of the same name
+  Account Admin/User, Project IAM Admin, Secret Manager Admin, Run Admin, Cloud Functions Admin, API Gateway Admin, API Keys Admin, Storage Admin,
+  Monitoring Admin, Logging Admin), and which only a job that runs in the GitHub environment of the same name
   as the Terraform environment (`dev` or `prd`) may impersonate;
 - the write access of both accounts to the state bucket, because Terraform locks the state even
   for a plan.
