@@ -5,3 +5,8 @@ subnet_cidr   = "10.10.0.0/24"
 pods_cidr     = "10.11.0.0/16"
 services_cidr = "10.12.0.0/20"
 environment   = "dev"
+alert_emails = [
+  "aurelienbara13@gmail.com",
+  "nicolaslouis320@gmail.com",
+  "quaduval@gmail.com",
+]

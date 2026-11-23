@@ -209,7 +209,9 @@ Cloud Logging ([ADR-0010](adr/0010-native-gcp-observability.md)):
   - **Node High CPU**: Sustained allocatable CPU > 85% for 5 minutes.
   - **Node High Memory**: Sustained allocatable memory > 85% for 5 minutes.
   - **Container Restarts**: Elevated restart rates alerting operators to CrashLoopBackOff or runner failures.
-
+  - **Runner jobs waiting**: jobs assigned but not running for 10 minutes (PromQL on the `gha_*` metrics of the runner controller).
+  - **Hello errors**: any 5xx response of the `hello` function.
+  - Every policy emails the addresses of `alert_emails` in `<env>.tfvars` (one `google_monitoring_notification_channel` each).
 ### Grafana
 
 Grafana shows the cluster, the runners and the functions in one place

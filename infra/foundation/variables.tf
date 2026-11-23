@@ -52,3 +52,13 @@ variable "environment" {
     error_message = "environment must be dev or prd."
   }
 }
+
+variable "alert_emails" {
+  type        = list(string)
+  description = "Email addresses notified when an alert fires, one notification channel each."
+
+  validation {
+    condition     = length(var.alert_emails) > 0
+    error_message = "alert_emails needs at least one address, or the alerts reach nobody."
+  }
+}
