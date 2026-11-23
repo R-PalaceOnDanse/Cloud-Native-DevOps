@@ -5,6 +5,7 @@
   "description": "Collaborative Pixel Canvas (r/place) & Cloud Native Serverless Architecture",
   "type": "module",
   "scripts": {
+    "dev": "npm run dev --prefix app/frontend",
     "test": "npm test --prefix app/common && npm test --prefix app/frontend && npm test --prefix app/functions/web-draw-proxy && npm test --prefix app/functions/auth-callback && npm test --prefix app/functions/draw-worker && node --test scripts/register-discord-commands.test.mjs && node --test tests/load/burst-load.test.mjs",
     "test:common": "npm test --prefix app/common",
     "test:frontend": "npm test --prefix app/frontend",
