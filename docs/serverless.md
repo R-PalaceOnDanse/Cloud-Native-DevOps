@@ -82,8 +82,7 @@ then prd ([ci.md](ci.md)). The destroy workflow destroys it before `foundation`.
 apply account needs `roles/run.admin` and `roles/secretmanager.admin` in addition to Editor, and
 the plan account `roles/serviceusage.apiKeysViewer`; both are granted by the `access` stack.
 
-## Next (C06)
+## Next (C06 & C07)
 
-The proxy pattern replaces `hello`: a Discord proxy that checks the Ed25519 signature and
-publishes to Pub/Sub. When a second function appears, the service account, the function and its
-IAM binding become a local module (ADR-0004).
+The proxy pattern replaces `hello`: a Discord proxy that checks the Ed25519 signature, a Web Draw Proxy that receives browser pixel batches and publishes to Pub/Sub, and an Auth Callback function that exchanges Discord OAuth codes.
+Firestore Native NoSQL database and Firestore Security Rules (`infra/serverless/firestore.rules`) are deployed via Terraform (`firestore.tf`, `firestore_rules.tf`) to enforce authenticated client read-only access and reject all direct client writes.
