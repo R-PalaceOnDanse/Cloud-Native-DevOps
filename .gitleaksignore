@@ -1,0 +1,3 @@
+# Gitleaks ignore file
+# False positives in test suites or mock fixtures
+56ba03cf6258e6dcd51ec2888c1983e0ed03590e:app/functions/auth-callback/src/index.test.ts:discord-client-id:240

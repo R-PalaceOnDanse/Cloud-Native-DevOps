@@ -83,3 +83,21 @@ In accordance with [ADR-0008](adr/0008-firestore-listeners-for-realtime.md) and 
 - **Asynchronous Pipeline**: The client never writes directly to storage or Firestore. All brush strokes are posted to the Web Draw Proxy (`/api/draw`).
 - **Token Bucket HUD Indicator**: The client displays a real-time token bucket indicator (`🪙 20/20`) that refills continuously (1 token every 3 seconds, up to 20 tokens per minute).
 - **Graceful Error Toasting**: If the user draws when tokens are exhausted or if the proxy returns HTTP 429, a floating toast notification informs the user of the retry cooldown without crashing the viewport.
+
+---
+
+## 6. Discord OAuth2 Authentication & Session Flow (Issue #79, C07 §3.1, ADR-0009)
+
+- **Anti-CSRF Protection**:
+  - Before redirecting to Discord, the client generates a unique cryptographically random state token (`csrf_<timestamp>_<random>`) stored in `sessionStorage`.
+  - When returning with `?code=...&state=...`, the client asserts strict equality before exchanging the code.
+- **Backend Auth Callback Cloud Function (`app/functions/auth-callback`)**:
+  - Securely reads the `DISCORD_CLIENT_SECRET` from Secret Manager.
+  - Exchanges the single-use authorization code with Discord OAuth2 token endpoint (`https://discord.com/api/oauth2/token`).
+  - Fetches the user's minimal Discord profile via `https://discord.com/api/users/@me` with scope `identify`.
+  - **Zero Access Token Persistence**: The Discord access token is strictly discarded from memory and never stored in any database, session store, or log.
+  - Mints a short-lived session token (1-hour expiration) carrying the Discord UID (`discord:<id>`) and username.
+- **Client Propagation**:
+  - The minted session token is stored in client memory and `sessionStorage`.
+  - Transmitted to the Web Draw Proxy (`Authorization: Bearer <sessionToken>`) and Firestore listeners, linking every placed pixel to the authenticated Discord user.
+

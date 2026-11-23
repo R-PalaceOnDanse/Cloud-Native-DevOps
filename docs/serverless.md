@@ -16,8 +16,12 @@ client --HTTPS + x-api-key--> API Gateway (canvas-gw) --ID token of api-gateway 
 |---|---|---|
 | API Gateway | `canvas-api` / `canvas-gw` | The only public entry point. Refuses a request without a valid API key (401). |
 | Cloud Run function | `hello` (Node.js 22, TypeScript) | Returns proof that it read its secret; never returns the value. |
+| Cloud Run function | `web-draw-proxy` (Node.js 22, TypeScript) | Validates pixel draw batches and publishes event envelopes to Pub/Sub (#76). |
+| Cloud Run function | `auth-callback` (Node.js 22, TypeScript) | Exchanges Discord OAuth2 code, discards access token, and mints session token (#79). |
 | Service account | `fn-hello` | Runtime identity of `hello`: writes logs, reads `hello-greeting`. Nothing else. |
-| Service account | `api-gateway` | Identity of the gateway. The only principal with `run.invoker` on `hello`. |
+| Service account | `fn-web-draw-proxy` | Runtime identity of `web-draw-proxy`: publishes to `pixel-draw-events`. |
+| Service account | `fn-auth-callback` | Runtime identity of `auth-callback`: reads Discord OAuth secrets from Secret Manager. |
+| Service account | `api-gateway` | Identity of the gateway. The only principal with `run.invoker` on protected functions. |
 | Service account | `fn-build` | Builds the sources with Cloud Build, instead of the default compute account. Roles: log writer, Artifact Registry writer, Storage object viewer. |
 | Secret | `hello-greeting` | Created by Terraform, **value added by hand** (below). |
 | Bucket | `<project>-fn-sources` | Private bucket of the zipped sources. |
