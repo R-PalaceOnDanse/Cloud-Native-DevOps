@@ -8,7 +8,9 @@
 import { createDefaultViewport, screenToWorld, zoomAtPoint, panViewport, ViewportState } from './viewport.js';
 import { CanvasRenderer } from './canvas.js';
 import { getBrushPixels, validateBrushStroke, BRUSH_PIXEL_COUNTS, BrushSize } from './brush.js';
-import { RealtimeManager, MockRealtimeProvider, SystemState } from './realtime.js';
+import { RealtimeManager, SystemState } from './realtime.js';
+import { createRealtimeProvider } from './firestore-provider.js';
+import { authenticateFirebase } from './firebase.js';
 import { authManager, UserProfile } from './auth.js';
 import { drawApiClient } from './api.js';
 import { formatPixelInspection } from './inspector.js';
@@ -69,7 +71,7 @@ const inspectColor = document.getElementById('inspect-color') as HTMLElement;
 const btnClearInspect = document.getElementById('btn-clear-inspect') as HTMLButtonElement;
 
 // Real-time Provider & Manager (Zero polling, strictly event-driven)
-const realtimeProvider = new MockRealtimeProvider();
+const realtimeProvider = createRealtimeProvider();
 const realtimeManager = new RealtimeManager(
   realtimeProvider,
   renderer,
@@ -229,6 +231,10 @@ authManager.onAuthStateChanged((user: UserProfile | null) => {
     userDisplay.classList.remove('hidden');
     userName.textContent = user.username;
     showToast(`Connecté en tant que ${user.username}`, 'success');
+    const token = authManager.getSessionToken();
+    if (token) {
+      void authenticateFirebase(token);
+    }
   } else {
     btnDiscordLogin.classList.remove('hidden');
     userDisplay.classList.add('hidden');

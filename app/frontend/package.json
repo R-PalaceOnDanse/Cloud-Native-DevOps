@@ -8,9 +8,11 @@
     "dev": "vite",
     "build": "node ./node_modules/typescript/bin/tsc && node ./node_modules/vite/bin/vite.js build",
     "preview": "vite preview",
-    "test": "node ./node_modules/typescript/bin/tsc && node --test dist/viewport.test.js dist/brush.test.js dist/realtime.test.js dist/api.test.js dist/inspector.test.js dist/canvas.test.js dist/auth.test.js"
+    "test": "node ./node_modules/typescript/bin/tsc && node --test dist/viewport.test.js dist/brush.test.js dist/realtime.test.js dist/api.test.js dist/inspector.test.js dist/canvas.test.js dist/auth.test.js dist/rules.test.js"
   },
-  "dependencies": {},
+  "dependencies": {
+    "firebase": "^13.4.0"
+  },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "typescript": "^5.7.0",

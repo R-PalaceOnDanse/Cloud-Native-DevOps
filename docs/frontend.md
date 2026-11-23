@@ -101,3 +101,31 @@ In accordance with [ADR-0008](adr/0008-firestore-listeners-for-realtime.md) and 
   - The minted session token is stored in client memory and `sessionStorage`.
   - Transmitted to the Web Draw Proxy (`Authorization: Bearer <sessionToken>`) and Firestore listeners, linking every placed pixel to the authenticated Discord user.
 
+---
+
+## 7. Native Firebase Client SDK & Zero Polling Architecture (Issue #81, ADR-0008)
+
+- **Native Real-time Provider (`FirestoreRealtimeProvider`)**:
+  - Direct integration with Firebase JS SDK (`firebase/firestore`, `firebase/auth`).
+  - Viewport-driven listener attachment: as the user pans or zooms, the client computes intersecting 64×64 chunks and invokes `onSnapshot(doc(firestore, 'chunks', chunkId))` to stream real-time chunk documents and deltas.
+  - Chunks leaving the viewport are immediately detached via their unsubscribe handle to preserve connection quotas.
+  - Subscribes to `config/system` via `onSnapshot` to react instantly to admin pause/resume events.
+- **Graceful Fallback**:
+  - Factory function `createRealtimeProvider()` automatically detects whether Firebase credentials (`VITE_FIREBASE_PROJECT_ID`) are present.
+  - If unconfigured (e.g. offline dev, test suites, or CI runs), it falls back seamlessly to `MockRealtimeProvider`.
+
+---
+
+## 8. Firestore Security Rules & Firebase Hosting (Issues #78, #84, ADR-0008, ADR-0009)
+
+- **Firestore Security Policy (`infra/serverless/firestore.rules`)**:
+  - **Default Deny**: All documents are private by default (`match /{document=**} { allow read, write: if false; }`).
+  - **Read Only for Authenticated Users**: `match /chunks/{chunkId}` and `match /config/{docId}` require `request.auth != null`.
+  - **Zero Client Writes**: All client writes (`write: if false`) are strictly rejected. Pixel updates must pass exclusively through the API Gateway ➔ Web Draw Proxy ➔ Pub/Sub ➔ Worker pipeline.
+  - **Protected Rate Limits**: `match /ratelimits/{userId}` rejects all client reads and writes (accessible only to backend workers via Admin SDK).
+- **Firebase Hosting Configuration (`firebase.json`)**:
+  - Serves static assets from `app/frontend/dist`.
+  - Single-page application URL rewrites: `**` rewrites to `/index.html`.
+  - Cache-Control headers: Immutable 1-year cache on hashed JS/CSS assets (`public, max-age=31536000, immutable`), and no-cache on `/index.html` for immediate release updates.
+
+

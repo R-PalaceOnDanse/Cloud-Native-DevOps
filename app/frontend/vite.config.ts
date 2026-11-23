@@ -9,5 +9,12 @@ export default defineConfig({
     target: 'es2022',
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          firebase: ['firebase/app', 'firebase/firestore', 'firebase/auth'],
+        },
+      },
+    },
   },
 });
