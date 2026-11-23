@@ -1,0 +1,23 @@
+{
+  "name": "draw-worker",
+  "version": "1.0.0",
+  "description": "Asynchronous Draw and Command Worker Cloud Function (Issues #48, #52, #53, #55, #56, #57, #141, #142 / C06 §4 & C07 §1)",
+  "main": "dist/index.js",
+  "type": "module",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "node ./node_modules/typescript/bin/tsc",
+    "gcp-build": "npm run build",
+    "test": "node ./node_modules/typescript/bin/tsc && node --test dist/index.test.js dist/pipeline-e2e.test.js",
+    "start": "functions-framework --target=drawWorker"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^5.0.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

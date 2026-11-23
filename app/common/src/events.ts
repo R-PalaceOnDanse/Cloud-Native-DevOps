@@ -17,6 +17,10 @@ export interface DrawnPixelData {
 export interface PixelDrawData {
   readonly userId: string;
   readonly pixels: readonly DrawnPixelData[];
+  readonly author?: string;
+  readonly applicationId?: string;
+  readonly interactionToken?: string;
+  readonly roleIds?: readonly string[];
 }
 
 export interface DiscordCommandData {
@@ -24,6 +28,9 @@ export interface DiscordCommandData {
   readonly commandName: string;
   readonly userId: string;
   readonly options: Record<string, unknown>;
+  readonly applicationId?: string;
+  readonly interactionToken?: string;
+  readonly roleIds?: readonly string[];
 }
 
 export interface SnapshotRequestedData {

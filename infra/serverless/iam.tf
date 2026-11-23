@@ -39,3 +39,64 @@ resource "google_service_account" "gateway" {
   display_name = "API Gateway: backend caller"
   description  = "Used by API Gateway to invoke the proxy functions."
 }
+
+# Runtime identity of the draw worker function (Issue #136).
+resource "google_service_account" "draw_worker" {
+  account_id   = "fn-draw-worker"
+  display_name = "Function draw-worker: runtime"
+  description  = "Consumes Pub/Sub events, updates Firestore chunks, and writes snapshots."
+}
+
+resource "google_project_iam_member" "draw_worker" {
+  for_each = toset([
+    "roles/logging.logWriter",
+    "roles/datastore.user",
+    "roles/pubsub.subscriber",
+  ])
+
+  project = var.project_id
+  role    = each.value
+  member  = "serviceAccount:${google_service_account.draw_worker.email}"
+}
+
+resource "google_storage_bucket_iam_member" "draw_worker_snapshots" {
+  bucket = google_storage_bucket.snapshots.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.draw_worker.email}"
+}
+
+# Runtime identity of the web draw proxy function.
+resource "google_service_account" "web_draw_proxy" {
+  account_id   = "fn-web-draw-proxy"
+  display_name = "Function web-draw-proxy: runtime"
+  description  = "Receives web draw requests and publishes to Pub/Sub."
+}
+
+resource "google_project_iam_member" "web_draw_proxy" {
+  for_each = toset([
+    "roles/logging.logWriter",
+    "roles/pubsub.publisher",
+  ])
+
+  project = var.project_id
+  role    = each.value
+  member  = "serviceAccount:${google_service_account.web_draw_proxy.email}"
+}
+
+# Runtime identity of the Discord auth callback function.
+resource "google_service_account" "auth_callback" {
+  account_id   = "fn-auth-callback"
+  display_name = "Function auth-callback: runtime"
+  description  = "Handles Discord OAuth2 code exchange and mints session tokens."
+}
+
+resource "google_project_iam_member" "auth_callback" {
+  for_each = toset([
+    "roles/logging.logWriter",
+    "roles/secretmanager.secretAccessor",
+  ])
+
+  project = var.project_id
+  role    = each.value
+  member  = "serviceAccount:${google_service_account.auth_callback.email}"
+}

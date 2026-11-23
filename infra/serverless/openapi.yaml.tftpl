@@ -31,3 +31,29 @@ paths:
           description: The function read its secret.
         "401":
           description: Missing or invalid API key.
+  /draw:
+    post:
+      operationId: webDrawProxy
+      summary: Asynchronous pixel drawing endpoint for web clients (Issue #76)
+      x-google-backend:
+        address: ${web_draw_proxy_url}
+        deadline: 15.0
+      responses:
+        "202":
+          description: Accepted for asynchronous processing.
+        "400":
+          description: Invalid coordinates or batch.
+        "401":
+          description: Missing or invalid authentication token.
+  /auth/discord/callback:
+    post:
+      operationId: authCallback
+      summary: Discord OAuth2 code exchange callback (Issue #79)
+      x-google-backend:
+        address: ${auth_callback_url}
+        deadline: 15.0
+      responses:
+        "200":
+          description: Successfully authenticated.
+        "400":
+          description: Invalid code or CSRF state mismatch.

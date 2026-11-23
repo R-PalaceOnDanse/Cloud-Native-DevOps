@@ -14,17 +14,22 @@ client --HTTPS + x-api-key--> API Gateway (canvas-gw) --ID token of api-gateway 
 
 | Resource | Name | Role |
 |---|---|---|
-| API Gateway | `canvas-api` / `canvas-gw` | The only public entry point. Refuses a request without a valid API key (401). |
+| API Gateway | `canvas-api` / `canvas-gw` | The only public entry point. Refuses a request without a valid API key (401) or validates OAuth / draw routes. |
 | Cloud Run function | `hello` (Node.js 22, TypeScript) | Returns proof that it read its secret; never returns the value. |
 | Cloud Run function | `web-draw-proxy` (Node.js 22, TypeScript) | Validates pixel draw batches and publishes event envelopes to Pub/Sub (#76). |
 | Cloud Run function | `auth-callback` (Node.js 22, TypeScript) | Exchanges Discord OAuth2 code, discards access token, and mints session token (#79). |
+| Cloud Run function | `draw-worker` (Node.js 22, TypeScript) | Consumes Pub/Sub messages, updates Firestore chunks, enforces rate limits, handles admin commands and snapshots (#141, #147). |
 | Service account | `fn-hello` | Runtime identity of `hello`: writes logs, reads `hello-greeting`. Nothing else. |
 | Service account | `fn-web-draw-proxy` | Runtime identity of `web-draw-proxy`: publishes to `pixel-draw-events`. |
 | Service account | `fn-auth-callback` | Runtime identity of `auth-callback`: reads Discord OAuth secrets from Secret Manager. |
+| Service account | `fn-draw-worker` | Runtime identity of `draw-worker`: reads Pub/Sub messages, writes Firestore chunks, accesses snapshot bucket (#136). |
 | Service account | `api-gateway` | Identity of the gateway. The only principal with `run.invoker` on protected functions. |
 | Service account | `fn-build` | Builds the sources with Cloud Build, instead of the default compute account. Roles: log writer, Artifact Registry writer, Storage object viewer. |
 | Secret | `hello-greeting` | Created by Terraform, **value added by hand** (below). |
 | Bucket | `<project>-fn-sources` | Private bucket of the zipped sources. |
+| Bucket | `<project>-canvas-snapshots` | Private bucket for timestamped canvas snapshots, accessed strictly via signed URLs (#135). |
+| Pub/Sub Topic | `pixel-draw-events` | Message broker topic for asynchronous pixel draws and commands (#137). |
+| Pub/Sub Subscription | `draw-worker-sub` | Push subscription invoking `draw-worker` with exponential retry backoff and DLQ (#137). |
 | API key | `canvas-demo` | Restricted to `canvas-api`. Read with `terraform output -raw demo_api_key`. |
 
 Every identity is explicit: the function runtime, the build and the gateway each name their own
@@ -86,3 +91,20 @@ the plan account `roles/serviceusage.apiKeysViewer`; both are granted by the `ac
 
 The proxy pattern replaces `hello`: a Discord proxy that checks the Ed25519 signature, a Web Draw Proxy that receives browser pixel batches and publishes to Pub/Sub, and an Auth Callback function that exchanges Discord OAuth codes.
 Firestore Native NoSQL database and Firestore Security Rules (`infra/serverless/firestore.rules`) are deployed via Terraform (`firestore.tf`, `firestore_rules.tf`) to enforce authenticated client read-only access and reject all direct client writes.
+The `draw-worker` function consumes Pub/Sub messages, enforces token bucket rate limits, updates Firestore chunks transactionally with Last-Write-Wins timestamps and epoch precedence, emits real-time delta documents with 5-minute TTL, and updates Discord interactions.
+
+## End-to-End Event Pipeline Test (Issue #143)
+
+The automated end-to-end integration test (`app/functions/draw-worker/src/pipeline-e2e.test.ts`) verifies the complete asynchronous flow across proxies, brokers, workers, and storage:
+
+```bash
+cd app/functions/draw-worker
+npm test
+```
+
+Pipeline verification flow:
+1. **Web Draw Proxy**: Accepts batch of pixels, authenticates session token, formats `EventEnvelope`, and publishes to `pixel-draw-events`.
+2. **Pub/Sub Broker**: Buffers messages with 7-day retention and dispatches to `draw-worker` push subscription with retry backoff and DLQ (`pixel-draw-events-dlq`).
+3. **Draw Worker**: Decodes Base64 envelope, validates bounds (`0..9999`), enforces per-user rate limiting (20 tokens/min), and applies transactional updates to `chunks/{chunkId}`.
+4. **Real-time Deltas**: Generates delta documents (`chunks/{chunkId}/deltas/{deltaId}`) with 300s TTL for real-time Firestore listeners.
+5. **Correlation ID Tracing**: Verifies `correlation_id` is propagated end-to-end through structured JSON logs and response headers.
