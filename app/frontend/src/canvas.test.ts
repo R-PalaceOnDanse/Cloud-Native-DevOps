@@ -79,3 +79,18 @@ test('CanvasRenderer renders without error across viewport', () => {
     renderer.render(viewport);
   });
 });
+
+test('CanvasRenderer clearAll removes all pixels and selections', () => {
+  const canvas = createMockCanvas();
+  const renderer = new CanvasRenderer(canvas);
+
+  renderer.setPixel(10, 10, '#ffffff', 'Alice');
+  renderer.setSelectedPixel({ x: 10, y: 10 });
+  assert.ok(renderer.getPixel(10, 10));
+  assert.ok(renderer.getSelectedPixel());
+
+  renderer.clearAll();
+  assert.equal(renderer.getPixel(10, 10), undefined);
+  assert.equal(renderer.getSelectedPixel(), null);
+});
+

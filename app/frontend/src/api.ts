@@ -24,8 +24,14 @@ export interface DrawErrorResponse {
 export class DrawApiClient {
   private readonly baseUrl: string;
 
-  constructor(baseUrl = '/api') {
-    this.baseUrl = baseUrl;
+  constructor(baseUrl?: string) {
+    if (baseUrl) {
+      this.baseUrl = baseUrl;
+    } else {
+      const meta = import.meta as unknown as { env?: Record<string, string | undefined> };
+      const envUrl = meta?.env?.VITE_API_GATEWAY_URL;
+      this.baseUrl = envUrl || '/api';
+    }
   }
 
   /**

@@ -286,7 +286,7 @@ To prevent accidental credit burns from autoscaling or resource misconfiguration
 a monthly budget with alerts. The budgets are defined in `infra/access/budget.tf` and managed as part
 of the `access` stack (which is never destroyed). The billing account and monthly amount of each
 environment are `billing_account` and `budget_amount` in `infra/access/<env>.tfvars`, the single
-source for those values. Both `dev` and `prd` share the same billing account (`01A021-589B0D-8ED8BC`).
+source for those values. Both `dev` and `prd` share the same billing account (`015B95-C1627B-339E15`).
 
 | Threshold | Basis |
 |---|---|

@@ -16,4 +16,9 @@ describe('Draw API Client (Issue #76)', () => {
     assert.ok('status' in result);
     assert.strictEqual(result.status, 'accepted');
   });
+
+  it('initializes with custom baseUrl', () => {
+    const client = new DrawApiClient('https://custom-gateway.cloud/api');
+    assert.ok(client);
+  });
 });

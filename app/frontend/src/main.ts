@@ -32,6 +32,8 @@ let isSpacePressed = false;
 let lastMouseX = 0;
 let lastMouseY = 0;
 let isCanvasPaused = false;
+let lastClearedAtTimestamp: number | null = null;
+let lastDrawnCoord: { x: number; y: number } | null = null;
 
 // Rate Limit Token Bucket State (20 tokens max, refills continuously)
 let userTokens = 20;
@@ -83,7 +85,7 @@ const realtimeManager = new RealtimeManager(
   }
 );
 
-// Subscribe to global system state (pause / resume)
+// Subscribe to global system state (pause / resume / admin clear)
 realtimeManager.subscribeSystemState((state: SystemState) => {
   isCanvasPaused = state.paused;
   if (pauseBanner) {
@@ -93,6 +95,15 @@ realtimeManager.subscribeSystemState((state: SystemState) => {
     } else {
       pauseBanner.classList.add('hidden');
     }
+  }
+
+  // Handle global grid reset (/admin clear)
+  if (state.lastClearedAt && state.lastClearedAt !== lastClearedAtTimestamp) {
+    lastClearedAtTimestamp = state.lastClearedAt;
+    renderer.clearAll();
+    clearInspect();
+    requestRender();
+    showToast('🧹 Le canevas a été réinitialisé par un administrateur.', 'info');
   }
 });
 
@@ -279,9 +290,53 @@ canvas.addEventListener('wheel', (e) => {
 }, { passive: false });
 
 window.addEventListener('keydown', (e) => {
+  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+    return;
+  }
+
   if (e.code === 'Space' && !isSpacePressed) {
     isSpacePressed = true;
     canvas.style.cursor = 'grab';
+  } else if (e.key === 'b' || e.key === 'B') {
+    currentTool = 'draw';
+    toolDrawBtn.classList.add('active');
+    toolPanBtn.classList.remove('active');
+    canvas.style.cursor = 'crosshair';
+  } else if (e.key === 'h' || e.key === 'H') {
+    currentTool = 'pan';
+    toolPanBtn.classList.add('active');
+    toolDrawBtn.classList.remove('active');
+    canvas.style.cursor = 'grab';
+  } else if (['1', '2', '3', '4'].includes(e.key)) {
+    const sizeMap: Record<string, BrushSize> = { '1': 1, '2': 3, '3': 5, '4': 9 };
+    const size = sizeMap[e.key];
+    if (size) {
+      currentBrushSize = size;
+      document.querySelectorAll('.btn-brush').forEach((btn) => {
+        const el = btn as HTMLElement;
+        if (el.dataset.size === String(size)) {
+          el.classList.add('active');
+        } else {
+          el.classList.remove('active');
+        }
+      });
+      updateBrushHint();
+      showToast(`Pinceau : ${size}px`, 'info');
+    }
+  } else if (e.key === '+' || e.key === '=') {
+    viewport = zoomAtPoint(canvas.width / 2, canvas.height / 2, 1.25, viewport);
+    realtimeManager.updateViewport(viewport);
+    requestRender();
+  } else if (e.key === '-' || e.key === '_') {
+    viewport = zoomAtPoint(canvas.width / 2, canvas.height / 2, 0.8, viewport);
+    realtimeManager.updateViewport(viewport);
+    requestRender();
+  } else if (e.key === '0' || e.key === 'c' || e.key === 'C') {
+    viewport = createDefaultViewport(canvas.width, canvas.height);
+    realtimeManager.updateViewport(viewport);
+    requestRender();
+  } else if (e.key === 'Escape') {
+    clearInspect();
   }
 });
 
@@ -294,6 +349,7 @@ window.addEventListener('keyup', (e) => {
 
 canvas.addEventListener('mousedown', (e) => {
   isMouseDown = true;
+  lastDrawnCoord = null;
   const dpr = window.devicePixelRatio || 1;
   lastMouseX = e.clientX * dpr;
   lastMouseY = e.clientY * dpr;
@@ -337,7 +393,95 @@ window.addEventListener('mousemove', (e) => {
 
 window.addEventListener('mouseup', () => {
   isMouseDown = false;
+  lastDrawnCoord = null;
   canvas.style.cursor = (isSpacePressed || currentTool === 'pan') ? 'grab' : 'crosshair';
+});
+
+// Touch and mobile gestures (pinch-to-zoom, touch pan, touch draw)
+let initialPinchDistance = 0;
+let initialPinchMidpoint = { x: 0, y: 0 };
+let lastTouchX = 0;
+let lastTouchY = 0;
+let touchStartTime = 0;
+
+canvas.addEventListener('touchstart', (e) => {
+  const dpr = window.devicePixelRatio || 1;
+  if (e.touches.length === 1) {
+    const touch = e.touches[0]!;
+    lastTouchX = touch.clientX * dpr;
+    lastTouchY = touch.clientY * dpr;
+    touchStartTime = Date.now();
+    lastDrawnCoord = null;
+  } else if (e.touches.length === 2) {
+    const t1 = e.touches[0]!;
+    const t2 = e.touches[1]!;
+    const dx = (t2.clientX - t1.clientX) * dpr;
+    const dy = (t2.clientY - t1.clientY) * dpr;
+    initialPinchDistance = Math.hypot(dx, dy);
+    initialPinchMidpoint = {
+      x: ((t1.clientX + t2.clientX) / 2) * dpr,
+      y: ((t1.clientY + t2.clientY) / 2) * dpr,
+    };
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  const dpr = window.devicePixelRatio || 1;
+
+  if (e.touches.length === 2) {
+    const t1 = e.touches[0]!;
+    const t2 = e.touches[1]!;
+    const dx = (t2.clientX - t1.clientX) * dpr;
+    const dy = (t2.clientY - t1.clientY) * dpr;
+    const dist = Math.hypot(dx, dy);
+
+    if (initialPinchDistance > 0 && dist > 0) {
+      const factor = dist / initialPinchDistance;
+      const clampedFactor = Math.max(0.85, Math.min(1.15, factor));
+      viewport = zoomAtPoint(initialPinchMidpoint.x, initialPinchMidpoint.y, clampedFactor, viewport);
+      initialPinchDistance = dist;
+      realtimeManager.updateViewport(viewport);
+      requestRender();
+    }
+  } else if (e.touches.length === 1) {
+    const touch = e.touches[0]!;
+    const touchX = touch.clientX * dpr;
+    const touchY = touch.clientY * dpr;
+    const dx = touchX - lastTouchX;
+    const dy = touchY - lastTouchY;
+
+    if (currentTool === 'pan') {
+      viewport = panViewport(dx, dy, viewport);
+      realtimeManager.updateViewport(viewport);
+      requestRender();
+    } else if (currentTool === 'draw') {
+      void handleDraw(touchX, touchY);
+    }
+
+    lastTouchX = touchX;
+    lastTouchY = touchY;
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+  const dpr = window.devicePixelRatio || 1;
+  if (e.touches.length === 0 && e.changedTouches.length === 1) {
+    const touch = e.changedTouches[0]!;
+    const elapsed = Date.now() - touchStartTime;
+    const touchX = touch.clientX * dpr;
+    const touchY = touch.clientY * dpr;
+    const dist = Math.hypot(touchX - lastTouchX, touchY - lastTouchY);
+
+    if (elapsed < 350 && dist < 15 * dpr) {
+      const world = screenToWorld(touchX, touchY, viewport);
+      inspectPixel(world.x, world.y);
+      if (currentTool === 'draw') {
+        void handleDraw(touchX, touchY);
+      }
+    }
+  }
+  lastDrawnCoord = null;
 });
 
 canvas.addEventListener('click', (e) => {
@@ -353,8 +497,12 @@ if (btnClearInspect) {
 }
 
 async function handleDraw(screenX: number, screenY: number): Promise<void> {
-  updateTokensDisplay();
   const world = screenToWorld(screenX, screenY, viewport);
+  if (lastDrawnCoord && lastDrawnCoord.x === world.x && lastDrawnCoord.y === world.y) {
+    return;
+  }
+
+  updateTokensDisplay();
   const batch = getBrushPixels(world.x, world.y, currentBrushSize, currentColor);
   if (batch.length === 0) return;
 
@@ -364,6 +512,7 @@ async function handleDraw(screenX: number, screenY: number): Promise<void> {
     return;
   }
 
+  lastDrawnCoord = { x: world.x, y: world.y };
   userTokens -= batch.length;
   updateTokensDisplay();
 

@@ -20,7 +20,7 @@ day and drifts as people work, so re-read the project before relying on it.
 | Project ID | `teampasx-cloudnative-dev` | `teampasx-cloudnative-prd` |
 | Project number | 812267599723 | 1024204425086 |
 | Created | 2026-10-22 | 2026-10-23 |
-| Billing | enabled; one budget with alerts, in the access stack (`01A021-589B0D-8ED8BC`) | enabled; one budget with alerts, in the access stack (`01A021-589B0D-8ED8BC`) |
+| Billing | enabled; one budget with alerts, in the access stack (`015B95-C1627B-339E15`) | enabled; one budget with alerts, in the access stack (`015B95-C1627B-339E15`) |
 | Foundation stack (Network & GKE) | applied (VPC, subnet, router, NAT, GKE cluster, system & runner node pools) | applied (VPC, subnet, router, NAT, GKE cluster, system & runner node pools) |
 | Access stack | applied 2026-10-23, 16 resources | applied 2026-10-23, 16 resources |
 
@@ -119,7 +119,7 @@ recorded: **Unknown, the team can answer**, and the answer belongs in the decisi
   those ADRs ask for. Nothing in the code uses them yet.
 - **The instructor's access**: the instructor (`jeremie@jjaouen.com`) has the *Editor* role on both dev and prd, managed as code in `infra/access/members.tf`.
 - **Team members access**: team members have the *Owner* role on both dev and prd, managed as code in `infra/access/members.tf`.
-- **Budget Alerts API** (`billingbudgets.googleapis.com`) is enabled in dev and prd. The budget of each project is created by `infra/access/budget.tf` and managed in the `access` stack with `prevent_destroy = true`. Both projects share the team billing account `01A021-589B0D-8ED8BC`.
+- **Budget Alerts API** (`billingbudgets.googleapis.com`) is enabled in dev and prd. The budget of each project is created by `infra/access/budget.tf` and managed in the `access` stack with `prevent_destroy = true`. Both projects share the team billing account `015B95-C1627B-339E15`.
 
 ### Only in prd
 

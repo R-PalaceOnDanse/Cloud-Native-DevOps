@@ -53,6 +53,11 @@ export class CanvasRenderer {
     return this.selectedPixel;
   }
 
+  public clearAll(): void {
+    this.pixels.clear();
+    this.selectedPixel = null;
+  }
+
   public render(viewport: ViewportState): void {
     const { ctx, canvas } = this;
     const width = canvas.width;
