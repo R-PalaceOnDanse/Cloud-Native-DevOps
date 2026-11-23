@@ -39,10 +39,31 @@ This document describes the reactive web frontend for the collaborative pixel ca
 - **Canvas Pause State (Admin Override)**:
   - The client subscribes to global system configuration (`config/system`).
   - When an admin executes `/admin pause`, a persistent red banner appears (`⏸️ Canevas en pause`), and any draw attempt is refused immediately with an explanatory toast notification until resumed by `/admin resume`.
+- **Global Reset (`/admin clear`)**:
+  - The client listens for updates to `lastClearedAt` in `config/system`.
+  - When triggered, `renderer.clearAll()` wipes all pixels and active selections in place, re-renders the empty 10,000 × 10,000 grid, and notifies the user via toast.
+
+### D. Keyboard Shortcuts & Touch Gestures
+- **Keyboard Shortcuts (Power-User & Defense)**:
+  - `B` : Switch to Brush / Draw tool
+  - `H` : Switch to Hand / Pan tool
+  - `Space` (held) : Temporary pan mode
+  - `1`, `2`, `3`, `4` : Quick-select brush size (1px, 3px, 5px, 9px)
+  - `+` / `-` : Smooth zoom in / out
+  - `0` or `C` : Recenter viewport to origin (5000, 5000)
+  - `Escape` : Deselect currently inspected pixel
+- **Touch & Mobile Support**:
+  - 1-finger drag in Pan mode : repositions viewport smoothly.
+  - 1-finger draw in Draw mode : places pixels at touch coordinate.
+  - Quick tap (< 350 ms) : inspects touched pixel.
+  - 2-finger pinch (pinch-to-zoom) : smooth zoom centered on touch midpoint.
+  - 2-finger drag : simultaneous pan and zoom.
 
 ---
 
 ## 3. Local Development & Testing
+
+See the full user guide and instructions in [app/frontend/README.md](../app/frontend/README.md).
 
 ```bash
 cd app/frontend
