@@ -210,6 +210,34 @@ Cloud Logging ([ADR-0010](adr/0010-native-gcp-observability.md)):
   - **Node High Memory**: Sustained allocatable memory > 85% for 5 minutes.
   - **Container Restarts**: Elevated restart rates alerting operators to CrashLoopBackOff or runner failures.
 
+### Grafana
+
+Grafana shows the cluster, the runners and the functions in one place
+([ADR-0017](adr/0017-prometheus-and-grafana-for-monitoring.md)). It runs on the system pool, has no
+disk and no public address. Its one datasource is Cloud Monitoring, which also serves the Managed
+Prometheus data; it reads it as its own Kubernetes service account (Workload Identity, role
+`monitoring.viewer`, no key).
+
+The admin password is in Secret Manager (`grafana-admin-password`, created by the `access` stack) and
+copied into the cluster by External Secrets Operator. Add it once per environment, after the `access`
+stack is applied:
+
+```bash
+openssl rand -base64 24 | tr -d '\n' | gcloud secrets versions add grafana-admin-password \
+  --project=teampasx-cloudnative-dev --data-file=-
+```
+
+To open Grafana, read the password, then forward the port and browse to `http://localhost:3000` (user
+`admin`):
+
+```bash
+gcloud secrets versions access latest --secret=grafana-admin-password --project=teampasx-cloudnative-dev
+kubectl port-forward --namespace monitoring service/grafana 3000:80
+```
+
+To change the password, add a new version with the first command; the cluster picks it up within the
+hour.
+
 ### Clean Teardown
 
 The cluster and its node pools are declared without `prevent_destroy` or `deletion_protection`. Running `terraform destroy` on `infra/foundation` removes the runner node pool, system node pool, GKE cluster, subnets, and Cloud NAT cleanly in dependency order without leaving orphan cloud resources.
