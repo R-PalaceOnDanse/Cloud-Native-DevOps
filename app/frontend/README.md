@@ -90,58 +90,60 @@ VITE_FIREBASE_APP_ID=
 L'interface se compose de quatre zones interactives épurées :
 
 ```
-+-----------------------------------------------------------------------------------------------+
-| 🎨 Pixel Canvas [10k x 10k] | X: 5420, Y: 120 [📍 Aller à] | 100% | ⚡ 4 tuiles | 🪙 20/20 [■] | [👾 Discord] |
-+-----------------------------------------------------------------------------------------------+
-| [Outil]        |                                                                              |
-|  ✏️ Dessin     |                                                                              |
-|  ✋ Pan        |                                                                              |
-|                |                      CANVAS 2D PRINCIPAL                                     |
-| [Pinceau]      |               (Grille 10 000 x 10 000 pixels)                                |
-|  1px | 3px     |                                                                              |
-|  5px | 9px     |                                                                              |
-|                |                                                                              |
-| [Palette]      |                                                                              |
-|  [■][■][■][■]  |                                                          +-------------------+
-|  [■][■][■][■]  |                                                          | INFO DU PIXEL     |
-|  [ColorPicker] |                                                          | Pos: X 5420, Y 120|
-|                |                                                          | Auteur: Alex#1234 |
-| [Centrer vue]  |                                                          | Date: 12:04:15    |
-| [📷 Exporter]  |                                                          | Coul: #ff0000     |
-| [Raccourcis]   |                                                          | [✕ Désélection]   |
-+----------------+----------------------------------------------------------+-------------------+
-| [Radar 10k]    |
-| [Viewport Box] |
-+----------------+
++---------------------------------------------------------------------------------------------------------+
+| 🎨 Pixel Canvas [10k x 10k] | X: 5420, Y: 120 [📍 Go To] | - 100% + [🎯 Center] | ⚡ 4 tiles | 🪙 20/20 [■] | 🎯 42 px | [⌨️ Help] | [👾 Discord] |
++---------------------------------------------------------------------------------------------------------+
+|                                                                                                         |
+|                                        CANVAS 2D PRINCIPAL                                              |
+|                                  (Grille 10 000 x 10 000 pixels)                                        |
+|                                                                                                         |
+|                                                                                     +-------------------+
+|                                                                                     | 🔍 PIXEL INSPECT  |
+|                                                                                     | Pos: X 5420, Y 120|
+|                                                                                     | Author: Alex#1234 |
+|                                                                                     | Time: 12:04:15    |
+|                                                                                     | Color: #ff0000    |
+|                                                                                     | [✕ Deselect]      |
+| +----------------+                                                                  +-------------------+
+| | [Radar 10k]    |     +--------------------------------------------------------------------------+     |
+| | [Viewport Box] |     | [✏️ Draw] [🔍 Inspect] [💉 Pick] [✋ Pan] | [■ Color] | [1px][3px][5px][9px]     |     |
+| +----------------+     | [🧹 Erase] [# Grid] | [📷 Export]                                        |     |
+|                        +--------------------------------------------------------------------------+     |
++---------------------------------------------------------------------------------------------------------+
 ```
 
 ### HUD Supérieur
 - **Logo & Grille** : Indique la taille globale (`10,000 × 10,000`).
-- **Coordonnées (X, Y) & Aller à** : Affiche la position sous le pointeur. Cliquer sur les coordonnées ou sur le bouton `📍 Aller à` ouvre un dialogue modal pour naviguer instantanément à n'importe quelle position `(X, Y)` et niveau de zoom.
+- **Coordonnées (X, Y) & Aller à** : Affiche la position sous le pointeur. Cliquer sur les coordonnées ou sur le bouton `📍 Go To` ouvre un dialogue modal pour naviguer instantanément à n'importe quelle position `(X, Y)` et niveau de zoom.
 - **Deep Linking par URL Hash** : L'URL se synchronise automatiquement (`#x=5420&y=120&z=1`). Ouvrir ou partager ce lien centre directement le viewport sur ces coordonnées exactes.
-- **Zoom** : Facteur d'échelle actuel (de `5%` à `5000%`).
-- **Badge Live (`⚡ N tuiles`)** : Nombre exact de tuiles 64×64 actuellement souscrites via Firestore `onSnapshot`.
+- **Contrôles de Zoom** : Boutons `−`, affichage du pourcentage (de `5%` à `5000%`), bouton `+` et bouton `🎯 Center` pour recentrer le viewport au centre exact (5000, 5000).
+- **Badge Live (`⚡ N tiles`)** : Nombre exact de tuiles 64×64 actuellement souscrites via Firestore `onSnapshot`.
 - **Réserve de Jetons & Jauge de Recharge (`🪙 N/20`)** : Compteur de jetons disponibles assorti d'une barre de progression de recharge continue (+1 jeton toutes les 3 secondes).
-- **Bouton Discord** :
-  - Non connecté : Bouton `Connexion Discord`.
+- **Compteur de Contribution (`🎯 N px`)** : Pixels posés par l'utilisateur pendant sa session, persisté dans `localStorage`.
+- **Bouton Discord & Raccourcis** :
+  - `⌨️ Help` : Ouvre le mémo visuel complet des raccourcis clavier.
+  - `Login with Discord` : Redirection OAuth2 officielle (ou profil local de test si non configuré).
   - Connecté : Avatar `👾`, pseudo de l'utilisateur, et bouton de déconnexion `✕`.
 
-### Barre d'Outils Latérale
-- **Outil** :
-  - `✏️ Dessin` : Le clic gauche pose des pixels avec la couleur et la taille de pinceau actives.
-  - `✋ Pan` : Le clic gauche saisit et déplace le canevas.
+### Dock Flottant Inférieur (Tools & Actions)
+Inspiré des designs modernes (Figma, Linear) sous forme de dock flottant centré en bas :
+- **Outils** :
+  - `✏️ Draw` (raccourci <kbd>B</kbd>) : Le clic gauche pose 1 pixel ou 1 trait avec la couleur active.
+  - `🔍 Inspect` (raccourci <kbd>V</kbd>) : Le clic gauche inspecte le pixel sans dessiner.
+  - `💉 Pick` (raccourci <kbd>I</kbd> ou <kbd>Alt</kbd>+clic) : Pipette prélevant la couleur du pixel cliqué.
+  - `✋ Pan` (raccourci <kbd>H</kbd> ou molette / <kbd>Espace</kbd>) : Déplace le canevas au glisser.
+- **Palette & Couleurs Récentes** :
+  - Bouton couleur active ouvrant le popover de la palette de 16 teintes standards + sélecteur HTML5 `<input type="color">`.
+  - Affichage instantané des couleurs récemment utilisées.
 - **Taille du Pinceau** :
   - `1px` : 1 pixel par coup (consomme 1 jeton).
   - `3px` : 3×3 pixels, soit 9 pixels par coup (consomme 9 jetons).
-  - `5px ⚠️` : 5×5 pixels, soit 25 pixels par coup. Une pastille d'avertissement signale qu'elle dépasse la capacité max standard (20 jetons).
+  - `5px ⚠️` : 5×5 pixels, soit 25 pixels par coup. Une pastille signale qu'elle dépasse la réserve standard (20 jetons).
   - `9px ⚠️` : 9×9 pixels, soit 81 pixels par coup.
-- **Palette de Couleurs** :
-  - 16 teintes standards sélectionnables d'un clic.
-  - Sélecteur de couleur personnalisé HTML5 (`<input type="color">`) avec affichage du code hexadécimal.
-- **Actions Rapides** :
-  - `Centrer la vue` : Réinitialise le viewport au centre exact de la grille avec un zoom 100%.
-  - `📷 Exporter vue` : Télécharge instantanément la portion visible du canevas en image PNG locale.
-- **Aide Raccourcis** : Mémo visuel des raccourcis clavier.
+- **Outils Rapides** :
+  - `🧹 Erase` (raccourci <kbd>E</kbd>) : Bascule immédiatement sur le blanc d'origine (`#ffffff`).
+  - `# Grid` (raccourci <kbd>G</kbd>) : Active/désactive l'affichage de la grille de pixels au zoom ($\ge 8\times$).
+  - `📷 Export` : Télécharge instantanément la portion visible du canevas en image PNG locale.
 
 ### Radar Minimap (Bas Gauche)
 - Affiche en permanence une vue miniature (140×140 px) de l'ensemble de la grille de 10 000 × 10 000 pixels.
@@ -149,21 +151,21 @@ L'interface se compose de quatre zones interactives épurées :
 - **Navigation Interactive** : Cliquer ou glisser directement sur le radar déplace immédiatement le viewport vers cette zone de la carte.
 - **Réductible** : Bouton `▾` permettant d'enrouler ou dérouler le radar à tout moment.
 
-### Panneau d'Inspection
-Situé en bas à droite, il réagit à chaque sélection de pixel :
-- **Réticule Cyan (`#06b6d4`)** : Encadre visuellement le pixel sélectionné dans le canevas.
+### Panneau d'Inspection (Bas Droite)
+Situé en bas à droite, il réagit à l'inspection d'un pixel (via outil `🔍 Inspect`, clic droit ou raccourci <kbd>V</kbd>) :
+- **Réticule Cyan (`#06b6d4`)** : Encadre visuellement le pixel inspecté dans le canevas.
 - **Position** : Coordonnées globales `X` et `Y`.
-- **Auteur** : Identifiant Discord de la dernière personne ayant peint ce pixel, ou `Vide (pixel vierge)` si jamais touché.
-- **Date** : Horodatage précis au format local (`JJ/MM/AAAA HH:MM:SS`), ou `Jamais modifié`.
+- **Auteur** : Identifiant Discord de la dernière personne ayant peint ce pixel, ou `Empty (virgin pixel)` si jamais touché.
+- **Date** : Horodatage précis au format local, ou `Never modified`.
 - **Couleur** : Aperçu coloré et valeur hexadécimale.
-- **Bouton Désélectionner** : Efface le réticule et réinitialise l'inspecteur.
+- **Bouton Deselect** : Efface le réticule et réinitialise l'inspecteur.
 
 ### Bannières et Notifications Toast
-- **Bannière Rouge Pause (`⏸️ Canevas en pause`)** : Apparaît instantanément en haut de l'écran lors d'une mise en pause administrative via `/admin pause`. Disparaît automatiquement dès la reprise via `/admin resume`.
-- **Toasts Flottants** :
+- **Bannière Rouge Pause (`⏸️ Canvas is Paused`)** : Apparaît instantanément en haut de l'écran lors d'une mise en pause administrative via `/admin pause`. Disparaît automatiquement dès la reprise via `/admin resume`.
+- **Toasts Anti-Spam & Clignotement Rouge** :
   - Succès de connexion Discord.
-  - Erreurs de rate limiting ou dépassement de capacité.
-  - Information lors d'un `/admin clear` ("🧹 Le canevas a été réinitialisé par un administrateur.").
+  - En cas d'erreurs répétées (jetons épuisés ou taille excessive), les messages d'erreur ne s'empilent pas : un unique toast **reclignote en rouge** (`toast-blink-red`) pendant que la jauge de tokens vibre (`token-battery-shake`).
+  - Information lors d'un `/admin clear` ("🧹 Canvas has been reset by an administrator.").
 
 ---
 
@@ -173,21 +175,27 @@ Situé en bas à droite, il réagit à chaque sélection de pixel :
 
 | Action | Contrôle |
 |---|---|
-| **Dessiner** | Clic gauche en mode `✏️ Dessin` |
-| **Inspecter un pixel** | Clic gauche sur n'importe quel pixel |
+| **Dessiner** | Clic gauche en mode `✏️ Draw` (strictement 1 pixel par clic à l'enfoncement) |
+| **Inspecter un pixel** | Clic droit direct sur le pixel, **OU** Clic gauche en mode `🔍 Inspect` |
+| **Pipette (Pick)** | Clic gauche en mode `💉 Pick`, **OU** <kbd>Alt</kbd> + Clic en mode Draw |
 | **Déplacer le canevas (Pan)** | Clic & glisser en mode `✋ Pan`, **OU** Clic Molette, **OU** Maintenir `Espace` + glisser |
 | **Zoomer / Dézoomer** | Molette de souris (centré sur le curseur) |
-| **Changer de couleur** | Clic sur une couleur de la palette ou dans le sélecteur |
+| **Changer de couleur** | Clic sur le pastille active pour ouvrir la palette |
+
+> [!NOTE]
+> **Zéro action au relâchement** : Tout déclenchement d'action (dessin, pipette, inspection) se produit strictement à l'enfoncement (`mousedown`). Le relâchement du bouton (`mouseup` / `touchend`) ne déclenche aucune action résiduelle et ne fait que restaurer le curseur. Le maintien du clic ne dessine pas en continu pour prévenir tout gaspillage de quota.
 
 ### Raccourcis Clavier Pro
 
-Conçus pour des démonstrations fluides et rapides lors de la soutenance :
-
 | Touche | Action |
 |---|---|
-| <kbd>B</kbd> | Activer l'outil **Dessin** (Brush) |
+| <kbd>B</kbd> | Activer l'outil **Draw** (Brush) |
+| <kbd>V</kbd> ou Clic Droit | Activer l'outil **Inspect** / Inspecter un pixel |
+| <kbd>I</kbd> ou <kbd>Alt</kbd>+Clic | Activer l'outil **Pick** (Eyedropper / Pipette) |
 | <kbd>H</kbd> | Activer l'outil **Pan** (Hand) |
 | <kbd>Espace</kbd> *(maintenu)* | Basculer temporairement en mode Pan |
+| <kbd>E</kbd> | Gomme rapide (couleur blanche `#ffffff`) |
+| <kbd>G</kbd> | Activer / désactiver la grille de pixels |
 | <kbd>1</kbd> | Pinceau taille **1px** (1 pixel) |
 | <kbd>2</kbd> | Pinceau taille **3px** (9 pixels) |
 | <kbd>3</kbd> | Pinceau taille **5px** (25 pixels) |
@@ -195,14 +203,14 @@ Conçus pour des démonstrations fluides et rapides lors de la soutenance :
 | <kbd>+</kbd> ou <kbd>=</kbd> | Zoom avant (+25%) |
 | <kbd>-</kbd> ou <kbd>_</kbd> | Zoom arrière (-20%) |
 | <kbd>0</kbd> ou <kbd>C</kbd> | Recentrer le canevas au milieu (X: 5000, Y: 5000) |
-| <kbd>Échap</kbd> | Désélectionner le pixel inspecté |
+| <kbd>Échap</kbd> | Désélectionner le pixel inspecté / Fermer les modales |
 
 ### Gestes Tactiles & Mobiles
 
 L'application est totalement réactive et optimisée pour les écrans tactiles et tablettes :
 - **1 doigt en mode Pan** : Glisser pour faire défiler le canevas.
-- **1 doigt en mode Dessin** : Poser des pixels au toucher.
-- **Tap court (< 350 ms)** : Sélectionne et inspecte le pixel touché.
+- **1 doigt en mode Draw** : Poser un pixel au toucher (sur appui, pas de rafale au glissé).
+- **1 doigt en mode Inspect** : Inspecter le pixel touché.
 - **Pincement à 2 doigts (Pinch-to-zoom)** : Zoom avant et zoom arrière fluides centrés sur le point médian entre les deux doigts.
 - **Glisser à 2 doigts** : Déplacement simultané du viewport.
 

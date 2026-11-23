@@ -24,21 +24,27 @@ This document describes the reactive web frontend for the collaborative pixel ca
 - **Dynamic Pixel Grid**: When zoomed in ($\ge 8\times$), subtle grid lines appear to assist precision drawing.
 
 ### B. Pixel Inspection (Issue #82, C07 §3.5)
-- Clicking on any pixel selects it and updates the bottom-right Inspector HUD:
+- Inspecting a pixel selects it and updates the bottom-right Inspector HUD:
+  - **Inspection Triggers**: Right-click directly on any pixel, or select the dedicated `🔍 Inspect` tool in the dock (shortcut `V`) and left-click on any pixel.
+  - **No Drawing Conflict**: Drawing a pixel does not automatically select it or pop open the inspection reticle, preserving an unobstructed drawing workflow.
   - **Visual Selection Reticle**: A cyan bounding highlight (`#06b6d4`) is drawn directly around the selected pixel in the viewport.
-  - **Empty Pixels**: Explicitly identifies unpainted pixels ("Vide (pixel vierge)", "Jamais modifié", default `#ffffff`).
-  - **Painted Pixels**: Displays the exact author Discord handle/ID, formatted timestamp of last update, and hex color code.
-  - **Deselection**: A "Désélectionner" action or clicking out-of-bounds clears the active selection reticle.
+  - **Empty Pixels**: Explicitly identifies unpainted pixels ("Empty (virgin pixel)", "Never modified", default `#ffffff`).
+  - **Painted Pixels**: Displays the exact author Discord handle/ID, formatted timestamp of last update, and hex color code with color preview swatch.
+  - **Deselection**: Clicking the "Deselect" button or pressing `Escape` clears the active selection reticle.
 
 ### C. Configurable Brush Tool & Stroke Validation (Issue #83, C07 §3.6)
 - **Brush sizes**: `1px` (1 pixel), `3px` (9 pixels), `5px` (25 pixels), `9px` (81 pixels).
+- **Strict 1-Pixel / 1-Stroke Per Click (On Press Down)**:
+  - Drawing is strictly executed upon `mousedown` (press down) and never on release.
+  - Moving the mouse while holding down the button (`mousemove`) does not draw in bursts or spam requests, guaranteeing strictly 1 action per intentional click.
 - **Stroke Larger Than Limit Explained, Not Cut**:
   - The client token bucket maintains a reserve capacity of 20 tokens (refilling continuously at 1 token / 3s).
   - When selecting a brush requiring more pixels than the maximum reserve capacity (e.g., 5px requiring 25 pixels or 9px requiring 81 pixels), the HUD highlights a warning.
-  - If a stroke attempt requires more than the maximum capacity, the client rejects the stroke with an explanatory toast (`Trait supérieur à la capacité maximale (25 pixels > 20 max). Réduisez la taille du pinceau. Le trait n'est pas tronqué pour préserver l'intégrité du dessin.`), rather than silently cutting or clipping the stroke shape.
+  - If a stroke attempt requires more than the maximum capacity, the client rejects the stroke with an explanatory toast (`Brush stroke exceeds maximum capacity (25 pixels > 20 max). Reduce brush size. Stroke is not truncated to preserve artwork integrity.`), rather than silently cutting or clipping the stroke shape.
+  - **Deduplicated Error Toasts with Red Pulse**: Repeated attempts when exhausted re-trigger a red pulse animation (`toast-blink-red`) and shake the token battery (`token-battery-shake`) without stacking duplicate toast popups.
 - **Canvas Pause State (Admin Override)**:
   - The client subscribes to global system configuration (`config/system`).
-  - When an admin executes `/admin pause`, a persistent red banner appears (`⏸️ Canevas en pause`), and any draw attempt is refused immediately with an explanatory toast notification until resumed by `/admin resume`.
+  - When an admin executes `/admin pause`, a persistent red banner appears (`⏸️ Canvas is Paused`), and any draw attempt is refused immediately with an explanatory toast notification until resumed by `/admin resume`.
 - **Global Reset (`/admin clear`)**:
   - The client listens for updates to `lastClearedAt` in `config/system`.
   - When triggered, `renderer.clearAll()` wipes all pixels and active selections in place, re-renders the empty 10,000 × 10,000 grid, and notifies the user via toast.
@@ -46,6 +52,7 @@ This document describes the reactive web frontend for the collaborative pixel ca
 ### D. Keyboard Shortcuts & Touch Gestures
 - **Keyboard Shortcuts (Power-User & Defense)**:
   - `B` : Switch to Brush / Draw tool
+  - `V` or `Right-Click` : Switch to Inspect tool / Inspect pixel
   - `I` : Switch to Eyedropper / Pipette tool (or hold `Alt` while in Draw mode)
   - `H` : Switch to Hand / Pan tool
   - `E` : Quick Eraser (switches color to canvas blank `#ffffff`)
@@ -54,11 +61,15 @@ This document describes the reactive web frontend for the collaborative pixel ca
   - `1`, `2`, `3`, `4` : Quick-select brush size (1px, 3px, 5px, 9px)
   - `+` / `-` : Smooth zoom in / out
   - `0` or `C` : Recenter viewport to origin (5000, 5000)
-  - `Escape` : Deselect currently inspected pixel
+  - `Escape` : Deselect currently inspected pixel and close active modals
+- **Mouse & Canvas Interaction Rules**:
+  - Left-click on press down executes active tool action (Draw, Inspect, or Pick).
+  - Right-click inspects immediately without modifying the canvas (native context menu suppressed via `contextmenu.preventDefault()`).
+  - Middle-click or Space + drag pans the viewport.
+  - Releasing mouse/touch (`mouseup`, `touchend`) strictly resets internal tracking and restores the cursor; zero actions are executed on release.
 - **Touch & Mobile Support**:
   - 1-finger drag in Pan mode : repositions viewport smoothly.
-  - 1-finger draw in Draw mode : places pixels at touch coordinate.
-  - Quick tap (< 350 ms) : inspects touched pixel.
+  - 1-finger draw in Draw mode : places pixels at touch coordinate on press down.
   - 2-finger pinch (pinch-to-zoom) : smooth zoom centered on touch midpoint.
   - 2-finger drag : simultaneous pan and zoom.
 
