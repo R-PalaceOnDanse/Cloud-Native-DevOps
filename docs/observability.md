@@ -45,3 +45,22 @@ To verify alert triggers during testing:
 1. **Trigger DLQ Alert**: Publish a malformed JSON payload directly to `pixel-draw-events`. After 5 failed delivery attempts, the message moves to DLQ, triggering the notification.
 2. **Trigger 5xx Error Alert**: Send rapid requests to a function with an invalid configuration.
 3. **Trigger Backlog Alert**: Run the burst load test (`tests/load/`) while worker max instances are constrained.
+
+---
+
+## 4. Load Testing & Scalability Demonstration (Issue #90, Decision #66)
+
+The platform includes an automated burst load testing tool to prove serverless scaling on Google Cloud Monitoring:
+- **Load Generator Script**: [tests/load/burst-load.mjs](../tests/load/burst-load.mjs)
+- **Detailed Runbook & Defense Script**: [docs/load-testing.md](load-testing.md)
+- **Architectural Decision**: [ADR-0020 (Load Testing Tool and Scenarios)](adr/0020-load-testing-tool-and-scenarios.md)
+
+Execute a quick dry-run:
+```bash
+npm run test:load
+```
+Execute a live burst against the deployed API Gateway:
+```bash
+node tests/load/burst-load.mjs --url "$GATEWAY_URL/draw" -c 20 -n 500 -b 9
+```
+

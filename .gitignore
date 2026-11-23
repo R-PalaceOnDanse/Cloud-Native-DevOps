@@ -8,4 +8,6 @@ crash.*.log
 # Node
 node_modules/
 dist/
+tests/load/*-report.json
+load-report.json
 infra/**/.build/
