@@ -44,11 +44,6 @@ let lastMouseY = 0;
 let isCanvasPaused = false;
 let lastClearedAtTimestamp: number | null = null;
 let lastDrawnCoord: { x: number; y: number } | null = null;
-let lastAttemptedCoord: { x: number; y: number } | null = null;
-let lastDrawTime = 0;
-const DRAG_DRAW_INTERVAL_MS = 100; // Pacing throttle when dragging to avoid spraying tokens uncontrollably
-let lastErrorBlinkTime = 0;
-const ERROR_BLINK_COOLDOWN_MS = 250; // Throttle re-blink animation to 250ms during continuous drag
 
 let userPixelsCount = 0;
 try {
@@ -799,7 +794,6 @@ window.addEventListener('keyup', (e) => {
 canvas.addEventListener('mousedown', (e) => {
   isMouseDown = true;
   lastDrawnCoord = null;
-  lastAttemptedCoord = null;
   const dpr = window.devicePixelRatio || 1;
   lastMouseX = e.clientX * dpr;
   lastMouseY = e.clientY * dpr;
@@ -823,8 +817,10 @@ canvas.addEventListener('mousedown', (e) => {
     return;
   }
 
-  // Draw on click (isDrag = false)
-  void handleDraw(e.clientX * dpr, e.clientY * dpr, false);
+  // Draw strictly 1 pixel/stroke per click (no drawing on hold/drag)
+  if (currentTool === 'draw' && e.button === 0) {
+    void handleDraw(lastMouseX, lastMouseY);
+  }
 });
 
 window.addEventListener('mousemove', (e) => {
@@ -847,9 +843,8 @@ window.addEventListener('mousemove', (e) => {
     viewport = panViewport(dx, dy, viewport);
     realtimeManager.updateViewport(viewport);
     requestRender();
-  } else if (currentTool === 'draw') {
-    void handleDraw(mouseX, mouseY, true);
   }
+  // In draw mode: strictly no drawing on mousemove (1 pixel per click)
 
   lastMouseX = mouseX;
   lastMouseY = mouseY;
@@ -858,7 +853,6 @@ window.addEventListener('mousemove', (e) => {
 window.addEventListener('mouseup', () => {
   isMouseDown = false;
   lastDrawnCoord = null;
-  lastAttemptedCoord = null;
   canvas.style.cursor = (isSpacePressed || currentTool === 'pan') ? 'grab' : 'crosshair';
   syncUrlHash();
 });
@@ -878,7 +872,6 @@ canvas.addEventListener('touchstart', (e) => {
     lastTouchY = touch.clientY * dpr;
     touchStartTime = Date.now();
     lastDrawnCoord = null;
-    lastAttemptedCoord = null;
   } else if (e.touches.length === 2) {
     const t1 = e.touches[0]!;
     const t2 = e.touches[1]!;
@@ -922,9 +915,8 @@ canvas.addEventListener('touchmove', (e) => {
       viewport = panViewport(dx, dy, viewport);
       realtimeManager.updateViewport(viewport);
       requestRender();
-    } else if (currentTool === 'draw') {
-      void handleDraw(touchX, touchY, true);
     }
+    // In draw mode: strictly no drawing on touchmove (1 pixel per tap)
 
     lastTouchX = touchX;
     lastTouchY = touchY;
@@ -944,12 +936,11 @@ canvas.addEventListener('touchend', (e) => {
       const world = screenToWorld(touchX, touchY, viewport);
       inspectPixel(world.x, world.y);
       if (currentTool === 'draw') {
-        void handleDraw(touchX, touchY, false);
+        void handleDraw(touchX, touchY);
       }
     }
   }
   lastDrawnCoord = null;
-  lastAttemptedCoord = null;
 });
 
 canvas.addEventListener('click', (e) => {
@@ -964,25 +955,11 @@ if (btnClearInspect) {
   });
 }
 
-async function handleDraw(screenX: number, screenY: number, isDrag = false): Promise<void> {
+async function handleDraw(screenX: number, screenY: number): Promise<void> {
   const world = screenToWorld(screenX, screenY, viewport);
-  if (lastDrawnCoord && lastDrawnCoord.x === world.x && lastDrawnCoord.y === world.y) {
+  if (world.x < 0 || world.x >= 10000 || world.y < 0 || world.y >= 10000) {
     return;
   }
-
-  const now = Date.now();
-  if (isDrag) {
-    // If cursor has not moved to a different coordinate while dragging, skip
-    if (lastAttemptedCoord && lastAttemptedCoord.x === world.x && lastAttemptedCoord.y === world.y) {
-      return;
-    }
-    // Controlled drag pacing: avoids dumping all tokens in 20ms during quick mouse motion
-    if (now - lastDrawTime < DRAG_DRAW_INTERVAL_MS) {
-      return;
-    }
-  }
-
-  lastAttemptedCoord = { x: world.x, y: world.y };
 
   updateTokensDisplay();
   const batch = getBrushPixels(world.x, world.y, currentBrushSize, currentColor);
@@ -990,15 +967,10 @@ async function handleDraw(screenX: number, screenY: number, isDrag = false): Pro
 
   const validation = validateBrushStroke(batch.length, userTokens, MAX_TOKENS, isCanvasPaused);
   if (!validation.allowed) {
-    // Distinct clicks always re-blink error toast immediately; continuous dragging throttles re-blink
-    if (!isDrag || now - lastErrorBlinkTime >= ERROR_BLINK_COOLDOWN_MS) {
-      lastErrorBlinkTime = now;
-      showToast(validation.message || 'Unable to perform action.', 'error');
-    }
+    showToast(validation.message || 'Unable to perform action.', 'error');
     return;
   }
 
-  lastDrawTime = now;
   lastDrawnCoord = { x: world.x, y: world.y };
   userTokens -= batch.length;
   updateTokensDisplay();
