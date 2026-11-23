@@ -6,6 +6,7 @@
  * Fulfills Issues #48, #52, #53, #55, #56, #57, #68, #141, #142 (C06 §4, C07 §1 & §2).
  */
 
+import { randomBytes } from 'node:crypto';
 import type { Request, Response } from '@google-cloud/functions-framework';
 import { ChunkStore, defaultChunkStore, isValidCoordinate } from './chunk-store.js';
 import { WorkerRateLimiter, defaultWorkerRateLimiter } from './rate-limiter.js';
@@ -61,7 +62,23 @@ export function createDrawWorkerHandler(deps: WorkerDependencies = {}) {
     const eventType = envelope.type || rawBody.message.attributes?.eventType;
     const eventSource = envelope.source || rawBody.message.attributes?.eventSource || 'unknown';
 
-    // Structured JSON log for Cloud Logging / distributed tracing (Issue #89)
+    // Distributed Trace Context extraction (Issue #88)
+    const incomingTraceParent = envelope.traceParent || rawBody.message?.attributes?.traceparent;
+    let traceId = randomBytes(16).toString('hex');
+    let parentSpanId: string | undefined = undefined;
+
+    if (incomingTraceParent) {
+      const match = String(incomingTraceParent).trim().match(/^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/i);
+      if (match) {
+        traceId = match[1]!.toLowerCase();
+        parentSpanId = match[2]!.toLowerCase();
+      }
+    }
+
+    const workerSpanId = randomBytes(8).toString('hex');
+    const projectId = process.env.GCP_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'teampasx-cloudnative-dev';
+
+    // Structured JSON log for Cloud Logging / distributed tracing (Issue #88, #89)
     console.log(
       JSON.stringify({
         severity: 'INFO',
@@ -69,6 +86,12 @@ export function createDrawWorkerHandler(deps: WorkerDependencies = {}) {
         correlationId,
         eventId: envelope.id,
         eventType,
+        trace_id: traceId,
+        span_id: workerSpanId,
+        parent_span_id: parentSpanId,
+        'logging.googleapis.com/trace': `projects/${projectId}/traces/${traceId}`,
+        'logging.googleapis.com/spanId': workerSpanId,
+        'logging.googleapis.com/trace_sampled': true,
       })
     );
 

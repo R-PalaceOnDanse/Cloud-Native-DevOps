@@ -15,6 +15,7 @@ locals {
     "pubsub.googleapis.com",            # Pub/Sub message broker
     "monitoring.googleapis.com",        # Cloud Monitoring
     "logging.googleapis.com",           # Cloud Logging
+    "cloudtrace.googleapis.com",        # Cloud Trace (Issue #88)
   ]
 }
 

@@ -64,3 +64,49 @@ Execute a live burst against the deployed API Gateway:
 node tests/load/burst-load.mjs --url "$GATEWAY_URL/draw" -c 20 -n 500 -b 9
 ```
 
+---
+
+## 5. Distributed Tracing with OpenTelemetry & Cloud Trace (Issue #88, C08 §6)
+
+Distributed tracing enables operators and developers to follow a single drawing action or command through the asynchronous pipeline:
+`Web Browser / Discord ➔ API Gateway ➔ Proxy Function ➔ Pub/Sub Message Broker ➔ Worker Function ➔ Firestore / GCS`.
+
+### W3C TraceContext & Cloud Trace Propagation
+1. **W3C `traceparent` Standard**: Traces adhere strictly to the W3C TraceContext specification (`00-${traceId}-${spanId}-${flags}`).
+2. **Root Span Generation (`web-draw-proxy`)**:
+   - The proxy inspects incoming headers for `traceparent` or Google's `X-Cloud-Trace-Context`.
+   - If absent, it mints a fresh 32-character hex `trace_id` and 16-character hex `span_id`.
+   - Sets response headers `X-Correlation-ID: <uuid>` and `traceparent: 00-<trace_id>-<span_id>-01`.
+   - Injects `traceParent` into the `EventEnvelope` and Pub/Sub message attributes.
+3. **Child Span Continuation (`draw-worker`)**:
+   - The worker decodes the Pub/Sub envelope and extracts `envelope.traceParent`.
+   - Inherits the exact same `trace_id` and links the proxy's `span_id` as `parent_span_id`.
+   - Mints a dedicated `workerSpanId`, creating a parent-child span hierarchy visible in Google Cloud Trace:
+     ```
+     [web-draw-proxy:handleDraw]  (Root Span, ~25ms)
+        └── [draw-worker:processDraw] (Child Span, ~45ms)
+              ├── ChunkStore:applyBatch
+              └── DeltaWriter:commit
+     ```
+
+### Bidirectional Linking with Cloud Logging
+In accordance with Google Cloud Logging standards, structured JSON logs emitted by both services carry:
+```json
+{
+  "severity": "INFO",
+  "message": "Processing event: pixel.draw from web",
+  "correlationId": "corr-12345",
+  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+  "span_id": "00f067aa0ba902b7",
+  "logging.googleapis.com/trace": "projects/teampasx-cloudnative-dev/traces/4bf92f3577b34da6a3ce929d0e0e4736",
+  "logging.googleapis.com/spanId": "00f067aa0ba902b7",
+  "logging.googleapis.com/trace_sampled": true
+}
+```
+In Google Cloud Console, clicking the trace icon next to any log line immediately opens Cloud Trace with the correlated waterfall view.
+
+### Cloud Infrastructure & Security Roles
+- **Cloud Trace API (`cloudtrace.googleapis.com`)**: Declared and managed in `infra/serverless/apis.tf`.
+- **Trace Agent IAM Role (`roles/cloudtrace.agent`)**: Granted in `infra/serverless/iam.tf` to all function runtime service accounts (`fn-web-draw-proxy`, `fn-draw-worker`, `fn-auth-callback`, `fn-hello`).
+
+

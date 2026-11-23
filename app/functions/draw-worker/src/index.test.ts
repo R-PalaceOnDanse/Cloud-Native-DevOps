@@ -357,4 +357,50 @@ test('Draw Worker Cloud Function (Issues #48, #52, #53, #55, #56, #57, #68, #141
     assert.ok(res.getResponseData().signedUrl.includes('storage.googleapis.com'));
     assert.ok(responseText.includes('Lien d\'accès signé'));
   });
+
+  await t.test('inherits and propagates distributed W3C traceparent and links to Cloud Trace (Issue #88)', async () => {
+    const originalConsoleLog = console.log;
+    let capturedLog: any = null;
+    console.log = (line: string) => {
+      try {
+        const parsed = JSON.parse(line);
+        if (parsed.message?.includes('Processing event')) {
+          capturedLog = parsed;
+        }
+      } catch {
+        // Ignore non-json
+      }
+    };
+
+    try {
+      const handler = createDrawWorkerHandler();
+      const parentTraceParent = '00-abcdef1234567890abcdef1234567890-1122334455667788-01';
+
+      const drawEnvelope = {
+        id: 'evt-trace-test',
+        correlationId: 'corr-trace-88',
+        type: 'pixel.draw',
+        source: 'web',
+        timestamp: Date.now(),
+        traceParent: parentTraceParent,
+        data: {
+          userId: 'user-trace',
+          pixels: [{ x: 5, y: 5, color: '#ff0000' }],
+        },
+      };
+
+      const { req, res } = createMockHttp(makePubSubPayload(drawEnvelope));
+      await handler(req, res);
+
+      assert.equal(res.getStatusCode(), 200);
+      assert.ok(capturedLog);
+      assert.equal(capturedLog.correlationId, 'corr-trace-88');
+      assert.equal(capturedLog.trace_id, 'abcdef1234567890abcdef1234567890');
+      assert.equal(capturedLog.parent_span_id, '1122334455667788');
+      assert.ok(capturedLog['logging.googleapis.com/trace'].includes('abcdef1234567890abcdef1234567890'));
+      assert.equal(capturedLog['logging.googleapis.com/trace_sampled'], true);
+    } finally {
+      console.log = originalConsoleLog;
+    }
+  });
 });

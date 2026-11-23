@@ -58,6 +58,8 @@ export interface EventEnvelope<T = unknown> {
   readonly source: EventSource;
   /** Millisecond timestamp when the event was produced */
   readonly timestamp: number;
+  /** Optional W3C traceparent header value for distributed tracing (Issue #88) */
+  readonly traceParent?: string | undefined;
   /** Event payload */
   readonly data: T;
 }
@@ -69,7 +71,8 @@ export function createEventEnvelope<K extends EventType>(
   type: K,
   source: EventSource,
   data: EventDataMap[K],
-  correlationId?: string
+  correlationId?: string,
+  traceParent?: string
 ): EventEnvelope<EventDataMap[K]> {
   return {
     id: randomUUID(),
@@ -77,6 +80,7 @@ export function createEventEnvelope<K extends EventType>(
     type,
     source,
     timestamp: Date.now(),
+    traceParent,
     data,
   };
 }

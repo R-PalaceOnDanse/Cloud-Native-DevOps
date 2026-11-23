@@ -28,8 +28,13 @@ resource "google_service_account" "hello" {
 }
 
 resource "google_project_iam_member" "hello_logs" {
+  for_each = toset([
+    "roles/logging.logWriter",
+    "roles/cloudtrace.agent",
+  ])
+
   project = var.project_id
-  role    = "roles/logging.logWriter"
+  role    = each.value
   member  = "serviceAccount:${google_service_account.hello.email}"
 }
 
@@ -68,6 +73,7 @@ resource "google_project_iam_member" "draw_worker" {
     "roles/logging.logWriter",
     "roles/datastore.user",
     "roles/pubsub.subscriber",
+    "roles/cloudtrace.agent",
   ])
 
   project = var.project_id
@@ -92,6 +98,7 @@ resource "google_project_iam_member" "web_draw_proxy" {
   for_each = toset([
     "roles/logging.logWriter",
     "roles/pubsub.publisher",
+    "roles/cloudtrace.agent",
   ])
 
   project = var.project_id
@@ -110,6 +117,7 @@ resource "google_project_iam_member" "auth_callback" {
   for_each = toset([
     "roles/logging.logWriter",
     "roles/secretmanager.secretAccessor",
+    "roles/cloudtrace.agent",
   ])
 
   project = var.project_id

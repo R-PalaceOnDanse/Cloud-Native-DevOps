@@ -10,6 +10,7 @@ export interface EventEnvelope<T = unknown> {
   type: string;
   source: string;
   timestamp: number;
+  traceParent?: string | undefined;
   data: T;
 }
 

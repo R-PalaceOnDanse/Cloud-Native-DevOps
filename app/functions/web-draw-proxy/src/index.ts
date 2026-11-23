@@ -7,7 +7,7 @@
  * Strictly zero direct storage writes.
  */
 
-import { randomUUID } from 'node:crypto';
+import { randomUUID, randomBytes } from 'node:crypto';
 import type { Request, Response } from '@google-cloud/functions-framework';
 import { validateDrawBatch } from './validator.js';
 import { extractAndVerifyToken } from './auth.js';
@@ -27,13 +27,51 @@ export function createDrawProxyHandler(publisher: EventPublisher, topicName = 'p
       return;
     }
 
-    // 2. Correlation ID propagation
+    // 2. Correlation ID & Distributed Tracing Context (Issue #88, #89)
     const incomingCorrelationId = req.header('X-Correlation-ID');
     const correlationId = incomingCorrelationId && incomingCorrelationId.trim().length > 0
       ? incomingCorrelationId.trim()
       : randomUUID();
 
+    const incomingTraceParent = req.header('traceparent') || req.header('X-Cloud-Trace-Context');
+    let traceId = randomBytes(16).toString('hex');
+    let parentSpanId: string | undefined = undefined;
+
+    if (incomingTraceParent) {
+      const matchW3C = incomingTraceParent.trim().match(/^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/i);
+      if (matchW3C) {
+        traceId = matchW3C[1]!.toLowerCase();
+        parentSpanId = matchW3C[2]!.toLowerCase();
+      } else {
+        const matchGcp = incomingTraceParent.trim().match(/^([0-9a-f]{32})/i);
+        if (matchGcp) {
+          traceId = matchGcp[1]!.toLowerCase();
+        }
+      }
+    }
+
+    const spanId = randomBytes(8).toString('hex');
+    const traceParent = `00-${traceId}-${spanId}-01`;
+
     res.setHeader('X-Correlation-ID', correlationId);
+    res.setHeader('traceparent', traceParent);
+
+    const projectId = process.env.GCP_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'teampasx-cloudnative-dev';
+
+    // Cloud Logging structured trace linking (Issue #88, C08 §6)
+    console.log(
+      JSON.stringify({
+        severity: 'INFO',
+        message: 'Received draw request',
+        correlationId,
+        trace_id: traceId,
+        span_id: spanId,
+        parent_span_id: parentSpanId,
+        'logging.googleapis.com/trace': `projects/${projectId}/traces/${traceId}`,
+        'logging.googleapis.com/spanId': spanId,
+        'logging.googleapis.com/trace_sampled': true,
+      })
+    );
 
     // 3. User Authentication
     const authHeader = req.header('Authorization');
@@ -60,13 +98,14 @@ export function createDrawProxyHandler(publisher: EventPublisher, topicName = 'p
       return;
     }
 
-    // 5. Build Event Envelope
+    // 5. Build Event Envelope (includes traceParent for distributed tracing)
     const event: EventEnvelope<PixelDrawData> = {
       id: randomUUID(),
       correlationId,
       type: 'pixel.draw',
       source: 'web',
       timestamp: Date.now(),
+      traceParent,
       data: {
         userId: auth.userId,
         pixels: validation.pixels,
@@ -81,6 +120,8 @@ export function createDrawProxyHandler(publisher: EventPublisher, topicName = 'p
         status: 'accepted',
         eventId: event.id,
         correlationId,
+        traceId,
+        spanId,
         messageId,
         pixelCount: validation.pixels.length,
       });
@@ -88,6 +129,7 @@ export function createDrawProxyHandler(publisher: EventPublisher, topicName = 'p
       res.status(500).json({
         error: 'Failed to publish draw event to broker.',
         correlationId,
+        traceId,
       });
     }
   };

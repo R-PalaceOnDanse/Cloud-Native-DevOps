@@ -156,6 +156,7 @@ describe('Web Draw Proxy Cloud Function (Issue #76)', () => {
     // Verify fast acknowledgement
     assert.strictEqual(res.statusCode, 202);
     assert.strictEqual(res.headers['X-Correlation-ID'], customCorrelationId);
+    assert.ok(typeof res.headers['traceparent'] === 'string' && res.headers['traceparent'].startsWith('00-'));
 
     // Verify published Pub/Sub event envelope
     assert.strictEqual(publisher.publishedEvents.length, 1);
@@ -166,7 +167,32 @@ describe('Web Draw Proxy Cloud Function (Issue #76)', () => {
     assert.strictEqual(envelope.type, 'pixel.draw');
     assert.strictEqual(envelope.source, 'web');
     assert.strictEqual(envelope.correlationId, customCorrelationId);
+    assert.ok(typeof envelope.traceParent === 'string' && envelope.traceParent.startsWith('00-'));
     assert.strictEqual((envelope.data as { userId: string }).userId, 'user_test_12345678');
     assert.strictEqual((envelope.data as { pixels: unknown[] }).pixels.length, 2);
+  });
+
+  it('inherits and propagates incoming W3C traceparent header (Issue #88)', async () => {
+    const incomingTrace = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01';
+    const req = createMockRequest({
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer user_test_trace',
+        traceparent: incomingTrace,
+      },
+      body: {
+        pixels: [{ x: 10, y: 10, color: '#ff0000' }],
+      },
+    });
+    const res = createMockResponse();
+
+    await handler(req, res as unknown as Response);
+
+    assert.strictEqual(res.statusCode, 202);
+    // Trace ID must match the incoming trace ID
+    assert.ok(res.headers['traceparent']!.includes('4bf92f3577b34da6a3ce929d0e0e4736'));
+
+    const published = publisher.publishedEvents[0]!;
+    assert.ok(published.event.traceParent!.includes('4bf92f3577b34da6a3ce929d0e0e4736'));
   });
 });
