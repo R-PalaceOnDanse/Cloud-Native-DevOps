@@ -54,6 +54,7 @@ resource "google_container_cluster" "primary" {
     google_project_service.compute,
     google_project_service.monitoring,
     google_project_service.logging,
+    google_compute_router_nat.nat,
   ]
 
   cluster_autoscaling {
