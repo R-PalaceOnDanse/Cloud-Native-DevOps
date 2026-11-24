@@ -90,7 +90,8 @@ resource "helm_release" "grafana" {
       }
       dashboards = {
         default = {
-          cluster = { json = replace(file("dashboards/cluster.json"), "__PROJECT_ID__", var.project_id) }
+          cluster    = { json = replace(file("dashboards/cluster.json"), "__PROJECT_ID__", var.project_id) }
+          serverless = { json = replace(file("dashboards/serverless.json"), "__PROJECT_ID__", var.project_id) }
         }
       }
     }),

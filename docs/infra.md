@@ -249,8 +249,13 @@ environment filled in. **Cluster and runners** (`cluster.json`) shows:
 - the runner activity from the controller's metrics: jobs assigned and running (the difference is the
   jobs waiting) and runners registered, busy and wanted.
 
+**Functions and gateway** (`serverless.json`) shows, for `hello`, the requests per second by response
+class, the share of 5xx, the latency (p50 and p95) and the running instances (0 when idle), and the
+requests per second of the API gateway. Queue depth and dead letters will join it with Pub/Sub.
+
 The queries were checked against the Managed Prometheus API of dev, except the runner activity ones
-(`gha_*`), which exist once the metrics of the controller are on. To change a dashboard, edit it in
+(`gha_*`), which exist once the metrics of the controller are on. Dev had no traffic on `hello` and the
+gateway yet, so those panels are accepted by the API but empty until a request goes through. To change a dashboard, edit it in
 Grafana, export its JSON and replace the file; a change made only in Grafana is lost at the next deploy.
 
 ### Clean Teardown
