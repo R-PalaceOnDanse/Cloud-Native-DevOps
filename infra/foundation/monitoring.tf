@@ -1,4 +1,4 @@
-# Cloud Monitoring Dashboard and Alerts for the GKE cluster and runners (ADR-0010, ADR-0017)
+# Cloud Monitoring Dashboard and Alerts for the GKE cluster and runners (ADR-0010, ADR-0021)
 
 # One email channel per team member: every alert below reaches all of them.
 resource "google_monitoring_notification_channel" "email" {

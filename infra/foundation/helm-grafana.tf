@@ -6,7 +6,7 @@ locals {
 }
 
 # Grafana reads Cloud Monitoring as its own Kubernetes service account, through Workload Identity:
-# no Google account and no key (ADR-0017). Viewer only: it can read metrics, not change anything.
+# no Google account and no key (ADR-0021). Viewer only: it can read metrics, not change anything.
 resource "google_project_iam_member" "grafana_monitoring_viewer" {
   project = var.project_id
   role    = "roles/monitoring.viewer"

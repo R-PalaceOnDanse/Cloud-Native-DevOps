@@ -126,7 +126,7 @@ The cluster resource is defined in `infra/foundation/gke.tf`:
 Compute resources are separated into two specialized node pools:
 
 #### 1. System Node Pool (`system-pool`)
-- **Node Count**: Fixed `1` node (`e2-medium`: 2 vCPU, 4 GB RAM, 20 GB pd-standard disk). It was an `e2-small`, which was already full with the runner controller, External Secrets Operator and the GKE system pods ([ADR-0017](adr/0017-prometheus-and-grafana-for-monitoring.md)).
+- **Node Count**: Fixed `1` node (`e2-medium`: 2 vCPU, 4 GB RAM, 20 GB pd-standard disk). It was an `e2-small`, which was already full with the runner controller, External Secrets Operator and the GKE system pods ([ADR-0021](adr/0021-prometheus-and-grafana-for-monitoring.md)).
 - **Purpose**: Runs essential cluster daemonsets and controllers (CoreDNS, kube-proxy, cert-manager, metrics-server, and runner controllers).
 - **Labels**: `role = "system"`.
 - **Management**: `auto_repair = true` and `auto_upgrade = true`.
@@ -201,7 +201,7 @@ Cloud Logging ([ADR-0010](adr/0010-native-gcp-observability.md)):
   - `monitoring_config`: System components, API server, controller manager, and scheduler metrics are collected automatically.
   - `managed_prometheus`: Google Cloud Managed Service for Prometheus (GMP) is enabled on the cluster, scraping Prometheus metrics seamlessly without requiring an in-cluster Prometheus server.
   - `logging_config`: System and workload logs (including runner pods) are streamed into Cloud Logging.
-- **Runner metrics** ([ADR-0017](adr/0017-prometheus-and-grafana-for-monitoring.md)): the runner controller and its listeners expose Prometheus metrics (jobs waiting, runners busy and registered), switched on in `helm-arc.tf`. A `PodMonitoring` from the local chart `charts/arc-metrics` tells Managed Prometheus to scrape them. Check it with `kubectl get podmonitoring -n arc-systems`.
+- **Runner metrics** ([ADR-0021](adr/0021-prometheus-and-grafana-for-monitoring.md)): the runner controller and its listeners expose Prometheus metrics (jobs waiting, runners busy and registered), switched on in `helm-arc.tf`. A `PodMonitoring` from the local chart `charts/arc-metrics` tells Managed Prometheus to scrape them. Check it with `kubectl get podmonitoring -n arc-systems`.
 - **Cluster Overview Dashboard** (`google_monitoring_dashboard.cluster`):
   - Declared declaratively in `infra/foundation/monitoring.tf`.
   - Visualizes active node count across node pools (verifying autoscaling and scale-to-zero of `runner-pool`), allocatable vs used CPU and memory, container resource usage per namespace (`arc-systems`, `arc-runners`, `external-secrets`), and container restart rates.
@@ -215,7 +215,7 @@ Cloud Logging ([ADR-0010](adr/0010-native-gcp-observability.md)):
 ### Grafana
 
 Grafana shows the cluster, the runners and the functions in one place
-([ADR-0017](adr/0017-prometheus-and-grafana-for-monitoring.md)). It runs on the system pool, has no
+([ADR-0021](adr/0021-prometheus-and-grafana-for-monitoring.md)). It runs on the system pool, has no
 disk and no public address. Its one datasource is Cloud Monitoring, which also serves the Managed
 Prometheus data; it reads it as its own Kubernetes service account (Workload Identity, role
 `monitoring.viewer`, no key).

@@ -69,7 +69,7 @@ resource "google_container_node_pool" "system" {
   node_count = 1
 
   node_config {
-    # e2-small was full (94% of its memory requested); Grafana needs room (ADR-0017).
+    # e2-small was full (94% of its memory requested); Grafana needs room (ADR-0021).
     machine_type = "e2-medium"
     disk_size_gb = 20
 

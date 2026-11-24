@@ -1,6 +1,6 @@
 # ADR-0010 — Native GCP observability with OpenTelemetry
 
-- **Status**: Accepted, dashboards amended by [ADR-0017](0017-prometheus-and-grafana-for-monitoring.md)
+- **Status**: Accepted, dashboards amended by [ADR-0021](0021-prometheus-and-grafana-for-monitoring.md)
 - **Date**: 2026-10-22
 - **Deciders**: project owner; team approval through the review of the pull request that adds this ADR
 - **Supersedes**: none

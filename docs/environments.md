@@ -66,7 +66,7 @@ Defined in `infra/foundation`, applied on 2026-10-23. The design is in
 | Runner Node Pool (`google_container_node_pool`) | `runner-pool` (0-2 × `e2-medium` Spot) | `runner-pool` (0-2 × `e2-medium` Spot) | Autoscaling Spot pool with `runner=true:NoSchedule` taint |
 | Monitoring Dashboard (`google_monitoring_dashboard`) | `teampasx-dev-vpc-gke-overview` | `teampasx-prd-vpc-gke-overview` | Cloud Monitoring dashboard for cluster nodes, pods, and runners |
 | Alert Policies (`google_monitoring_alert_policy`) | Node CPU/Memory high, container restarts, runner jobs waiting, hello errors | Node CPU/Memory high, container restarts, runner jobs waiting, hello errors | Alerts on resource pressure, container failures, runners and the function; each one emails the three team members (`alert_emails`) |
-| Grafana (`helm_release`) and the PodMonitoring of the runner controller | in the code, not applied yet | in the code, not applied yet | Dashboards of the cluster and the functions ([ADR-0017](adr/0017-prometheus-and-grafana-for-monitoring.md)) |
+| Grafana (`helm_release`) and the PodMonitoring of the runner controller | in the code, not applied yet | in the code, not applied yet | Dashboards of the cluster and the functions ([ADR-0021](adr/0021-prometheus-and-grafana-for-monitoring.md)) |
 | Workload Identity and External Secrets Operator (`helm_release`) | in the code, not applied yet | in the code, not applied yet | Copies the runner token from Secret Manager into the cluster ([ADR-0016](adr/0016-external-secrets-operator.md)) |
 
 ### Access stack, in both projects

@@ -1,4 +1,4 @@
-# ADR-0017 — Prometheus and Grafana for the dashboards
+# ADR-0021 — Prometheus and Grafana for the dashboards
 
 - **Status**: Accepted
 - **Date**: 2026-11-23

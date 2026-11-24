@@ -1,4 +1,4 @@
-# Grafana on the system pool (ADR-0017). No disk: the dashboards are files of the repository and the
+# Grafana on the system pool (ADR-0021). No disk: the dashboards are files of the repository and the
 # datasource is provisioned by Terraform. No public address: reach it with kubectl port-forward.
 replicas: 1
 
