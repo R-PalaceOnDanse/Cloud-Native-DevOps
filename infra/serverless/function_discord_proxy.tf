@@ -32,7 +32,7 @@ resource "google_cloudfunctions2_function" "discord_proxy" {
   service_config {
     service_account_email          = google_service_account.discord_proxy.email
     min_instance_count             = 0
-    max_instance_count             = var.discord_proxy_max_instance
+    max_instance_count             = var.discord_proxy_max_instances
     available_memory               = "256M"
     timeout_seconds                = 30
     all_traffic_on_latest_revision = true
