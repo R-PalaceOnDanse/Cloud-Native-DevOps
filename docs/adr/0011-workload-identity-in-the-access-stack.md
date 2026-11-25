@@ -42,8 +42,11 @@ Option 3, in every project (dev and prd).
 - Positive: no key in GitHub; a destroy of the foundation cannot cut the pipeline off; a pull
   request from a branch can plan but cannot change anything; prd cannot be applied by a job that
   does not run in the `prd` environment.
-- Negative / trade-offs accepted: `github-apply` is broad (Editor plus Project IAM Admin). It is
-  narrowed once the stacks that really need specific roles exist. The first apply of the stack is
+- Negative / trade-offs accepted: `github-apply` was initially broad (Editor plus Project IAM Admin).
+  It has now been narrowed to least-privilege predefined administrative roles (Compute Network Admin,
+  Container Admin, Service Usage Admin, IAM Service Account Admin/User, Project IAM Admin, Secret
+  Manager Admin, Run Admin, Storage Admin, Monitoring Admin, Logging Admin), removing Editor and its
+  ~12,000 unneeded permissions. The first apply of the stack is
   done by hand, since the pipeline cannot authenticate before it exists.
 - To verify with the first real plan: that the Viewer and Security Reviewer roles are enough for
   the plans of every stack, and that GitHub's OIDC token carries the environment claim for jobs

@@ -1,5 +1,7 @@
-# maxRunners and minRunners are set by helm-arc.tf from <env>.tfvars, where Terraform validates
-# them (docs/infra.md#cost-safeguards). Do not set them here.
+# The name is the label a job puts in `runs-on`. Both environments serve the same repository, so
+# each one has its own name.
+runnerScaleSetName: arc-prd
+maxRunners: 2
 
 template:
   spec:

@@ -137,6 +137,33 @@ are first **used**, as `Permission 'iam.serviceAccounts.getAccessToken' denied` 
 authentication action only prepares a credentials file and does not call Google, so a check that
 looked at that step alone would pass whatever the rules are.
 
+## Where the jobs run
+
+The checks (`terraform-ci`, `functions-ci`, `secret-scan`) run on the label held by the repository
+variable `RUNNER_LABEL`, and on GitHub's `ubuntu-latest` when it is not set. The runners in the
+clusters are `arc-dev` and `arc-prd` ([infra.md](infra.md#2-runner-node-pool-runner-pool)). Changing
+it needs no commit:
+
+```bash
+gh variable set RUNNER_LABEL --body arc-dev   # the checks use the dev runners
+gh variable delete RUNNER_LABEL               # back to GitHub's runners
+```
+
+A run reads the variable when it starts, so a run already queued keeps its label.
+
+`terraform-deploy`, `terraform-destroy`, `terraform-run` and `auth-check` never follow it: they stay
+on `ubuntu-latest`. The destroy deletes the cluster that would be running it, and a deploy must work
+when the cluster is missing or broken.
+
+What to know before setting it:
+
+- At most two runners per cluster, on Spot nodes: a pull request's jobs queue behind each other,
+  and a preempted node fails the job it runs (re-run it).
+- If no runner exists (cluster destroyed, controller down), a job waits until it times out. Delete
+  the variable.
+- The runner image is bare: a step that needs a tool the image lacks fails. Fix the step or the
+  image, or delete the variable.
+
 ## Limits of the free GitHub plan
 
 The repository is private and belongs to an organization on the free plan, where an environment
