@@ -5,7 +5,7 @@ import { createDrawProxyHandler } from './index.js';
 import { MockEventPublisher } from './publisher.js';
 
 /** Claims forwarded by API Gateway once it has verified the Firebase ID token. */
-function userinfo(uid = 'discord:123456789012345678', name = 'Alice') {
+function userinfo(uid = 'discord:24680', name = 'Alice') {
   return Buffer.from(JSON.stringify({ user_id: uid, sub: uid, name })).toString('base64url');
 }
 
@@ -198,7 +198,7 @@ describe('Web Draw Proxy Cloud Function (Issue #76)', () => {
     assert.strictEqual(envelope.source, 'web');
     assert.strictEqual(envelope.correlationId, customCorrelationId);
     assert.ok(typeof envelope.traceParent === 'string' && envelope.traceParent.startsWith('00-'));
-    assert.strictEqual((envelope.data as { userId: string }).userId, '123456789012345678');
+    assert.strictEqual((envelope.data as { userId: string }).userId, '24680');
     assert.strictEqual((envelope.data as { author: string }).author, 'Alice');
     assert.strictEqual((envelope.data as { pixels: unknown[] }).pixels.length, 2);
   });
