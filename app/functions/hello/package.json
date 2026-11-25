@@ -10,6 +10,7 @@
   "scripts": {
     "build": "tsc",
     "gcp-build": "npm run build",
+    "test": "npm run build && node --test dist/*.test.js",
     "start": "functions-framework --target=hello"
   },
   "dependencies": {

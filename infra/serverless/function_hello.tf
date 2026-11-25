@@ -61,6 +61,7 @@ resource "google_cloudfunctions2_function" "hello" {
 
     environment_variables = {
       HELLO_SECRET_VERSION = "${google_secret_manager_secret.hello_greeting.id}/versions/latest"
+      PROJECT_ID           = var.project_id
     }
   }
 

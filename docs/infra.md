@@ -126,7 +126,7 @@ The cluster resource is defined in `infra/foundation/gke.tf`:
 Compute resources are separated into two specialized node pools:
 
 #### 1. System Node Pool (`system-pool`)
-- **Node Count**: Fixed `1` node (`e2-small`: 2 vCPU burstable, 2 GB RAM, 20 GB pd-standard disk).
+- **Node Count**: Fixed `1` node (`e2-medium`: 2 vCPU, 4 GB RAM, 20 GB pd-standard disk). It was an `e2-small`, which was already full with the runner controller, External Secrets Operator and the GKE system pods ([ADR-0021](adr/0021-prometheus-and-grafana-for-monitoring.md)).
 - **Purpose**: Runs essential cluster daemonsets and controllers (CoreDNS, kube-proxy, cert-manager, metrics-server, and runner controllers).
 - **Labels**: `role = "system"`.
 - **Management**: `auto_repair = true` and `auto_upgrade = true`.
@@ -242,6 +242,7 @@ Cloud Logging ([ADR-0010](adr/0010-native-gcp-observability.md)):
   - `monitoring_config`: System components, API server, controller manager, and scheduler metrics are collected automatically.
   - `managed_prometheus`: Google Cloud Managed Service for Prometheus (GMP) is enabled on the cluster, scraping Prometheus metrics seamlessly without requiring an in-cluster Prometheus server.
   - `logging_config`: System and workload logs (including runner pods) are streamed into Cloud Logging.
+- **Runner metrics** ([ADR-0021](adr/0021-prometheus-and-grafana-for-monitoring.md)): the runner controller and its listeners expose Prometheus metrics (jobs waiting, runners busy and registered), switched on in `helm-arc.tf`. A `PodMonitoring` from the local chart `charts/arc-metrics` tells Managed Prometheus to scrape them. Check it with `kubectl get podmonitoring -n arc-systems`.
 - **Cluster Overview Dashboard** (`google_monitoring_dashboard.cluster`):
   - Declared declaratively in `infra/foundation/monitoring.tf`.
   - Visualizes active node count across node pools (verifying autoscaling and scale-to-zero of `runner-pool`), allocatable vs used CPU and memory, container resource usage per namespace (`arc-systems`, `arc-runners`, `external-secrets`), and container restart rates.
@@ -249,6 +250,54 @@ Cloud Logging ([ADR-0010](adr/0010-native-gcp-observability.md)):
   - **Node High CPU**: Sustained allocatable CPU > 85% for 5 minutes.
   - **Node High Memory**: Sustained allocatable memory > 85% for 5 minutes.
   - **Container Restarts**: Elevated restart rates alerting operators to CrashLoopBackOff or runner failures.
+  - **Runner jobs waiting**: jobs assigned but not running for 10 minutes (PromQL on the `gha_*` metrics of the runner controller).
+  - **Hello errors**: any 5xx response of the `hello` function.
+  - Every policy emails the addresses of `alert_emails` in `<env>.tfvars` (one `google_monitoring_notification_channel` each).
+### Grafana
+
+Grafana shows the cluster, the runners and the functions in one place
+([ADR-0021](adr/0021-prometheus-and-grafana-for-monitoring.md)). It runs on the system pool, has no
+disk and no public address. Its one datasource is Cloud Monitoring, which also serves the Managed
+Prometheus data; it reads it as its own Kubernetes service account (Workload Identity, role
+`monitoring.viewer`, no key).
+
+The admin password is in Secret Manager (`grafana-admin-password`, created by the `access` stack) and
+copied into the cluster by External Secrets Operator. Add it once per environment, after the `access`
+stack is applied:
+
+```bash
+openssl rand -base64 24 | tr -d '\n' | gcloud secrets versions add grafana-admin-password \
+  --project=teampasx-cloudnative-dev --data-file=-
+```
+
+To open Grafana, read the password, then forward the port and browse to `http://localhost:3000` (user
+`admin`):
+
+```bash
+gcloud secrets versions access latest --secret=grafana-admin-password --project=teampasx-cloudnative-dev
+kubectl port-forward --namespace monitoring service/grafana 3000:80
+```
+
+To change the password, add a new version with the first command; the cluster picks it up within the
+hour.
+
+The dashboards are files in `infra/foundation/dashboards/`, loaded by Terraform with the project of the
+environment filled in. **Cluster and runners** (`cluster.json`) shows:
+
+- the nodes by pool, so the runner pool going from 0 up and back to 0 is visible, and the containers
+  per namespace (the `arc-runners` line is the runners);
+- CPU and memory, per node and per namespace, and the container restarts;
+- the runner activity from the controller's metrics: jobs assigned and running (the difference is the
+  jobs waiting) and runners registered, busy and wanted.
+
+**Functions and gateway** (`serverless.json`) shows, for `hello`, the requests per second by response
+class, the share of 5xx, the latency (p50 and p95) and the running instances (0 when idle), and the
+requests per second of the API gateway. Queue depth and dead letters will join it with Pub/Sub.
+
+The queries were checked against the Managed Prometheus API of dev, except the runner activity ones
+(`gha_*`), which exist once the metrics of the controller are on. Dev had no traffic on `hello` and the
+gateway yet, so those panels are accepted by the API but empty until a request goes through. To change a dashboard, edit it in
+Grafana, export its JSON and replace the file; a change made only in Grafana is lost at the next deploy.
 
 ### Clean Teardown
 
@@ -295,8 +344,8 @@ each project it creates:
   any workflow of the repository may impersonate. Plans use it, including on pull requests;
 - the service account `github-apply`, which creates and changes resources using least-privilege
   predefined roles (Compute Network Admin, Container Admin, Service Usage Admin, IAM Service
-  Account Admin/User, Project IAM Admin, Secret Manager Admin, Run Admin, Storage Admin, Monitoring
-  Admin, Logging Admin), and which only a job that runs in the GitHub environment of the same name
+  Account Admin/User, Project IAM Admin, Secret Manager Admin, Run Admin, Cloud Functions Admin, API Gateway Admin, API Keys Admin, Storage Admin,
+  Monitoring Admin, Logging Admin), and which only a job that runs in the GitHub environment of the same name
   as the Terraform environment (`dev` or `prd`) may impersonate;
 - the write access of both accounts to the state bucket, because Terraform locks the state even
   for a plan.
@@ -318,6 +367,9 @@ read its own backend configuration: change both together.
 Human access to the GCP projects is managed as code in `infra/access/members.tf`. Keeping these permissions in the `access` stack guarantees that running `terraform destroy` on `infra/foundation` removes the networking infrastructure without ever locking team members or the instructor out:
 
 - **Instructor**: `jeremie@jjaouen.com` is granted `roles/editor` on both `dev` and `prd` (`instructor_email` variable).
+  The instructor's *Billing Account Viewer* role on the billing account is granted by hand, not by
+  Terraform: the plan account cannot read the billing account's policy, so it made every plan of
+  `access` fail. A `removed` block in `members.tf` makes Terraform forget it without deleting it.
 - **Team members**: `aurelienbara13@gmail.com`, `nicolaslouis320@gmail.com`, and `quaduval@gmail.com` are granted `roles/owner` on both projects (`team_members` variable).
 
 ## Create a state bucket

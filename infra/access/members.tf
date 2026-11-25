@@ -4,10 +4,15 @@ resource "google_project_iam_member" "instructor" {
   member  = "user:${var.instructor_email}"
 }
 
-resource "google_billing_account_iam_member" "instructor_billing_viewer" {
-  billing_account_id = var.billing_account
-  role               = "roles/billing.viewer"
-  member             = "user:${var.instructor_email}"
+# The instructor's billing viewer role is on the shared billing account, not on the project: the
+# plan account cannot read that policy, so every plan of this stack failed. It is granted by hand
+# (docs/environments.md). Terraform forgets it at the next apply and leaves it in place.
+removed {
+  from = google_billing_account_iam_member.instructor_billing_viewer
+
+  lifecycle {
+    destroy = false
+  }
 }
 
 resource "google_project_iam_member" "team" {

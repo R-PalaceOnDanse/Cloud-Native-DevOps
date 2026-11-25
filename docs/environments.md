@@ -62,10 +62,11 @@ Defined in `infra/foundation`, applied on 2026-10-23. The design is in
 | Cloud Router (`google_compute_router`) | `teampasx-dev-vpc-router` | `teampasx-prd-vpc-router` | Regional router in `europe-west1` |
 | Cloud NAT (`google_compute_router_nat`) | `teampasx-dev-vpc-nat` | `teampasx-prd-vpc-nat` | Egress NAT for private nodes and runners |
 | GKE Cluster (`google_container_cluster`) | `teampasx-dev-vpc-gke` | `teampasx-prd-vpc-gke` | Private GKE cluster in `europe-west1-b` for CI/CD runners |
-| System Node Pool (`google_container_node_pool`) | `system-pool` (1 × `e2-small`) | `system-pool` (1 × `e2-small`) | Dedicated pool for controllers and cluster services |
+| System Node Pool (`google_container_node_pool`) | `system-pool` (1 × `e2-medium`) | `system-pool` (1 × `e2-medium`) | Dedicated pool for controllers and cluster services |
 | Runner Node Pool (`google_container_node_pool`) | `runner-pool` (0-2 × `e2-medium` Spot) | `runner-pool` (0-2 × `e2-medium` Spot) | Autoscaling Spot pool with `runner=true:NoSchedule` taint |
 | Monitoring Dashboard (`google_monitoring_dashboard`) | `teampasx-dev-vpc-gke-overview` | `teampasx-prd-vpc-gke-overview` | Cloud Monitoring dashboard for cluster nodes, pods, and runners |
-| Alert Policies (`google_monitoring_alert_policy`) | Node CPU/Memory high, container restarts | Node CPU/Memory high, container restarts | Automated threshold alerts on resource pressure and container failures |
+| Alert Policies (`google_monitoring_alert_policy`) | Node CPU/Memory high, container restarts, runner jobs waiting, hello errors | Node CPU/Memory high, container restarts, runner jobs waiting, hello errors | Alerts on resource pressure, container failures, runners and the function; each one emails the three team members (`alert_emails`) |
+| Grafana (`helm_release`) and the PodMonitoring of the runner controller | in the code, not applied yet | in the code, not applied yet | Dashboards of the cluster and the functions ([ADR-0021](adr/0021-prometheus-and-grafana-for-monitoring.md)) |
 | Workload Identity and External Secrets Operator (`helm_release`) | in the code, not applied yet | in the code, not applied yet | Copies the runner token from Secret Manager into the cluster ([ADR-0016](adr/0016-external-secrets-operator.md)) |
 
 ### Access stack, in both projects
@@ -81,10 +82,11 @@ is in [ADR-0011](adr/0011-workload-identity-in-the-access-stack.md) and the beha
 | Service account | `github-plan` | Read-only identity for `terraform plan`, usable by any workflow of the repository |
 | Service account | `github-apply` | Identity for apply and destroy, usable only by the GitHub environment of the same name as the project's environment |
 | Project roles of `github-plan` | Viewer, Security Reviewer | Refresh the state and read IAM policies |
-| Project roles of `github-apply` | Scoped least-privilege roles (Compute Network Admin, Container Admin, Service Usage Admin, IAM Service Account Admin/User, Project IAM Admin, Secret Manager Admin, Run Admin, Storage Admin, Monitoring Admin, Logging Admin) | Create resources and their IAM bindings without broad Editor permissions |
+| Project roles of `github-apply` | Scoped least-privilege roles (Compute Network Admin, Container Admin, Service Usage Admin, IAM Service Account Admin/User, Project IAM Admin, Secret Manager Admin, Run Admin, Cloud Functions Admin, API Gateway Admin, API Keys Admin, Storage Admin, Monitoring Admin, Logging Admin) | Create resources and their IAM bindings without broad Editor permissions |
 | State bucket role | `roles/storage.objectAdmin` on the bucket, for both accounts | Terraform writes a lock even for a plan |
 | Impersonation bindings | `roles/iam.workloadIdentityUser` on each account | Who may use each account, as described above |
 | Enabled APIs | Cloud Resource Manager, IAM, IAM Credentials, Security Token Service | Required by the federation; left enabled on destroy |
+| Secret `grafana-admin-password` | Secret Manager | Admin password of Grafana, value added by hand, `prevent_destroy`. In the code, **not applied yet** |
 | Secret `arc-github-token` and the Secret Manager API | Secret Manager | GitHub token of the runner controller, value added by hand, `prevent_destroy`. In the code since [ADR-0016](adr/0016-external-secrets-operator.md), **not applied yet** (the counts above are those of 2026-10-23) |
 
 The full names of the provider and of the two accounts are the outputs of the stack
@@ -119,7 +121,7 @@ recorded: **Unknown, the team can answer**, and the answer belongs in the decisi
   are the kind of services that [ADR-0008](adr/0008-firestore-listeners-for-realtime.md) and
   [ADR-0009](adr/0009-firebase-hosting-and-discord-oauth.md) rely on, and may come from the spike
   those ADRs ask for. Nothing in the code uses them yet.
-- **The instructor's access**: the instructor (`jeremie@jjaouen.com`) has the *Editor* role on both dev and prd, managed as code in `infra/access/members.tf`.
+- **The instructor's access**: the instructor (`jeremie@jjaouen.com`) has the *Editor* role on both dev and prd, managed as code in `infra/access/members.tf`, and *Billing Account Viewer* on the billing account, granted by hand (see [infra.md](infra.md)).
 - **Team members access**: team members have the *Owner* role on both dev and prd, managed as code in `infra/access/members.tf`.
 - **Budget Alerts API** (`billingbudgets.googleapis.com`) is enabled in dev and prd. The budget of each project is created by `infra/access/budget.tf` and managed in the `access` stack with `prevent_destroy = true`. Both projects share the team billing account `01A021-589B0D-8ED8BC`.
 

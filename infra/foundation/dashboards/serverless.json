@@ -1,0 +1,316 @@
+{
+  "uid": "serverless-overview",
+  "title": "Functions and gateway",
+  "description": "The hello function and the API gateway: traffic, errors, latency, instances (issue #86).",
+  "tags": [
+    "serverless",
+    "hello",
+    "gateway"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "time": {
+    "from": "now-3h",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "hello: requests per second",
+      "description": "Requests received by the function, by response class (2xx, 4xx, 5xx).",
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcm"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 30,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcm"
+          },
+          "refId": "A",
+          "queryType": "promQL",
+          "promQLQuery": {
+            "projectName": "__PROJECT_ID__",
+            "expr": "sum by (response_code_class) (rate(run_googleapis_com:request_count{monitored_resource=\"cloud_run_revision\",service_name=\"hello\"}[5m]))",
+            "step": "60s",
+            "legendFormat": "{{response_code_class}}"
+          }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "hello: error ratio",
+      "description": "Share of 5xx responses. The hello-errors alert fires on any 5xx.",
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcm"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcm"
+          },
+          "refId": "A",
+          "queryType": "promQL",
+          "promQLQuery": {
+            "projectName": "__PROJECT_ID__",
+            "expr": "sum(rate(run_googleapis_com:request_count{monitored_resource=\"cloud_run_revision\",service_name=\"hello\",response_code_class=\"5xx\"}[5m])) / sum(rate(run_googleapis_com:request_count{monitored_resource=\"cloud_run_revision\",service_name=\"hello\"}[5m]))",
+            "step": "60s",
+            "legendFormat": "5xx ratio"
+          }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "hello: latency",
+      "description": "Time to answer, 50th and 95th percentile.",
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcm"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcm"
+          },
+          "refId": "A",
+          "queryType": "promQL",
+          "promQLQuery": {
+            "projectName": "__PROJECT_ID__",
+            "expr": "histogram_quantile(0.5, sum by (le) (rate(run_googleapis_com:request_latencies_bucket{monitored_resource=\"cloud_run_revision\",service_name=\"hello\"}[5m])))",
+            "step": "60s",
+            "legendFormat": "p50"
+          }
+        },
+        {
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcm"
+          },
+          "refId": "B",
+          "queryType": "promQL",
+          "promQLQuery": {
+            "projectName": "__PROJECT_ID__",
+            "expr": "histogram_quantile(0.95, sum by (le) (rate(run_googleapis_com:request_latencies_bucket{monitored_resource=\"cloud_run_revision\",service_name=\"hello\"}[5m])))",
+            "step": "60s",
+            "legendFormat": "p95"
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "hello: instances",
+      "description": "Running instances. It scales to 0 when idle and up to the maximum under load.",
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcm"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcm"
+          },
+          "refId": "A",
+          "queryType": "promQL",
+          "promQLQuery": {
+            "projectName": "__PROJECT_ID__",
+            "expr": "sum by (state) (run_googleapis_com:container_instance_count{monitored_resource=\"cloud_run_revision\",service_name=\"hello\"})",
+            "step": "60s",
+            "legendFormat": "{{state}}"
+          }
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Gateway: requests per second",
+      "description": "Requests received by the public gateway, by response class.",
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcm"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 30,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcm"
+          },
+          "refId": "A",
+          "queryType": "promQL",
+          "promQLQuery": {
+            "projectName": "__PROJECT_ID__",
+            "expr": "sum by (response_code_class) (rate(apigateway_googleapis_com:proxy_request_count[5m]))",
+            "step": "60s",
+            "legendFormat": "{{response_code_class}}"
+          }
+        }
+      ]
+    }
+  ]
+}
