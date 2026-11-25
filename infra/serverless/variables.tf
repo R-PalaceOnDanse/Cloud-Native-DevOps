@@ -57,3 +57,14 @@ variable "frontend_origin" {
 locals {
   frontend_origin = var.frontend_origin != "" ? var.frontend_origin : "https://${var.project_id}.web.app"
 }
+
+variable "discord_proxy_max_instances" {
+  type        = number
+  description = "Maximum number of instances of the Discord proxy function: a cost safeguard."
+  default     = 3
+
+  validation {
+    condition     = var.discord_proxy_max_instances >= 1 && var.discord_proxy_max_instances <= 10
+    error_message = "discord_proxy_max_instances must be between 1 and 10."
+  }
+}

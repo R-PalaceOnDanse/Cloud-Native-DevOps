@@ -1,0 +1,26 @@
+{
+  "name": "discord-proxy",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "npm run build && node --test 'dist/**/*.test.js'",
+    "build": "tsc",
+    "gcp-build": "npm run build",
+    "start": "functions-framework --target=discordProxy"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google-cloud/functions-framework": "^5.0.5",
+    "@google-cloud/secret-manager": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "~5.9.3"
+  },
+  "engines": {
+    "node": "22"
+  }
+}

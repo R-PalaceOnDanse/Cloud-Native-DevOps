@@ -132,12 +132,53 @@ Compute resources are separated into two specialized node pools:
 - **Management**: `auto_repair = true` and `auto_upgrade = true`.
 
 #### 2. Runner Node Pool (`runner-pool`)
-- **Autoscaling**: `min_node_count = 0`, `max_node_count = 2` (dynamically scales to zero when no CI jobs are running).
+- **Autoscaling**: `total_min_node_count = 0`, `total_max_node_count = runner_node_max_count`
+  (2 in both environments). The pool scales to zero when no CI job is running; see
+  [Cost safeguards](#cost-safeguards).
 - **Machine Type**: `e2-medium` (2 vCPU, 4 GB RAM, 20 GB pd-standard disk).
 - **Cost Safeguard (Spot VMs)**: Configured with `spot = true` to use Google Cloud Spot VMs, slashing compute costs by 60% to 91% compared to standard on-demand VMs.
 - **Taint Isolation**: Configured with `taint { key = "runner", value = "true", effect = "NO_SCHEDULE" }` and label `role = "runner"`. This guarantees that system pods never schedule on runner nodes, allowing the pool to scale down to 0 instances when idle.
 - **Management**: `auto_repair = true` and `auto_upgrade = true`.
 - **Runner label**: the runners of dev are `arc-dev` and those of prd `arc-prd` (`runnerScaleSetName` in `values/runners-<env>.yaml`). A job reaches them with `runs-on: arc-dev`; how the workflows choose is in [ci.md](ci.md#where-the-jobs-run).
+
+### Cost safeguards
+
+An autoscaling mistake must not be able to burn the credits. Every limit below is enforced in code,
+in both environments, and changes only through a pull request.
+
+| Safeguard | Value | Where |
+|---|---|---|
+| Maximum runner nodes | 2 | `runner_node_max_count` in `infra/foundation/<env>.tfvars`, used as `total_max_node_count` of `runner-pool` in `gke.tf` |
+| Runner nodes when idle | 0 | `total_min_node_count` of `runner-pool` in `infra/foundation/gke.tf` |
+| Maximum runners | 2 | `runner_max_count` in `infra/foundation/<env>.tfvars`, passed to ARC as `maxRunners` in `helm-arc.tf` |
+| System node | 1, fixed, `e2-small` | `node_count` of `system-pool` in `infra/foundation/gke.tf` |
+| Runner machines | Spot `e2-medium` | `spot = true` on `runner-pool` in `infra/foundation/gke.tf` |
+| Node auto-provisioning | off | `cluster_autoscaling { enabled = false }` in `infra/foundation/gke.tf` |
+| Monthly budget | 20 EUR per project, alerts at 50 %, 90 %, 100 % and forecast 100 % | `infra/access/budget.tf`, `budget_amount` in `infra/access/<env>.tfvars` |
+
+Two checks stop a wrong value before it reaches the cloud:
+
+- `runner_node_max_count` and `runner_max_count` only accept a whole number from 1 to 3. Raising the
+  ceiling above 3 means changing the validation in `variables.tf`, in its own pull request.
+- A `precondition` in `helm-arc.tf` refuses a plan where `runner_max_count` is greater than
+  `runner_node_max_count`: one runner fills one `e2-medium` node, so extra runners would stay Pending.
+
+With node auto-provisioning off, the cluster autoscaler can only resize the two node pools declared in
+`gke.tf`; it can never create a new pool without a size limit.
+
+**Idle scale-down.** `minRunners` is set to 0 in `helm-arc.tf`, so ARC keeps no runner pod when no job
+is queued. With no runner pod left, the cluster autoscaler removes the runner nodes down to
+`total_min_node_count = 0`; the `OPTIMIZE_UTILIZATION` profile makes it remove idle nodes sooner. The
+scale-up and the return to zero were measured in [runner-auto-scaling-demo.md](runner-auto-scaling-demo.md).
+
+**What the safeguards do not cover.**
+
+- The budget only sends alerts (see [Budget alerts](#budget-alerts)): it never stops a resource.
+- Some costs run as long as the `foundation` stack exists, even with no job: the GKE cluster
+  management fee, the `system-pool` node, Cloud NAT, and the cluster monitoring and logging. To stop
+  them, run the manual destroy workflow (see [Clean Teardown](#clean-teardown)); the budgets and the
+  human access stay, since they live in the `access` stack.
+  human access stay, since they live in the `access` stack.
 
 ### Connecting & Operating the Cluster
 
@@ -243,6 +284,23 @@ If migrating from the legacy Personal Access Token (`arc-github-token`):
    gcloud secrets versions destroy arc-github-token --version=1 --project=teampasx-cloudnative-dev
    ```
 
+### Cluster Monitoring & Observability
+
+Observability for the cluster and runners is integrated natively with Google Cloud Monitoring and
+Cloud Logging ([ADR-0010](adr/0010-native-gcp-observability.md)):
+
+- **Native GKE Metrics & Logs**:
+  - `monitoring_config`: System components, API server, controller manager, and scheduler metrics are collected automatically.
+  - `managed_prometheus`: Google Cloud Managed Service for Prometheus (GMP) is enabled on the cluster, scraping Prometheus metrics seamlessly without requiring an in-cluster Prometheus server.
+  - `logging_config`: System and workload logs (including runner pods) are streamed into Cloud Logging.
+- **Cluster Overview Dashboard** (`google_monitoring_dashboard.cluster`):
+  - Declared declaratively in `infra/foundation/monitoring.tf`.
+  - Visualizes active node count across node pools (verifying autoscaling and scale-to-zero of `runner-pool`), allocatable vs used CPU and memory, container resource usage per namespace (`arc-systems`, `arc-runners`, `external-secrets`), and container restart rates.
+- **Alert Policies** (`google_monitoring_alert_policy`):
+  - **Node High CPU**: Sustained allocatable CPU > 85% for 5 minutes.
+  - **Node High Memory**: Sustained allocatable memory > 85% for 5 minutes.
+  - **Container Restarts**: Elevated restart rates alerting operators to CrashLoopBackOff or runner failures.
+
 ### Clean Teardown
 
 The cluster and its node pools are declared without `prevent_destroy` or `deletion_protection`. Running `terraform destroy` on `infra/foundation` removes the runner node pool, system node pool, GKE cluster, subnets, and Cloud NAT cleanly in dependency order without leaving orphan cloud resources.
@@ -286,8 +344,10 @@ each project it creates:
   `github_repository`;
 - the service account `github-plan`, read-only (Viewer and Security Reviewer on the project), which
   any workflow of the repository may impersonate. Plans use it, including on pull requests;
-- the service account `github-apply`, which creates and changes resources (Editor and Project IAM
-  Admin on the project), and which only a job that runs in the GitHub environment of the same name
+- the service account `github-apply`, which creates and changes resources using least-privilege
+  predefined roles (Compute Network Admin, Container Admin, Service Usage Admin, IAM Service
+  Account Admin/User, Project IAM Admin, Secret Manager Admin, Run Admin, Storage Admin, Monitoring
+  Admin, Logging Admin), and which only a job that runs in the GitHub environment of the same name
   as the Terraform environment (`dev` or `prd`) may impersonate;
 - the write access of both accounts to the state bucket, because Terraform locks the state even
   for a plan.
@@ -351,7 +411,8 @@ state, and a second one would send every alert twice. To change an amount, chang
 in the `tfvars` through a pull request. Changing or importing a budget requires the
 *Billing Account Administrator* (`roles/billing.admin`) or *Billing Account Costs Manager*
 (`roles/billing.costsManager`) role on the billing account of the project, which belongs to another
-team member. Alert emails go to the billing account's administrators and users.
+team member. Alert emails go to the billing account's administrators and users; every team member
+is one of them, so every member receives the alerts.
 
 Standard GCP budgets are notification-only and do not stop resources automatically. When an alert
 fires, the team must inspect and downscale running workloads.

@@ -19,17 +19,29 @@ locals {
     "roles/serviceusage.apiKeysViewer",
   ]
 
-  # Creates and changes resources and their IAM bindings. Broad on purpose for now: it is narrowed
-  # when the stacks that need specific roles exist (see docs/infra.md).
+  # Scoped administrative roles following least-privilege principles, replacing the broad roles/editor:
   apply_project_roles = [
-    "roles/editor",
-    "roles/resourcemanager.projectIamAdmin",
-    # Editor cannot set IAM policies on resources. The serverless stack sets them on a Cloud Run
-    # service (who may invoke a function) and on a secret (which function may read it).
-    "roles/run.admin",
-    "roles/secretmanager.admin",
-    # Editor cannot create Kubernetes roles. The ARC controller chart creates some in the cluster.
+    # Network infrastructure (VPC, subnets, secondary ranges, Cloud Router, Cloud NAT)
+    "roles/compute.networkAdmin",
+    # GKE clusters, node pools and Kubernetes engine operations
     "roles/container.admin",
+    # Service enablement for declarative google_project_service resources
+    "roles/serviceusage.serviceUsageAdmin",
+    # Service accounts management for workloads and runners
+    "roles/iam.serviceAccountAdmin",
+    "roles/iam.serviceAccountUser",
+    # IAM policy bindings on project and resources
+    "roles/resourcemanager.projectIamAdmin",
+    # Secret Manager management (runner tokens, secrets, IAM policies)
+    "roles/secretmanager.admin",
+    # Cloud Run and serverless function administration
+    "roles/run.admin",
+    # Storage bucket management
+    "roles/storage.admin",
+    # Cloud Monitoring dashboards, metric descriptors, alert policies
+    "roles/monitoring.admin",
+    # Cloud Logging log sinks and configurations
+    "roles/logging.admin",
   ]
 }
 

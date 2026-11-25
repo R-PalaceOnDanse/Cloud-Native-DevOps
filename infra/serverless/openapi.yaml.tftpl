@@ -91,3 +91,17 @@ paths:
           description: Successfully authenticated.
         "400":
           description: Invalid code or CSRF state mismatch.
+  /discord/interactions:
+    post:
+      operationId: discordInteractions
+      summary: Discord interactions endpoint. The proxy function checks the Ed25519 signature.
+      x-google-backend:
+        address: ${discord_proxy_url}
+        # Without it the gateway calls the private function unauthenticated and gets a 403.
+        jwt_audience: ${discord_proxy_url}
+        deadline: 10.0
+      responses:
+        "200":
+          description: PING answered with PONG, or command acknowledged.
+        "401":
+          description: Invalid Discord signature.
