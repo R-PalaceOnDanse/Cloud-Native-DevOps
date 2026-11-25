@@ -16,3 +16,19 @@ resource "google_secret_manager_secret_iam_member" "hello_reads_greeting" {
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.hello.email}"
 }
+
+resource "google_secret_manager_secret" "discord_public_key" {
+  secret_id = "discord-public-key"
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.serverless]
+}
+
+resource "google_secret_manager_secret_iam_member" "discord_proxy_reads_public_key" {
+  secret_id = google_secret_manager_secret.discord_public_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.discord_proxy.email}"
+}
