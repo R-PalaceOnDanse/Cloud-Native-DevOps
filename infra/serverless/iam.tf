@@ -68,11 +68,11 @@ resource "google_service_account" "draw_worker" {
   description  = "Consumes Pub/Sub events, updates Firestore chunks, and writes snapshots."
 }
 
+# Pub/Sub pushes to it (pubsub.tf), so it needs no subscriber role.
 resource "google_project_iam_member" "draw_worker" {
   for_each = toset([
     "roles/logging.logWriter",
-    "roles/datastore.user",
-    "roles/pubsub.subscriber",
+    "roles/datastore.user", # chunks, config/system, ratelimits
     "roles/cloudtrace.agent",
   ])
 
@@ -81,10 +81,18 @@ resource "google_project_iam_member" "draw_worker" {
   member  = "serviceAccount:${google_service_account.draw_worker.email}"
 }
 
+# Writes the snapshots, nothing else in Cloud Storage.
 resource "google_storage_bucket_iam_member" "draw_worker_snapshots" {
   bucket = google_storage_bucket.snapshots.name
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${google_service_account.draw_worker.email}"
+}
+
+# Signs the snapshot URLs with its own identity (IAM signBlob): no key file exists.
+resource "google_service_account_iam_member" "draw_worker_signs_urls" {
+  service_account_id = google_service_account.draw_worker.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.draw_worker.email}"
 }
 
 # Runtime identity of the web draw proxy function.
@@ -94,10 +102,10 @@ resource "google_service_account" "web_draw_proxy" {
   description  = "Receives web draw requests and publishes to Pub/Sub."
 }
 
+# Publishes to pixel-draw-events only: the grant is on the topic (pubsub.tf), not on the project.
 resource "google_project_iam_member" "web_draw_proxy" {
   for_each = toset([
     "roles/logging.logWriter",
-    "roles/pubsub.publisher",
     "roles/cloudtrace.agent",
   ])
 
@@ -113,14 +121,21 @@ resource "google_service_account" "auth_callback" {
   description  = "Handles Discord OAuth2 code exchange and mints session tokens."
 }
 
+# Reads one secret (granted on the secret, secrets.tf) and mints Firebase custom tokens.
 resource "google_project_iam_member" "auth_callback" {
   for_each = toset([
     "roles/logging.logWriter",
-    "roles/secretmanager.secretAccessor",
     "roles/cloudtrace.agent",
   ])
 
   project = var.project_id
   role    = each.value
   member  = "serviceAccount:${google_service_account.auth_callback.email}"
+}
+
+# firebase-admin signs the custom tokens through IAM signBlob with this identity: no key file.
+resource "google_service_account_iam_member" "auth_callback_signs_tokens" {
+  service_account_id = google_service_account.auth_callback.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.auth_callback.email}"
 }

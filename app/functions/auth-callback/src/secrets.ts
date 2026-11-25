@@ -23,6 +23,28 @@ export class EnvSecretReader implements SecretReader {
   }
 }
 
+/**
+ * Reads the client secret from Secret Manager with the function's own identity (accessor on this one
+ * secret only), and caches it for the life of the instance.
+ * `versionName` = projects/<project>/secrets/discord-client-secret/versions/latest
+ */
+export class SecretManagerSecretReader implements SecretReader {
+  private cached: string | undefined;
+
+  constructor(private readonly versionName: string) {}
+
+  async getDiscordClientSecret(): Promise<string> {
+    if (this.cached) return this.cached;
+    if (!this.versionName) throw new Error('DISCORD_CLIENT_SECRET_VERSION is not set');
+    const { SecretManagerServiceClient } = await import('@google-cloud/secret-manager');
+    const [version] = await new SecretManagerServiceClient().accessSecretVersion({ name: this.versionName });
+    const value = version.payload?.data ? Buffer.from(version.payload.data).toString('utf8').trim() : '';
+    if (!value) throw new Error('The Discord client secret has no value yet.');
+    this.cached = value;
+    return value;
+  }
+}
+
 export class MockSecretReader implements SecretReader {
   private secret: string | null;
 

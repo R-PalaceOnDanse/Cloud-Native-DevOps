@@ -14,7 +14,8 @@
     "start": "functions-framework --target=webDrawProxy"
   },
   "dependencies": {
-    "@google-cloud/functions-framework": "^5.0.5"
+    "@google-cloud/functions-framework": "^5.0.5",
+    "@google-cloud/pubsub": "^4.11.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

@@ -13,7 +13,7 @@ import type { Request, Response } from '@google-cloud/functions-framework';
 import { createAuthCallbackHandler } from './index.js';
 import { MockSecretReader } from './secrets.js';
 import { MockDiscordOAuthClient } from './oauth.js';
-import { HmacSessionTokenMinter } from './token.js';
+import { FakeTokenMinter } from './token.js';
 
 function createMockHttp(reqOverrides: Partial<Request> = {}) {
   let statusCode = 200;
@@ -80,7 +80,7 @@ function createMockHttp(reqOverrides: Partial<Request> = {}) {
 describe('Discord OAuth2 Login Callback Cloud Function (Issue #79)', () => {
   const secretReader = new MockSecretReader('mock-client-secret-abc');
   const oauthClient = new MockDiscordOAuthClient();
-  const tokenMinter = new HmacSessionTokenMinter('test-signing-secret', 3600);
+  const tokenMinter = new FakeTokenMinter();
   const clientId = 'mock-discord-client-id';
   const defaultRedirectUri = 'http://localhost:5173/auth/callback';
 
@@ -234,15 +234,12 @@ describe('Discord OAuth2 Login Callback Cloud Function (Issue #79)', () => {
     assert.equal(body.expiresIn, 3600);
     assert.ok(body.token, 'Must return session token');
 
-    // Verify token structure
-    const [headerB64, payloadB64] = body.token.split('.');
-    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
-    assert.equal(payload.uid, 'discord:mock-discord-user-id-alpha');
-    assert.equal(payload.username, 'DiscordArtist');
+    // The Firebase custom token is minted for the UID discord:<id> (the gateway and the rules rely on it)
+    assert.equal(body.token, 'test-custom-token.discord:mock-discord-user-id-alpha.DiscordArtist');
 
     // CRITICAL: Discord access token must be discarded and NEVER stored or exposed
     assert.equal((body as any).access_token, undefined);
-    assert.equal((payload as any).access_token, undefined);
+    assert.ok(!JSON.stringify(body).includes('access_token'));
 
     // Verify correlation ID
     assert.ok(getHeaders()['x-correlation-id'], 'Must set X-Correlation-ID header');
@@ -267,8 +264,8 @@ describe('Discord OAuth2 Login Callback Cloud Function (Issue #79)', () => {
     assert.equal(getHeaders()['x-correlation-id'], customCorrelationId);
   });
 
-  it('redirects browser GET requests back to frontend with session token in URL', async () => {
-    const targetRedirect = 'https://app.example.com/auth/callback';
+  it('redirects browser GET requests to the registered redirect URI only, never to one chosen by the caller', async () => {
+    const targetRedirect = 'https://attacker.example.com/steal';
     const { req, res, getRedirect, getHeaders } = createMockHttp({
       method: 'GET',
       query: {
@@ -284,7 +281,7 @@ describe('Discord OAuth2 Login Callback Cloud Function (Issue #79)', () => {
     assert.equal(redirect.status, 302);
     assert.ok(redirect.url);
     const parsed = new URL(redirect.url);
-    assert.equal(parsed.origin, 'https://app.example.com');
+    assert.equal(parsed.origin, 'http://localhost:5173');
     assert.equal(parsed.pathname, '/auth/callback');
     assert.ok(parsed.searchParams.get('token'), 'Must include session token');
     assert.equal(parsed.searchParams.get('username'), 'DiscordArtist');

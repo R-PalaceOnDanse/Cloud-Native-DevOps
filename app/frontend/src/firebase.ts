@@ -62,6 +62,15 @@ export function getFirebaseInstance(): FirebaseInstance | null {
 }
 
 /**
+ * Firebase ID token of the signed-in user, refreshed by the SDK. API Gateway verifies it on /draw
+ * (issuer securetoken.google.com/<project>), so it is the only credential sent to the API.
+ */
+export async function getFirebaseIdToken(): Promise<string | null> {
+  const user = getFirebaseInstance()?.auth.currentUser;
+  return user ? user.getIdToken() : null;
+}
+
+/**
  * Authenticates the Firebase client with a custom token minted by the auth-callback function.
  */
 export async function authenticateFirebase(customToken: string): Promise<boolean> {

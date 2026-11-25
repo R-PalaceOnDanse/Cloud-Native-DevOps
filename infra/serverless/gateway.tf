@@ -2,6 +2,7 @@
 
 locals {
   openapi_spec = templatefile("${path.module}/openapi.yaml.tftpl", {
+    project_id         = var.project_id
     hello_url          = google_cloudfunctions2_function.hello.service_config[0].uri
     web_draw_proxy_url = google_cloudfunctions2_function.web_draw_proxy.service_config[0].uri
     auth_callback_url  = google_cloudfunctions2_function.auth_callback.service_config[0].uri

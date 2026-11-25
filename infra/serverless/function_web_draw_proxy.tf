@@ -38,7 +38,14 @@ resource "google_cloudfunctions2_function" "web_draw_proxy" {
     available_memory               = "256M"
     timeout_seconds                = 15
     all_traffic_on_latest_revision = true
-    ingress_settings               = "ALLOW_ALL"
+    # API Gateway does not run in the VPC: the function stays reachable, but only the gateway service
+    # account may invoke it (no allUsers binding).
+    ingress_settings = "ALLOW_ALL"
+
+    environment_variables = {
+      PIXEL_DRAW_TOPIC = google_pubsub_topic.pixel_draw.name
+      FRONTEND_ORIGIN  = local.frontend_origin
+    }
   }
 
   depends_on = [

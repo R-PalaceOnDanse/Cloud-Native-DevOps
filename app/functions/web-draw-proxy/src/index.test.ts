@@ -4,6 +4,11 @@ import type { Request, Response } from '@google-cloud/functions-framework';
 import { createDrawProxyHandler } from './index.js';
 import { MockEventPublisher } from './publisher.js';
 
+/** Claims forwarded by API Gateway once it has verified the Firebase ID token. */
+function userinfo(uid = 'discord:123456789012345678', name = 'Alice') {
+  return Buffer.from(JSON.stringify({ user_id: uid, sub: uid, name })).toString('base64url');
+}
+
 function createMockResponse() {
   const res: Partial<Response> & {
     statusCode: number;
@@ -22,6 +27,10 @@ function createMockResponse() {
       return this as Response;
     },
     json(data: unknown) {
+      this.body = data;
+      return this as Response;
+    },
+    send(data: unknown) {
       this.body = data;
       return this as Response;
     },
@@ -78,10 +87,31 @@ describe('Web Draw Proxy Cloud Function (Issue #76)', () => {
     assert.strictEqual(publisher.publishedEvents.length, 0);
   });
 
+  it('answers the CORS preflight without publishing anything', async () => {
+    const res = createMockResponse();
+    await handler(createMockRequest({ method: 'OPTIONS' }), res as unknown as Response);
+    assert.strictEqual(res.statusCode, 204);
+    assert.ok(res.headers['Access-Control-Allow-Methods']!.includes('POST'));
+    assert.strictEqual(publisher.publishedEvents.length, 0);
+  });
+
+  it('refuses an identity that is not a Discord-linked account, and a bearer token alone', async () => {
+    for (const headers of <Array<Record<string, string>>>[
+      { 'X-Apigateway-Api-Userinfo': userinfo('anonymous-uid') },
+      { 'X-Apigateway-Api-Userinfo': 'not-base64-json' },
+      { Authorization: 'Bearer user_forged_12345678' },
+    ]) {
+      const res = createMockResponse();
+      await handler(createMockRequest({ headers, body: { pixels: [{ x: 1, y: 1, color: '#ff0000' }] } }), res as unknown as Response);
+      assert.strictEqual(res.statusCode, 401);
+    }
+    assert.strictEqual(publisher.publishedEvents.length, 0);
+  });
+
   it('rejects invalid or out-of-bounds pixel coordinates with 400 Bad Request', async () => {
     const req = createMockRequest({
       method: 'POST',
-      headers: { Authorization: 'Bearer user_test_12345678' },
+      headers: { 'X-Apigateway-Api-Userinfo': userinfo() },
       body: {
         pixels: [
           { x: 10000, y: 50, color: '#ff0000' }, // Out of bounds [0..9999]
@@ -99,7 +129,7 @@ describe('Web Draw Proxy Cloud Function (Issue #76)', () => {
   it('rejects invalid hex color format with 400 Bad Request', async () => {
     const req = createMockRequest({
       method: 'POST',
-      headers: { Authorization: 'Bearer user_test_12345678' },
+      headers: { 'X-Apigateway-Api-Userinfo': userinfo() },
       body: {
         pixels: [
           { x: 50, y: 50, color: 'blue' }, // Invalid format: expected #rrggbb
@@ -123,7 +153,7 @@ describe('Web Draw Proxy Cloud Function (Issue #76)', () => {
 
     const req = createMockRequest({
       method: 'POST',
-      headers: { Authorization: 'Bearer user_test_12345678' },
+      headers: { 'X-Apigateway-Api-Userinfo': userinfo() },
       body: { pixels },
     });
     const res = createMockResponse();
@@ -139,7 +169,7 @@ describe('Web Draw Proxy Cloud Function (Issue #76)', () => {
     const req = createMockRequest({
       method: 'POST',
       headers: {
-        Authorization: 'Bearer user_test_12345678',
+        'X-Apigateway-Api-Userinfo': userinfo(),
         'X-Correlation-ID': customCorrelationId,
       },
       body: {
@@ -168,7 +198,8 @@ describe('Web Draw Proxy Cloud Function (Issue #76)', () => {
     assert.strictEqual(envelope.source, 'web');
     assert.strictEqual(envelope.correlationId, customCorrelationId);
     assert.ok(typeof envelope.traceParent === 'string' && envelope.traceParent.startsWith('00-'));
-    assert.strictEqual((envelope.data as { userId: string }).userId, 'user_test_12345678');
+    assert.strictEqual((envelope.data as { userId: string }).userId, '123456789012345678');
+    assert.strictEqual((envelope.data as { author: string }).author, 'Alice');
     assert.strictEqual((envelope.data as { pixels: unknown[] }).pixels.length, 2);
   });
 
@@ -177,7 +208,7 @@ describe('Web Draw Proxy Cloud Function (Issue #76)', () => {
     const req = createMockRequest({
       method: 'POST',
       headers: {
-        Authorization: 'Bearer user_test_trace',
+        'X-Apigateway-Api-Userinfo': userinfo(),
         traceparent: incomingTrace,
       },
       body: {

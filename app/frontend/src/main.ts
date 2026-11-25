@@ -20,7 +20,7 @@ import { Minimap } from './minimap.js';
 import { getBrushPixels, validateBrushStroke, BRUSH_PIXEL_COUNTS, BrushSize } from './brush.js';
 import { RealtimeManager, SystemState } from './realtime.js';
 import { createRealtimeProvider } from './firestore-provider.js';
-import { authenticateFirebase } from './firebase.js';
+import { authenticateFirebase, getFirebaseIdToken } from './firebase.js';
 import { authManager, UserProfile } from './auth.js';
 import { drawApiClient } from './api.js';
 import { formatPixelInspection } from './inspector.js';
@@ -690,7 +690,9 @@ authManager.onAuthStateChanged((user: UserProfile | null) => {
 });
 
 btnDiscordLogin.addEventListener('click', () => {
-  authManager.loginWithDiscord();
+  // Real Discord OAuth2 when the app ID is configured at build time; simulated login in local dev only.
+  const discordClientId = (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_DISCORD_CLIENT_ID;
+  authManager.loginWithDiscord(discordClientId || undefined);
 });
 
 btnLogout.addEventListener('click', () => {
@@ -1000,13 +1002,19 @@ async function handleDraw(screenX: number, screenY: number): Promise<void> {
     return;
   }
 
+  // Only a Discord-linked Firebase session may draw: the gateway verifies this ID token.
+  const token = await getFirebaseIdToken();
+  if (!token && drawApiClient.isRemote()) {
+    showToast('Sign in with Discord to draw.', 'error');
+    return;
+  }
+
   lastDrawnCoord = { x: world.x, y: world.y };
   userTokens -= batch.length;
   updateTokensDisplay();
 
   const user = authManager.getCurrentUser();
   const author = user?.username || 'Anonymous';
-  const token = authManager.getSessionToken() || (user?.id ? `user_${user.id}` : undefined);
 
   // 1. Optimistic local rendering
   renderer.applyBatch(batch, author);
@@ -1023,7 +1031,7 @@ async function handleDraw(screenX: number, screenY: number): Promise<void> {
     return;
   }
 
-  const result = await drawApiClient.submitDraw(batch, token);
+  const result = await drawApiClient.submitDraw(batch, token ?? undefined);
   if ('error' in result && result.error) {
     showToast(result.error, 'error');
   }

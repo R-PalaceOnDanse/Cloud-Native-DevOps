@@ -59,6 +59,11 @@ export class DrawApiClient {
     }
   }
 
+  /** True when a real API Gateway URL is configured (VITE_API_GATEWAY_URL), false in local dev. */
+  public isRemote(): boolean {
+    return /^https:\/\//.test(this.baseUrl);
+  }
+
   /**
    * Submits a batch of drawn pixels to the Web Draw Proxy.
    * Propagates W3C traceparent and correlation ID for distributed tracing (Issue #88, #89).
@@ -88,7 +93,7 @@ export class DrawApiClient {
       const response = await fetch(`${this.baseUrl}/draw`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ pixels, token }),
+        body: JSON.stringify({ pixels }),
       });
 
       if (response.status === 202) {
@@ -115,6 +120,9 @@ export class DrawApiClient {
         error: errJson.error || `Server error (${response.status}).`,
       };
     } catch {
+      if (this.isRemote()) {
+        return { error: 'Network error: the draw was not sent.' };
+      }
       // In local dev without gateway running, acknowledge optimistically
       return {
         status: 'accepted',

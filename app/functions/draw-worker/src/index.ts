@@ -1,18 +1,23 @@
 /**
- * Draw and Command Worker Cloud Function.
- * Consumes Pub/Sub messages, enforces rate limits and admin authorization,
- * performs transactional writes to Firestore chunks, and updates Discord interactions.
- * 
- * Fulfills Issues #48, #52, #53, #55, #56, #57, #68, #141, #142 (C06 §4, C07 §1 & §2).
+ * Draw and command worker (Cloud Run function, Pub/Sub push subscription).
+ *
+ * Consumes the events of `pixel-draw-events`:
+ *   - pixel.draw        from the web proxy and the Discord proxy (/draw)
+ *   - discord.command   /get, /snapshot, /admin pause|resume|clear|ratelimit
+ *
+ * State lives in Firestore and Cloud Storage, never in the instance (Issue #167). A transient failure
+ * answers 500 so Pub/Sub redelivers, then dead-letters after 5 attempts; a business rejection (paused,
+ * rate limited, unauthorized, invalid) answers 200 so it is not retried.
+ *
+ * Issues #48, #52, #53, #55, #56, #57, #68, #141, #142, #167 (C06 §4, C07 §1-2).
  */
 
 import { randomBytes } from 'node:crypto';
 import type { Request, Response } from '@google-cloud/functions-framework';
-import { ChunkStore, defaultChunkStore, isValidCoordinate } from './chunk-store.js';
-import { WorkerRateLimiter, defaultWorkerRateLimiter } from './rate-limiter.js';
 import { isUserAdmin } from './admin-auth.js';
-import { discordApiClient, DiscordApiClient } from './discord-api.js';
-import { SnapshotService, defaultSnapshotService } from './snapshot-service.js';
+import { discordApiClient, type DiscordApiClient } from './discord-api.js';
+import { renderCanvas, snapshotObjectName, type SnapshotStorage } from './snapshot-service.js';
+import { isValidColor, isValidCoordinate, type CanvasStore, type PixelWrite, type RateLimiter } from './store.js';
 
 export interface PubSubMessagePayload {
   message?: {
@@ -24,297 +29,240 @@ export interface PubSubMessagePayload {
 }
 
 export interface WorkerDependencies {
-  chunkStore?: ChunkStore;
-  rateLimiter?: WorkerRateLimiter;
-  snapshotService?: SnapshotService;
-  discordClient?: DiscordApiClient;
-  firestoreAdmins?: readonly string[];
-  snapshotBucketName?: string;
+  canvas: CanvasStore;
+  rateLimiter: RateLimiter;
+  snapshots: SnapshotStorage;
+  discord: DiscordApiClient;
 }
 
-export function createDrawWorkerHandler(deps: WorkerDependencies = {}) {
-  const chunkStore = deps.chunkStore || defaultChunkStore;
-  const rateLimiter = deps.rateLimiter || defaultWorkerRateLimiter;
-  const snapshotService = deps.snapshotService || defaultSnapshotService;
-  const discord = deps.discordClient || discordApiClient;
-  const firestoreAdmins = deps.firestoreAdmins || [];
-  const snapshotBucketName = deps.snapshotBucketName || process.env.SNAPSHOT_BUCKET || 'teampasx-canvas-snapshots';
+const SIGNED_URL_SECONDS = 3600;
 
+function log(severity: string, message: string, fields: Record<string, unknown> = {}) {
+  const line = JSON.stringify({ severity, message, function: 'draw-worker', ...fields });
+  if (severity === 'ERROR') console.error(line);
+  else if (severity === 'WARNING') console.warn(line);
+  else console.log(line);
+}
+
+export function createDrawWorkerHandler(resolveDeps: () => WorkerDependencies) {
   return async function drawWorker(req: Request, res: Response): Promise<void> {
-    const rawBody = req.body as PubSubMessagePayload;
-
-    if (!rawBody?.message?.data) {
+    const body = req.body as PubSubMessagePayload;
+    if (!body?.message?.data) {
       res.status(400).json({ error: 'Bad Request: missing Pub/Sub message data.' });
       return;
     }
 
-    // 1. Decode Base64 Pub/Sub Data
     let envelope: any;
     try {
-      const decodedString = Buffer.from(rawBody.message.data, 'base64').toString('utf8');
-      envelope = JSON.parse(decodedString);
+      envelope = JSON.parse(Buffer.from(body.message.data, 'base64').toString('utf8'));
     } catch {
+      // A message that cannot be parsed will never succeed: acknowledge it, do not retry.
       res.status(400).json({ error: 'Bad Request: unable to parse JSON message payload.' });
       return;
     }
 
-    const correlationId = envelope.correlationId || rawBody.message.attributes?.correlationId || 'unknown-corr-id';
-    const eventType = envelope.type || rawBody.message.attributes?.eventType;
-    const eventSource = envelope.source || rawBody.message.attributes?.eventSource || 'unknown';
+    const attributes = body.message.attributes ?? {};
+    const correlationId: string = envelope.correlationId || attributes.correlationId || 'unknown-corr-id';
+    const eventType: string | undefined = envelope.type || attributes.eventType;
+    const eventSource: string = envelope.source || attributes.eventSource || 'unknown';
 
-    // Distributed Trace Context extraction (Issue #88)
-    const incomingTraceParent = envelope.traceParent || rawBody.message?.attributes?.traceparent;
-    let traceId = randomBytes(16).toString('hex');
-    let parentSpanId: string | undefined = undefined;
+    // Trace context propagated from the proxy (W3C traceparent), linked in Cloud Logging (Issue #88, #89).
+    const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT || 'unknown-project';
+    const parent = String(envelope.traceParent || attributes.traceparent || '').match(/^00-([0-9a-f]{32})-([0-9a-f]{16})-[0-9a-f]{2}$/i);
+    const traceId = parent ? parent[1]!.toLowerCase() : randomBytes(16).toString('hex');
+    const spanId = randomBytes(8).toString('hex');
+    const trace = {
+      correlationId,
+      eventId: envelope.id,
+      eventType,
+      trace_id: traceId,
+      span_id: spanId,
+      parent_span_id: parent ? parent[2]!.toLowerCase() : undefined,
+      'logging.googleapis.com/trace': `projects/${projectId}/traces/${traceId}`,
+      'logging.googleapis.com/spanId': spanId,
+      'logging.googleapis.com/trace_sampled': true,
+    };
+    log('INFO', `Processing event: ${eventType} from ${eventSource}`, trace);
 
-    if (incomingTraceParent) {
-      const match = String(incomingTraceParent).trim().match(/^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/i);
-      if (match) {
-        traceId = match[1]!.toLowerCase();
-        parentSpanId = match[2]!.toLowerCase();
-      }
-    }
+    const data = envelope.data ?? {};
+    const appId: string | undefined = data.applicationId;
+    const token: string | undefined = data.interactionToken;
 
-    const workerSpanId = randomBytes(8).toString('hex');
-    const projectId = process.env.GCP_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'teampasx-cloudnative-dev';
-
-    // Structured JSON log for Cloud Logging / distributed tracing (Issue #88, #89)
-    console.log(
-      JSON.stringify({
-        severity: 'INFO',
-        message: `Processing event: ${eventType} from ${eventSource}`,
-        correlationId,
-        eventId: envelope.id,
-        eventType,
-        trace_id: traceId,
-        span_id: workerSpanId,
-        parent_span_id: parentSpanId,
-        'logging.googleapis.com/trace': `projects/${projectId}/traces/${traceId}`,
-        'logging.googleapis.com/spanId': workerSpanId,
-        'logging.googleapis.com/trace_sampled': true,
-      })
-    );
-
-    // 2. Route by Event Type
-    if (eventType === 'pixel.draw') {
-      const data = envelope.data || {};
-      const userId = data.userId || 'anonymous';
-      const author = data.author || (eventSource === 'web' ? 'Web User' : `Discord:<@${userId}>`);
-      const pixels: Array<{ x: number; y: number; color: string }> = data.pixels || [];
-      const appId = data.applicationId;
-      const token = data.interactionToken;
-
-      // 2a. Check Global Canvas Pause State (Issue #57)
-      if (chunkStore.getPauseState()) {
-        console.warn(
-          JSON.stringify({
-            severity: 'WARNING',
-            message: 'Draw rejected: canvas is currently paused by an administrator.',
-            correlationId,
-            userId,
-          })
-        );
-        if (appId && token) {
-          await discord.editOriginalResponse(appId, token, {
-            content: '⏸️ Le canevas est actuellement en pause par un administrateur. Le dessin est suspendu.',
-          });
-        }
-        res.status(200).json({ status: 'rejected_paused', correlationId });
-        return;
-      }
-
-      // 2b. Check User Rate Limit (Issue #52)
-      const rateCheck = rateLimiter.tryConsume(userId, pixels.length);
-      if (!rateCheck.allowed) {
-        console.warn(
-          JSON.stringify({
-            severity: 'WARNING',
-            message: `Draw rejected: rate limit exceeded for user ${userId}`,
-            correlationId,
-            userId,
-            retryAfterSeconds: rateCheck.retryAfterSeconds,
-          })
-        );
-        if (appId && token) {
-          await discord.editOriginalResponse(appId, token, {
-            content: `⏳ ${rateCheck.message || 'Rate limit atteint.'}`,
-          });
-        }
-        res.status(200).json({ status: 'rate_limited', correlationId });
-        return;
-      }
-
-      // 2c. Validate Pixel Coordinates
-      for (const p of pixels) {
-        if (!isValidCoordinate(p.x, p.y)) {
-          console.warn(
-            JSON.stringify({
-              severity: 'WARNING',
-              message: `Draw rejected: invalid coordinate (${p.x}, ${p.y})`,
-              correlationId,
-            })
-          );
-          if (appId && token) {
-            await discord.editOriginalResponse(appId, token, {
-              content: `❌ Coordonnées invalides : (${p.x}, ${p.y}). Les valeurs doivent être comprises entre 0 et 9999.`,
-            });
-          }
-          res.status(200).json({ status: 'invalid_coordinates', correlationId });
-          return;
-        }
-      }
-
-      // 2d. Transactional Chunk Write & Delta Document Emission (Issues #51, #58)
-      const writeResult = chunkStore.applyDraw(envelope.id, pixels, author, envelope.timestamp);
-
-      console.log(
-        JSON.stringify({
-          severity: 'INFO',
-          message: `pixel.processed: applied ${writeResult.applied} pixels across chunks`,
-          correlationId,
-          eventId: envelope.id,
-          applied: writeResult.applied,
-          duplicate: writeResult.duplicate,
-        })
-      );
-
-      // 2e. Update Discord Deferred Interaction Response (Issue #142)
-      if (appId && token) {
-        await discord.editOriginalResponse(appId, token, {
-          content: `✅ Pixel${pixels.length > 1 ? 's' : ''} posé${pixels.length > 1 ? 's' : ''} avec succès ! (${pixels.length} pixel${pixels.length > 1 ? 's' : ''} à [${pixels[0]?.x}, ${pixels[0]?.y}])`,
-        });
-      }
-
-      res.status(200).json({ status: 'processed', applied: writeResult.applied, correlationId });
+    let deps: WorkerDependencies;
+    try {
+      deps = resolveDeps();
+    } catch (err) {
+      log('ERROR', 'Worker misconfigured', { ...trace, error: String(err) });
+      res.status(500).json({ error: 'worker misconfigured', correlationId });
       return;
     }
 
-    if (eventType === 'discord.command') {
-      const data = envelope.data || {};
-      const commandName = data.commandName;
-      const userId = data.userId;
-      const roleIds = data.roleIds;
-      const options = data.options || {};
-      const appId = data.applicationId;
-      const token = data.interactionToken;
-      const subcommand = options.subcommand || options.action;
+    const reply = async (content: string) => {
+      if (appId && token) await deps.discord.editOriginalResponse(appId, token, { content });
+    };
+    const done = (status: string, extra: Record<string, unknown> = {}) => {
+      res.status(200).json({ status, correlationId, ...extra });
+    };
 
-      if (commandName === 'admin') {
-        // Enforce Admin Authorization (Issue #68 / ADR-0019)
-        const authorized = isUserAdmin(userId, roleIds, firestoreAdmins);
-        if (!authorized) {
-          console.warn(
-            JSON.stringify({
-              severity: 'WARNING',
-              message: `Unauthorized admin command attempt by user ${userId}`,
-              correlationId,
-              subcommand,
-            })
-          );
-          if (appId && token) {
-            await discord.editOriginalResponse(appId, token, {
-              content: '⛔ Commande réservée aux administrateurs autorisés.',
-            });
-          }
-          res.status(200).json({ status: 'unauthorized', correlationId });
+    try {
+      if (eventType === 'pixel.draw') {
+        const userId: string = data.userId || 'anonymous';
+        const author: string = data.author || (eventSource === 'web' ? `web:${userId}` : `discord:${userId}`);
+        const pixels: PixelWrite[] = Array.isArray(data.pixels) ? data.pixels : [];
+
+        if (pixels.length === 0 || pixels.some((p) => !isValidCoordinate(p?.x, p?.y) || !isValidColor(p?.color))) {
+          log('WARNING', 'Draw rejected: invalid pixel', trace);
+          await reply('❌ Invalid pixel: x and y must be between 0 and 9999 and the color a hex value like #ff0000.');
+          done('invalid_coordinates');
           return;
         }
 
-        if (subcommand === 'pause') {
-          chunkStore.setPauseState(true);
-          console.log(JSON.stringify({ severity: 'NOTICE', message: 'Canvas paused globally by admin', correlationId }));
-          if (appId && token) {
-            await discord.editOriginalResponse(appId, token, {
-              content: '⏸️ **Canevas en pause** : les dessins sont désormais suspendus pour tous les utilisateurs.',
-            });
-          }
-          res.status(200).json({ status: 'admin_pause_success', correlationId });
+        const system = await deps.canvas.getSystemState();
+        if (system.paused) {
+          log('WARNING', 'Draw rejected: canvas paused', { ...trace, userId });
+          await reply('⏸️ Drawing is paused by an administrator.');
+          done('rejected_paused');
           return;
         }
 
-        if (subcommand === 'resume') {
-          chunkStore.setPauseState(false);
-          console.log(JSON.stringify({ severity: 'NOTICE', message: 'Canvas resumed by admin', correlationId }));
-          if (appId && token) {
-            await discord.editOriginalResponse(appId, token, {
-              content: '▶️ **Canevas actif** : les dessins sont de nouveau autorisés.',
-            });
-          }
-          res.status(200).json({ status: 'admin_resume_success', correlationId });
+        const rate = await deps.rateLimiter.tryConsume(userId, pixels.length);
+        if (!rate.allowed) {
+          log('WARNING', 'Draw rejected: rate limit', { ...trace, userId, retryAfterSeconds: rate.retryAfterSeconds });
+          await reply(`⏳ ${rate.message ?? 'Rate limit reached.'}`);
+          done('rate_limited', { retryAfterSeconds: rate.retryAfterSeconds });
           return;
         }
 
-        if (subcommand === 'clear') {
-          const newEpoch = chunkStore.getEpoch() + 1;
-          chunkStore.setEpoch(newEpoch);
-          console.log(JSON.stringify({ severity: 'NOTICE', message: `Canvas cleared by admin: new epoch ${newEpoch}`, correlationId }));
+        const result = await deps.canvas.applyDraw(envelope.id, pixels, author, Number(envelope.timestamp) || Date.now());
+        log('INFO', `pixel.processed: ${result.applied} pixels applied`, { ...trace, userId, applied: result.applied, duplicate: result.duplicate });
+        const first = pixels[0]!;
+        await reply(`✅ ${pixels.length === 1 ? 'Pixel' : `${pixels.length} pixels`} drawn at (${first.x}, ${first.y}).`);
+        done('processed', { applied: result.applied, duplicate: result.duplicate });
+        return;
+      }
+
+      if (eventType === 'discord.command') {
+        const userId: string = data.userId;
+        const options = data.options ?? {};
+        const subcommand: string | undefined = options.subcommand || options.action;
+        const system = await deps.canvas.getSystemState();
+        const admin = () => isUserAdmin(userId, data.roleIds, system.admins);
+
+        if (data.commandName === 'get') {
+          const image = renderCanvas(await deps.canvas.listPixels());
           if (appId && token) {
-            await discord.editOriginalResponse(appId, token, {
-              content: `🧹 **Canevas réinitialisé** avec succès ! (Époque active : **${newEpoch}**).`,
-            });
+            await deps.discord.postFollowupWithImage(
+              appId,
+              token,
+              image.png,
+              'canvas.png',
+              `🎨 Current canvas, from (${image.originX}, ${image.originY}), 1 image pixel = ${image.scale}×${image.scale} cells.`
+            );
           }
-          res.status(200).json({ status: 'admin_clear_success', epoch: newEpoch, correlationId });
+          done('get_success');
           return;
         }
 
-        if (subcommand === 'ratelimit') {
-          const targetUser = options.user as string;
-          const limit = Number(options.limit);
-          if (targetUser && !isNaN(limit)) {
-            rateLimiter.setOverride(targetUser, limit);
-            console.log(JSON.stringify({ severity: 'NOTICE', message: `Admin override rate limit for ${targetUser} set to ${limit}`, correlationId }));
-            if (appId && token) {
-              await discord.editOriginalResponse(appId, token, {
-                content: `⚙️ Limite de dessin pour <@${targetUser}> définie à **${limit} pixels / minute**.`,
-              });
+        if (data.commandName === 'snapshot') {
+          if (!admin()) {
+            await reply('⛔ `/snapshot` is reserved to administrators.');
+            done('unauthorized');
+            return;
+          }
+          const image = renderCanvas(await deps.canvas.listPixels());
+          const objectName = snapshotObjectName();
+          const signedUrl = await deps.snapshots.save(objectName, image.png, SIGNED_URL_SECONDS);
+          log('NOTICE', `Snapshot stored: ${objectName}`, trace);
+          await reply(`📸 Snapshot saved. Signed link, valid 1 hour:\n${signedUrl}`);
+          done('snapshot_success', { objectName, signedUrl });
+          return;
+        }
+
+        if (data.commandName === 'admin') {
+          if (!admin()) {
+            log('WARNING', 'Unauthorized admin command', { ...trace, userId, subcommand });
+            await reply('⛔ This command is reserved to administrators.');
+            done('unauthorized');
+            return;
+          }
+
+          if (subcommand === 'pause' || subcommand === 'resume') {
+            await deps.canvas.setPaused(subcommand === 'pause', userId);
+            log('NOTICE', `Canvas ${subcommand}d by admin`, { ...trace, userId });
+            await reply(subcommand === 'pause' ? '⏸️ Drawing is now paused for everyone.' : '▶️ Drawing is allowed again.');
+            done(`admin_${subcommand}_success`);
+            return;
+          }
+
+          if (subcommand === 'clear') {
+            const epoch = await deps.canvas.clear(userId);
+            log('NOTICE', `Canvas cleared by admin, epoch ${epoch}`, { ...trace, userId });
+            await reply('🧹 The canvas has been cleared.');
+            done('admin_clear_success', { epoch });
+            return;
+          }
+
+          if (subcommand === 'ratelimit') {
+            const target = String(options.user ?? '');
+            const limit = Number(options.limit);
+            if (!target || !Number.isInteger(limit) || limit < 0) {
+              await reply('❌ Usage: /admin ratelimit user:<user> limit:<pixels per minute, 0 or more>');
+              done('invalid_arguments');
+              return;
             }
-            res.status(200).json({ status: 'admin_ratelimit_success', targetUser, limit, correlationId });
+            await deps.rateLimiter.setOverride(target, limit);
+            log('NOTICE', `Rate limit of ${target} set to ${limit}/min`, { ...trace, userId });
+            await reply(`⚙️ <@${target}> can now draw **${limit} pixels per minute**.`);
+            done('admin_ratelimit_success', { targetUser: target, limit });
             return;
           }
         }
       }
 
-      if (commandName === 'get') {
-        // Issue #55: Render current canvas view as PNG
-        const png = snapshotService.renderSampleCanvasPng(chunkStore);
-        if (appId && token) {
-          await discord.postFollowupWithImage(appId, token, png, 'canvas.png', '🎨 Voici l’état actuel de la grille :');
-        }
-        res.status(200).json({ status: 'get_success', correlationId });
-        return;
-      }
-
-      if (commandName === 'snapshot') {
-        // Issue #56: Generate snapshot in private bucket and share via signed URL
-        const authorized = isUserAdmin(userId, roleIds, firestoreAdmins);
-        if (!authorized) {
-          if (appId && token) {
-            await discord.editOriginalResponse(appId, token, {
-              content: '⛔ Commande `/snapshot` réservée aux administrateurs autorisés.',
-            });
-          }
-          res.status(200).json({ status: 'unauthorized', correlationId });
-          return;
-        }
-
-        const timestamp = Date.now();
-        const objectName = `snapshots/snapshot_${timestamp}.png`;
-        const signedUrl = snapshotService.createSignedUrl(snapshotBucketName, objectName, 3600);
-
-        console.log(JSON.stringify({ severity: 'NOTICE', message: `Snapshot created: gs://${snapshotBucketName}/${objectName}`, correlationId }));
-
-        if (appId && token) {
-          await discord.editOriginalResponse(appId, token, {
-            content: `📸 **Snapshot généré avec succès !**\nLien d'accès signé (valide 1h) :\n${signedUrl}`,
-          });
-        }
-        res.status(200).json({ status: 'snapshot_success', signedUrl, correlationId });
-        return;
-      }
+      done('ignored_unrecognized_event');
+    } catch (err) {
+      // Transient failure (Firestore, Storage, Discord): let Pub/Sub retry, then dead-letter.
+      log('ERROR', 'Event processing failed', { ...trace, error: err instanceof Error ? err.message : String(err) });
+      res.status(500).json({ error: 'processing failed', correlationId });
     }
-
-    res.status(200).json({ status: 'ignored_unrecognized_event', correlationId });
   };
 }
 
-export const drawWorker = createDrawWorkerHandler();
+let productionDeps: WorkerDependencies | undefined;
+
+/** Builds the Google Cloud clients once per instance, on the first event. */
+async function buildProductionDeps(): Promise<WorkerDependencies> {
+  const bucket = process.env.SNAPSHOT_BUCKET;
+  if (!bucket) throw new Error('SNAPSHOT_BUCKET is not set');
+  const [{ Firestore }, { Storage }, store, snapshot] = await Promise.all([
+    import('@google-cloud/firestore'),
+    import('@google-cloud/storage'),
+    import('./firestore-store.js'),
+    import('./snapshot-service.js'),
+  ]);
+  const db = new Firestore({ ignoreUndefinedProperties: true });
+  return {
+    canvas: new store.FirestoreCanvasStore(db),
+    rateLimiter: new store.FirestoreRateLimiter(db),
+    snapshots: new snapshot.GcsSnapshotStorage(new Storage(), bucket),
+    discord: discordApiClient,
+  };
+}
+
+const productionHandler = createDrawWorkerHandler(() => {
+  if (!productionDeps) throw new Error('dependencies not initialised');
+  return productionDeps;
+});
+
+export async function drawWorker(req: Request, res: Response): Promise<void> {
+  if (!productionDeps) {
+    try {
+      productionDeps = await buildProductionDeps();
+    } catch (err) {
+      log('ERROR', 'Worker initialisation failed', { error: String(err) });
+      res.status(500).json({ error: 'worker initialisation failed' });
+      return;
+    }
+  }
+  await productionHandler(req, res);
+}

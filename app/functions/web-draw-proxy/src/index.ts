@@ -10,16 +10,33 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import type { Request, Response } from '@google-cloud/functions-framework';
 import { validateDrawBatch } from './validator.js';
-import { extractAndVerifyToken } from './auth.js';
-import { EventPublisher, MockEventPublisher, EventEnvelope } from './publisher.js';
+import { identityFromGateway, USERINFO_HEADER } from './auth.js';
+import { EventPublisher, PubSubEventPublisher, EventEnvelope } from './publisher.js';
 
 export interface PixelDrawData {
   userId: string;
+  author: string;
   pixels: Array<{ x: number; y: number; color: string }>;
 }
 
-export function createDrawProxyHandler(publisher: EventPublisher, topicName = 'pixel-draw-events') {
+/** The browser calls the gateway from the frontend origin: answer the CORS preflight. */
+function setCors(res: Response) {
+  res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_ORIGIN || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Correlation-ID, traceparent');
+  res.setHeader('Access-Control-Expose-Headers', 'X-Correlation-ID, traceparent');
+  res.setHeader('Access-Control-Max-Age', '3600');
+  res.setHeader('Vary', 'Origin');
+}
+
+export function createDrawProxyHandler(publisher: EventPublisher, topicName = process.env.PIXEL_DRAW_TOPIC || 'pixel-draw-events') {
   return async function webDrawProxy(req: Request, res: Response): Promise<void> {
+    setCors(res);
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+
     // 1. Only allow POST method
     if (req.method !== 'POST') {
       res.setHeader('Allow', 'POST');
@@ -73,10 +90,8 @@ export function createDrawProxyHandler(publisher: EventPublisher, topicName = 'p
       })
     );
 
-    // 3. User Authentication
-    const authHeader = req.header('Authorization');
-    const bodyToken = typeof req.body?.token === 'string' ? req.body.token : undefined;
-    const auth = extractAndVerifyToken(authHeader, bodyToken);
+    // 3. User identity, verified by the gateway (Firebase ID token of a Discord-linked account)
+    const auth = identityFromGateway(req.header(USERINFO_HEADER));
 
     if (!auth.authenticated || !auth.userId) {
       res.status(401).json({
@@ -108,6 +123,7 @@ export function createDrawProxyHandler(publisher: EventPublisher, topicName = 'p
       traceParent,
       data: {
         userId: auth.userId,
+        author: auth.username ?? `discord:${auth.userId}`,
         pixels: validation.pixels,
       },
     };
@@ -126,6 +142,15 @@ export function createDrawProxyHandler(publisher: EventPublisher, topicName = 'p
         pixelCount: validation.pixels.length,
       });
     } catch (err) {
+      console.error(
+        JSON.stringify({
+          severity: 'ERROR',
+          message: 'Failed to publish draw event',
+          correlationId,
+          error: err instanceof Error ? err.message : String(err),
+          'logging.googleapis.com/trace': `projects/${projectId}/traces/${traceId}`,
+        })
+      );
       res.status(500).json({
         error: 'Failed to publish draw event to broker.',
         correlationId,
@@ -135,6 +160,5 @@ export function createDrawProxyHandler(publisher: EventPublisher, topicName = 'p
   };
 }
 
-// Default export for Google Cloud Functions Framework
-const defaultPublisher = new MockEventPublisher();
-export const webDrawProxy = createDrawProxyHandler(defaultPublisher);
+// Entry point for the Functions Framework: publishes to the real Pub/Sub topic.
+export const webDrawProxy = createDrawProxyHandler(new PubSubEventPublisher());

@@ -1,129 +1,128 @@
 /**
- * Snapshot & Image Rendering Service.
- * Fulfills Issues #54, #55, #56 (C07 §1 & §2).
- * 
- * Features:
- * 1. Pure Node.js standard PNG binary encoder with zero native bindings (C++ / canvas / sharp).
- * 2. Composes 64x64 RGBA pixel grid into standard PNG binary buffer.
- * 3. Simulates private Cloud Storage bucket upload and signed URL generation with 1-hour expiration.
+ * Canvas rendering (/get) and snapshot storage (/snapshot). Issues #55, #56, #167, C07 §2.
+ *
+ * - The grid is 10000x10000: the image covers the painted area (bounding box plus a margin), scaled
+ *   down so its longest side is at most MAX_IMAGE_SIDE pixels.
+ * - Snapshots go to the private bucket under a timestamped name; Discord gets a V4 signed URL valid one
+ *   hour. On Cloud Run there is no key file: the Storage client signs through the IAM signBlob API with
+ *   the function's own service account (roles/iam.serviceAccountTokenCreator on itself).
  */
 
 import { deflateSync } from 'node:zlib';
-import { ChunkStore, CHUNK_SIZE } from './chunk-store.js';
+import type { Storage } from '@google-cloud/storage';
+import type { PixelWrite } from './store.js';
 
-// Precomputed CRC32 table for pure Node.js PNG encoder
+export const MAX_IMAGE_SIDE = 1024;
+const MARGIN = 8;
+
 const CRC_TABLE = new Uint32Array(256);
 for (let i = 0; i < 256; i++) {
   let c = i;
-  for (let k = 0; k < 8; k++) {
-    c = (c & 1) ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-  }
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
   CRC_TABLE[i] = c >>> 0;
 }
 
 function crc32(buf: Buffer): number {
   let crc = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) {
-    crc = CRC_TABLE[(crc ^ buf[i]!) & 0xff]! ^ (crc >>> 8);
-  }
+  for (let i = 0; i < buf.length; i++) crc = CRC_TABLE[(crc ^ buf[i]!) & 0xff]! ^ (crc >>> 8);
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-function createChunk(type: string, data: Buffer): Buffer {
+function pngChunk(type: string, data: Buffer): Buffer {
   const len = Buffer.alloc(4);
   len.writeUInt32BE(data.length, 0);
-
-  const typeBuf = Buffer.from(type, 'ascii');
-  const body = Buffer.concat([typeBuf, data]);
-
-  const crcBuf = Buffer.alloc(4);
-  crcBuf.writeUInt32BE(crc32(body), 0);
-
-  return Buffer.concat([len, body, crcBuf]);
+  const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(body), 0);
+  return Buffer.concat([len, body, crc]);
 }
 
-/**
- * Encodes RGBA raw pixel buffer into standard PNG binary format.
- */
+/** Encodes an RGBA buffer as PNG, without native dependencies. */
 export function encodeRgbaToPng(rgba: Uint8Array, width: number, height: number): Buffer {
-  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-
-  // IHDR Chunk: width, height, bitDepth (8), colorType (6 = RGBA), compression (0), filter (0), interlace (0)
-  const ihdrData = Buffer.alloc(13);
-  ihdrData.writeUInt32BE(width, 0);
-  ihdrData.writeUInt32BE(height, 4);
-  ihdrData.writeUInt8(8, 8);
-  ihdrData.writeUInt8(6, 9);
-  ihdrData.writeUInt8(0, 10);
-  ihdrData.writeUInt8(0, 11);
-  ihdrData.writeUInt8(0, 12);
-  const ihdr = createChunk('IHDR', ihdrData);
-
-  // Scanlines with filter byte 0 (None)
-  const scanlineLength = 1 + width * 4;
-  const rawData = Buffer.alloc(height * scanlineLength);
-
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr.writeUInt8(8, 8); // bit depth
+  ihdr.writeUInt8(6, 9); // RGBA
+  const stride = 1 + width * 4;
+  const raw = Buffer.alloc(height * stride);
   for (let y = 0; y < height; y++) {
-    const rowOffset = y * scanlineLength;
-    rawData.writeUInt8(0, rowOffset); // Filter byte 0
-    const srcOffset = y * width * 4;
-    for (let x = 0; x < width * 4; x++) {
-      rawData[rowOffset + 1 + x] = rgba[srcOffset + x] || 0;
-    }
+    raw.set(rgba.subarray(y * width * 4, (y + 1) * width * 4), y * stride + 1);
   }
-
-  const compressed = deflateSync(rawData);
-  const idat = createChunk('IDAT', compressed);
-  const iend = createChunk('IEND', Buffer.alloc(0));
-
-  return Buffer.concat([signature, ihdr, idat, iend]);
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', deflateSync(raw)),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
 }
 
-export class SnapshotService {
-  /**
-   * Renders the center chunk or active area into a PNG image.
-   */
-  public renderSampleCanvasPng(chunkStore: ChunkStore): Buffer {
-    const width = CHUNK_SIZE;
-    const height = CHUNK_SIZE;
-    const rgba = new Uint8Array(width * height * 4);
+export interface RenderedCanvas {
+  png: Buffer;
+  width: number;
+  height: number;
+  /** Canvas coordinates of the top-left corner and grid cells per image pixel. */
+  originX: number;
+  originY: number;
+  scale: number;
+}
 
-    // Initialize with white background
-    for (let i = 0; i < width * height; i++) {
-      rgba[i * 4] = 255;
-      rgba[i * 4 + 1] = 255;
-      rgba[i * 4 + 2] = 255;
-      rgba[i * 4 + 3] = 255;
-    }
-
-    // Paint active pixels from origin chunk (chunk_0_0)
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const p = chunkStore.getPixel(x, y);
-        if (p) {
-          const hex = p.color.replace('#', '');
-          const r = parseInt(hex.substring(0, 2), 16) || 0;
-          const g = parseInt(hex.substring(2, 4), 16) || 0;
-          const b = parseInt(hex.substring(4, 6), 16) || 0;
-          const idx = (y * width + x) * 4;
-          rgba[idx] = r;
-          rgba[idx + 1] = g;
-          rgba[idx + 2] = b;
-          rgba[idx + 3] = 255;
-        }
-      }
-    }
-
-    return encodeRgbaToPng(rgba, width, height);
+/** Renders the painted area of the grid on a white background. */
+export function renderCanvas(pixels: readonly PixelWrite[]): RenderedCanvas {
+  if (pixels.length === 0) {
+    const size = 64;
+    return { png: encodeRgbaToPng(new Uint8Array(size * size * 4).fill(255), size, size), width: size, height: size, originX: 0, originY: 0, scale: 1 };
   }
 
-  /**
-   * Generates a signed URL with 1-hour expiration for the private snapshot.
-   */
-  public createSignedUrl(bucketName: string, objectName: string, expiresInSeconds = 3600): string {
-    const expires = Math.floor(Date.now() / 1000) + expiresInSeconds;
-    return `https://storage.googleapis.com/${bucketName}/${objectName}?GoogleAccessId=sa-discord-worker@mock.iam.gserviceaccount.com&Expires=${expires}&Signature=mockSignedBlobSignature`;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of pixels) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  minX = Math.max(0, minX - MARGIN);
+  minY = Math.max(0, minY - MARGIN);
+  maxX = Math.min(9999, maxX + MARGIN);
+  maxY = Math.min(9999, maxY + MARGIN);
+
+  const spanX = maxX - minX + 1;
+  const spanY = maxY - minY + 1;
+  const scale = Math.max(1, Math.ceil(Math.max(spanX, spanY) / MAX_IMAGE_SIDE));
+  const width = Math.ceil(spanX / scale);
+  const height = Math.ceil(spanY / scale);
+
+  const rgba = new Uint8Array(width * height * 4).fill(255);
+  for (const p of pixels) {
+    const ix = Math.floor((p.x - minX) / scale);
+    const iy = Math.floor((p.y - minY) / scale);
+    const i = (iy * width + ix) * 4;
+    const hex = p.color.replace('#', '');
+    rgba[i] = parseInt(hex.slice(0, 2), 16) || 0;
+    rgba[i + 1] = parseInt(hex.slice(2, 4), 16) || 0;
+    rgba[i + 2] = parseInt(hex.slice(4, 6), 16) || 0;
+    rgba[i + 3] = 255;
+  }
+  return { png: encodeRgbaToPng(rgba, width, height), width, height, originX: minX, originY: minY, scale };
+}
+
+export interface SnapshotStorage {
+  /** Stores the image and returns a time-limited signed URL to it. */
+  save(objectName: string, png: Buffer, expiresInSeconds: number): Promise<string>;
+}
+
+export class GcsSnapshotStorage implements SnapshotStorage {
+  constructor(private readonly storage: Storage, private readonly bucketName: string) {}
+
+  async save(objectName: string, png: Buffer, expiresInSeconds: number): Promise<string> {
+    const file = this.storage.bucket(this.bucketName).file(objectName);
+    await file.save(png, { contentType: 'image/png', resumable: false, metadata: { cacheControl: 'private, max-age=0' } });
+    const [url] = await file.getSignedUrl({ version: 'v4', action: 'read', expires: Date.now() + expiresInSeconds * 1000 });
+    return url;
   }
 }
 
-export const defaultSnapshotService = new SnapshotService();
+/** Snapshot object name: `snapshots/2026-11-25T14-03-07-123Z.png`. */
+export function snapshotObjectName(now = new Date()): string {
+  return `snapshots/${now.toISOString().replace(/[:.]/g, '-')}.png`;
+}

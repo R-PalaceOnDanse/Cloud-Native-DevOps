@@ -14,6 +14,15 @@ securityDefinitions:
     type: apiKey
     name: x-api-key
     in: header
+  # Firebase ID token of a signed-in web user (ADR-0009). The gateway checks signature, issuer,
+  # audience and expiry, then forwards the claims to the function in X-Apigateway-Api-Userinfo.
+  firebase:
+    authorizationUrl: ""
+    flow: implicit
+    type: oauth2
+    x-google-issuer: "https://securetoken.google.com/${project_id}"
+    x-google-jwks_uri: "https://www.googleapis.com/service_accounts/v1/metadata/x509/securetoken@system.gserviceaccount.com"
+    x-google-audiences: "${project_id}"
 
 paths:
   /hello:
@@ -33,9 +42,21 @@ paths:
         "401":
           description: Missing or invalid API key.
   /draw:
+    options:
+      operationId: webDrawProxyCors
+      summary: CORS preflight of the browser, answered by the function without authentication.
+      x-google-backend:
+        address: ${web_draw_proxy_url}
+        jwt_audience: ${web_draw_proxy_url}
+        deadline: 5.0
+      responses:
+        "204":
+          description: Preflight accepted.
     post:
       operationId: webDrawProxy
       summary: Asynchronous pixel drawing endpoint for web clients (Issue #76)
+      security:
+        - firebase: []
       x-google-backend:
         address: ${web_draw_proxy_url}
         jwt_audience: ${web_draw_proxy_url}
@@ -48,6 +69,16 @@ paths:
         "401":
           description: Missing or invalid authentication token.
   /auth/discord/callback:
+    options:
+      operationId: authCallbackCors
+      summary: CORS preflight of the browser.
+      x-google-backend:
+        address: ${auth_callback_url}
+        jwt_audience: ${auth_callback_url}
+        deadline: 5.0
+      responses:
+        "204":
+          description: Preflight accepted.
     post:
       operationId: authCallback
       summary: Discord OAuth2 code exchange callback (Issue #79)

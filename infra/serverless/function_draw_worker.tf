@@ -34,14 +34,17 @@ resource "google_cloudfunctions2_function" "draw_worker" {
   service_config {
     service_account_email          = google_service_account.draw_worker.email
     min_instance_count             = 0
-    max_instance_count             = 5
+    max_instance_count             = var.worker_max_instances
     available_memory               = "512M"
     timeout_seconds                = 60
     all_traffic_on_latest_revision = true
-    ingress_settings               = "ALLOW_ALL"
+    # Only reachable from Google services of the project (the Pub/Sub push), never from the internet.
+    ingress_settings = "ALLOW_INTERNAL_ONLY"
 
     environment_variables = {
       SNAPSHOT_BUCKET = google_storage_bucket.snapshots.name
+      ADMIN_USER_IDS  = join(",", var.admin_user_ids)
+      ADMIN_ROLE_ID   = var.admin_role_id
     }
   }
 

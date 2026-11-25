@@ -8,14 +8,14 @@
 
 import { randomUUID } from 'node:crypto';
 import type { Request, Response } from '@google-cloud/functions-framework';
-import { SecretReader, MockSecretReader, EnvSecretReader } from './secrets.js';
+import { SecretReader, MockSecretReader, EnvSecretReader, SecretManagerSecretReader } from './secrets.js';
 import {
   DiscordOAuthClient,
   MockDiscordOAuthClient,
   HttpDiscordOAuthClient,
   OAuthError,
 } from './oauth.js';
-import { SessionTokenMinter, HmacSessionTokenMinter } from './token.js';
+import { SessionTokenMinter, FirebaseCustomTokenMinter } from './token.js';
 
 export interface AuthCallbackDependencies {
   secretReader: SecretReader;
@@ -28,6 +28,16 @@ export interface AuthCallbackDependencies {
 
 export function createAuthCallbackHandler(deps: AuthCallbackDependencies) {
   return async function authCallback(req: Request, res: Response): Promise<void> {
+    // The frontend calls the gateway from its own origin: answer the CORS preflight.
+    res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_ORIGIN || '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept, X-Correlation-ID');
+    res.setHeader('Vary', 'Origin');
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+
     // 1. Only allow GET and POST methods
     if (req.method !== 'GET' && req.method !== 'POST') {
       res.setHeader('Allow', 'GET, POST');
@@ -46,10 +56,9 @@ export function createAuthCallbackHandler(deps: AuthCallbackDependencies) {
     // 3. Extract parameters from query (GET) or body (POST)
     const code = (req.method === 'GET' ? req.query?.code : req.body?.code) as string | undefined;
     const state = (req.method === 'GET' ? req.query?.state : req.body?.state) as string | undefined;
-    const requestedRedirect = (req.method === 'GET' ? req.query?.redirect_uri : req.body?.redirect_uri) as string | undefined;
-    const redirectUri = requestedRedirect && requestedRedirect.trim().length > 0
-      ? requestedRedirect.trim()
-      : deps.defaultRedirectUri;
+    // The redirect URI is the one registered on the Discord application: a caller cannot choose where
+    // the session token is sent (open redirect). Discord rejects a code issued for another URI anyway.
+    const redirectUri = deps.defaultRedirectUri;
 
     // 4. Validate State (Anti-CSRF requirement, Issue #79)
     if (!state || typeof state !== 'string' || state.trim().length === 0) {
@@ -146,25 +155,31 @@ export function createAuthCallbackHandler(deps: AuthCallbackDependencies) {
   };
 }
 
-// Default export for Google Cloud Functions Framework
-const isProduction = process.env.NODE_ENV === 'production';
-const secretReader = isProduction
-  ? new EnvSecretReader('DISCORD_CLIENT_SECRET')
-  : new MockSecretReader();
+// Entry point for the Functions Framework. On Cloud Run (K_SERVICE is set) the real clients are
+// used and a missing setting fails loudly; the mocks only serve local development.
+const onCloudRun = Boolean(process.env.K_SERVICE);
 
-const oauthClient = isProduction
-  ? new HttpDiscordOAuthClient()
-  : new MockDiscordOAuthClient();
-
-const tokenMinter = new HmacSessionTokenMinter(
-  process.env.SESSION_SECRET || 'dev-session-signing-secret',
-  3600
-);
+function required(name: string, localDefault: string): string {
+  const value = process.env[name];
+  if (value && value.trim()) return value.trim();
+  if (onCloudRun) {
+    // Do not crash the container (the deployment would fail): Discord will refuse the exchange and
+    // the error is logged on every request until the setting is fixed.
+    console.error(JSON.stringify({ severity: 'ERROR', message: `${name} is not set`, function: 'auth-callback' }));
+    return '';
+  }
+  return localDefault;
+}
 
 export const authCallback = createAuthCallbackHandler({
-  secretReader,
-  oauthClient,
-  tokenMinter,
-  clientId: process.env.DISCORD_CLIENT_ID || 'mock-discord-client-id',
-  defaultRedirectUri: process.env.DISCORD_REDIRECT_URI || 'http://localhost:5173/auth/callback',
+  // The client secret is read from Secret Manager at request time (infra/serverless/secrets.tf).
+  secretReader: onCloudRun
+    ? new SecretManagerSecretReader(process.env.DISCORD_CLIENT_SECRET_VERSION ?? '')
+    : process.env.DISCORD_CLIENT_SECRET
+      ? new EnvSecretReader('DISCORD_CLIENT_SECRET')
+      : new MockSecretReader(),
+  oauthClient: onCloudRun ? new HttpDiscordOAuthClient() : new MockDiscordOAuthClient(),
+  tokenMinter: new FirebaseCustomTokenMinter(),
+  clientId: required('DISCORD_CLIENT_ID', 'mock-discord-client-id'),
+  defaultRedirectUri: required('DISCORD_REDIRECT_URI', 'http://localhost:5173/'),
 });

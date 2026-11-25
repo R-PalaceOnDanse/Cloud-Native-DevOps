@@ -143,7 +143,7 @@ export class AuthManager {
   public async handleOAuthReturn(
     code: string,
     state: string,
-    callbackUrl = '/api/auth/discord/callback'
+    callbackUrl = `${(import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_API_GATEWAY_URL || '/api'}/auth/discord/callback`
   ): Promise<OAuthExchangeResult> {
     // 1. Verify anti-CSRF state
     if (typeof sessionStorage !== 'undefined') {

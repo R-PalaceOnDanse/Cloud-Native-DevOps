@@ -38,12 +38,23 @@ resource "google_cloudfunctions2_function" "auth_callback" {
     available_memory               = "256M"
     timeout_seconds                = 15
     all_traffic_on_latest_revision = true
-    ingress_settings               = "ALLOW_ALL"
+    # Same as web-draw-proxy: reachable only through the gateway service account.
+    ingress_settings = "ALLOW_ALL"
+
+    # The client secret never appears in Terraform: the function reads it from Secret Manager at
+    # request time, so a deployment does not fail before someone has added its value.
+    environment_variables = {
+      DISCORD_CLIENT_ID             = var.discord_client_id
+      DISCORD_REDIRECT_URI          = local.frontend_origin # must be registered as an OAuth2 redirect on Discord
+      FRONTEND_ORIGIN               = local.frontend_origin
+      DISCORD_CLIENT_SECRET_VERSION = "${google_secret_manager_secret.discord_client_secret.id}/versions/latest"
+    }
   }
 
   depends_on = [
     google_project_service.serverless,
     google_project_iam_member.build,
+    google_secret_manager_secret_iam_member.auth_callback_reads_client_secret,
   ]
 }
 
