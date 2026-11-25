@@ -91,11 +91,46 @@ then prd ([ci.md](ci.md)). The destroy workflow destroys it before `foundation`.
 apply account needs `roles/run.admin` and `roles/secretmanager.admin` in addition to Editor, and
 the plan account `roles/serviceusage.apiKeysViewer`; both are granted by the `access` stack.
 
-## Next (C06 & C07)
+## The application pipeline (C06 & C07)
 
-The proxy pattern replaces `hello`: a Discord proxy that checks the Ed25519 signature, a Web Draw Proxy that receives browser pixel batches and publishes to Pub/Sub, and an Auth Callback function that exchanges Discord OAuth codes.
-Firestore Native NoSQL database and Firestore Security Rules (`infra/serverless/firestore.rules`) are deployed via Terraform (`firestore.tf`, `firestore_rules.tf`) to enforce authenticated client read-only access and reject all direct client writes.
-The `draw-worker` function consumes Pub/Sub messages, enforces token bucket rate limits, updates Firestore chunks transactionally with Last-Write-Wins timestamps and epoch precedence, emits real-time delta documents with 5-minute TTL, and updates Discord interactions.
+| Component | Role | Identity and access |
+|---|---|---|
+| `discord-proxy` | `/discord/interactions`: checks the Ed25519 signature, answers PING | `fn-discord-proxy`, reads `discord-public-key` |
+| `web-draw-proxy` | `/draw`: validates a pixel batch, publishes `pixel.draw` | `fn-web-draw-proxy`, publisher on `pixel-draw-events` only |
+| `auth-callback` | `/auth/discord/callback`: Discord OAuth2 code exchange, mints a Firebase custom token for `discord:<id>` | `fn-auth-callback`, reads `discord-client-secret`, signs with its own identity |
+| `pixel-draw-events` | Topic; push subscription to the worker with an OIDC token of `pubsub-push`, 5 attempts then `pixel-draw-events-dlq` (kept 7 days in `pixel-draw-events-dlq-inspection`) | |
+| `draw-worker` | Draws, `/get`, `/snapshot`, `/admin *`. Ingress internal only: only the Pub/Sub push reaches it | `fn-draw-worker`: Firestore, snapshot bucket, signs its own URLs |
+
+Data in Firestore (the frontend listens to `chunks/*` and `config/system`; clients can read, never write):
+
+- `chunks/chunk_X_Y`: 64×64 tile, `pixels["lx,ly"] = {color, author, timestamp}`. Each tile is written
+  in one transaction that also reads the epoch: concurrent writes retry instead of losing a pixel,
+  a redelivered event is skipped (`processedEvents`), and a write racing `/admin clear` cannot bring
+  old pixels back.
+- `config/system`: `paused`, `epoch`, `lastClearedAt`, `admins` (extra admin Discord IDs).
+- `ratelimits/{discordId}`: token bucket, 20 pixels per minute, `overrideLimit` set by `/admin ratelimit`.
+
+Web login (ADR-0009): Discord OAuth2 → `auth-callback` → custom token → the browser signs in to
+Firebase → its ID token is checked by the Firestore rules, and by **API Gateway** on `/draw`, which
+then forwards the verified identity to the function (`X-Apigateway-Api-Userinfo`). Nothing else can
+call the function, so the identity cannot be forged.
+
+## Configure an environment for the application (once per environment)
+
+1. Discord developer portal, the application of the environment:
+   - OAuth2 → Redirects: add the `frontend_origin` output (by default `https://<project>.web.app`).
+   - General → Interactions endpoint URL: `<gateway_url>/discord/interactions`.
+2. `infra/serverless/<env>.tfvars`: `discord_client_id` (the application ID, public) and
+   `admin_user_ids` (Discord IDs of the admins), then a release.
+3. Secret values, never in Terraform:
+   ```bash
+   printf '%s' "<client secret>" | gcloud secrets versions add discord-client-secret --data-file=- --project=<project>
+   printf '%s' "<public key>"    | gcloud secrets versions add discord-public-key   --data-file=- --project=<project>
+   ```
+4. Build the frontend with `terraform output -json frontend_build_env` as its `VITE_*` variables (#168).
+
+Check: `curl -X POST <gateway_url>/draw` answers 401 (no Firebase token); the worker URL answers 403
+from the internet; `/discord/interactions` with a bad signature answers 401.
 
 ## End-to-End Event Pipeline Test (Issue #143)
 
@@ -107,11 +142,14 @@ npm test
 ```
 
 Pipeline verification flow:
-1. **Web Draw Proxy**: Accepts batch of pixels, authenticates session token, formats `EventEnvelope`, and publishes to `pixel-draw-events`.
-2. **Pub/Sub Broker**: Buffers messages with 7-day retention and dispatches to `draw-worker` push subscription with retry backoff and DLQ (`pixel-draw-events-dlq`).
-3. **Draw Worker**: Decodes Base64 envelope, validates bounds (`0..9999`), enforces per-user rate limiting (20 tokens/min), and applies transactional updates to `chunks/{chunkId}`.
-4. **Real-time Deltas**: Generates delta documents (`chunks/{chunkId}/deltas/{deltaId}`) with 300s TTL for real-time Firestore listeners.
-5. **Correlation ID Tracing**: Verifies `correlation_id` is propagated end-to-end through structured JSON logs and response headers.
+1. **Web Draw Proxy**: takes the identity verified by the gateway, validates the batch, formats the `EventEnvelope` and publishes to `pixel-draw-events`.
+2. **Pub/Sub**: pushes to `draw-worker` with retry backoff, then dead-letters to `pixel-draw-events-dlq`.
+3. **Draw Worker**: decodes the envelope, validates bounds (`0..9999`) and colors, applies pause and the per-user rate limit (20/min), writes `chunks/{chunkId}` in a transaction.
+4. **Real time**: the frontend listens to the chunk documents it displays; only the changed tile is sent.
+5. **Correlation ID**: propagated from the proxy to the worker in the envelope and in every structured log line, with the Cloud Trace ID.
+
+These tests use in-memory stores; the Firestore and Cloud Storage code paths are exercised on dev
+after a release (see "Configure an environment" above).
 
 ## Discord Slash Commands Registration (Issue #49)
 
