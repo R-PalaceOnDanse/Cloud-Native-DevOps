@@ -4,10 +4,22 @@ resource "google_project_iam_member" "instructor" {
   member  = "user:${var.instructor_email}"
 }
 
-resource "google_billing_account_iam_member" "instructor_billing_viewer" {
+# Billing viewer on the billing account of the projects (the free-credit account since the change
+# of account). New address so that Terraform never needs to read the previous account.
+resource "google_billing_account_iam_member" "instructor_billing_viewer_account" {
   billing_account_id = var.billing_account
   role               = "roles/billing.viewer"
   member             = "user:${var.instructor_email}"
+}
+
+# The binding on the previous billing account is only forgotten, not deleted: the pipeline has no
+# right on that account. A billing admin removes it by hand if needed.
+removed {
+  from = google_billing_account_iam_member.instructor_billing_viewer
+
+  lifecycle {
+    destroy = false
+  }
 }
 
 resource "google_project_iam_member" "team" {
