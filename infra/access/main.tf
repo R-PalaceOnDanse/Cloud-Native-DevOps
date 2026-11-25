@@ -42,6 +42,16 @@ locals {
     "roles/monitoring.admin",
     # Cloud Logging log sinks and configurations
     "roles/logging.admin",
+    # Serverless stack (infra/serverless): without these the release fails once Editor is gone
+    "roles/cloudfunctions.admin",          # Cloud Run functions
+    "roles/pubsub.admin",                  # topics, subscriptions, dead-letter grants
+    "roles/datastore.owner",               # Firestore database
+    "roles/firebaserules.admin",           # Firestore security rules
+    "roles/firebase.admin",                # Firebase project and web app
+    "roles/identityplatform.admin",        # Firebase Authentication configuration
+    "roles/apigateway.admin",              # API, configs and gateway
+    "roles/serviceusage.apiKeysAdmin",     # API key of the C05 demo
+    "roles/iam.serviceAccountTokenCreator", # API Gateway, Pub/Sub and self-signing grants on service accounts
   ]
 }
 
