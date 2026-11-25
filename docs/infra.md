@@ -326,6 +326,9 @@ read its own backend configuration: change both together.
 Human access to the GCP projects is managed as code in `infra/access/members.tf`. Keeping these permissions in the `access` stack guarantees that running `terraform destroy` on `infra/foundation` removes the networking infrastructure without ever locking team members or the instructor out:
 
 - **Instructor**: `jeremie@jjaouen.com` is granted `roles/editor` on both `dev` and `prd` (`instructor_email` variable).
+  The instructor's *Billing Account Viewer* role on the billing account is granted by hand, not by
+  Terraform: the plan account cannot read the billing account's policy, so it made every plan of
+  `access` fail. A `removed` block in `members.tf` makes Terraform forget it without deleting it.
 - **Team members**: `aurelienbara13@gmail.com`, `nicolaslouis320@gmail.com`, and `quaduval@gmail.com` are granted `roles/owner` on both projects (`team_members` variable).
 
 ## Create a state bucket
