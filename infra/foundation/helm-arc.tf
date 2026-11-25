@@ -48,4 +48,25 @@ resource "helm_release" "arc_runner" {
     name  = "githubConfigSecret"
     value = "arc-github"
   }
+
+  # Cost safeguards (docs/infra.md#cost-safeguards). They are set here rather than in
+  # values/runners-<env>.yaml so that Terraform validates them.
+  set {
+    name  = "maxRunners"
+    value = tostring(var.runner_max_count)
+  }
+
+  # No idle runner is kept waiting: when no job is queued the scale set has no pod, so the runner
+  # nodes become empty and the cluster autoscaler removes them. Not a variable on purpose.
+  set {
+    name  = "minRunners"
+    value = "0"
+  }
+
+  lifecycle {
+    precondition {
+      condition     = var.runner_max_count <= var.runner_node_max_count
+      error_message = "runner_max_count must not exceed runner_node_max_count: one runner fills one e2-medium node, so the extra runners would stay Pending."
+    }
+  }
 }
