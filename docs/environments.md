@@ -20,7 +20,7 @@ day and drifts as people work, so re-read the project before relying on it.
 | Project ID | `teampasx-cloudnative-dev` | `teampasx-cloudnative-prd` |
 | Project number | 812267599723 | 1024204425086 |
 | Created | 2026-10-22 | 2026-10-23 |
-| Billing | enabled; one budget with alerts, in the access stack (`01A021-589B0D-8ED8BC`) | enabled; one budget with alerts, in the access stack (`01A021-589B0D-8ED8BC`) |
+| Billing | enabled; one budget with alerts, in the access stack (`015B95-C1627B-339E15`) | enabled; one budget with alerts, in the access stack (`015B95-C1627B-339E15`) |
 | Foundation stack (Network & GKE) | applied (VPC, subnet, router, NAT, GKE cluster, system & runner node pools) | applied (VPC, subnet, router, NAT, GKE cluster, system & runner node pools) |
 | Access stack | applied 2026-10-23, 16 resources | applied 2026-10-23, 16 resources |
 
@@ -82,12 +82,15 @@ is in [ADR-0011](adr/0011-workload-identity-in-the-access-stack.md) and the beha
 | Service account | `github-plan` | Read-only identity for `terraform plan`, usable by any workflow of the repository |
 | Service account | `github-apply` | Identity for apply and destroy, usable only by the GitHub environment of the same name as the project's environment |
 | Project roles of `github-plan` | Viewer, Security Reviewer | Refresh the state and read IAM policies |
-| Project roles of `github-apply` | Scoped least-privilege roles (Compute Network Admin, Container Admin, Service Usage Admin, IAM Service Account Admin/User, Project IAM Admin, Secret Manager Admin, Run Admin, Cloud Functions Admin, API Gateway Admin, API Keys Admin, Storage Admin, Monitoring Admin, Logging Admin) | Create resources and their IAM bindings without broad Editor permissions |
+
+| Project roles of `github-apply` | Scoped least-privilege roles (Compute Network Admin, Container Admin, Service Usage Admin, IAM Service Account Admin/User, Project IAM Admin, Secret Manager Admin, Run Admin, Cloud Functions Admin, API Gateway Admin, API Keys Admin, Storage Admin, Monitoring Admin, Logging Admin, and for the rest of the serverless stack Pub/Sub Admin, Datastore Owner, Firebase Rules Admin, Firebase Admin, Identity Platform Admin, Service Account Token Creator) | Create resources and their IAM bindings without broad Editor permissions |
 | State bucket role | `roles/storage.objectAdmin` on the bucket, for both accounts | Terraform writes a lock even for a plan |
 | Impersonation bindings | `roles/iam.workloadIdentityUser` on each account | Who may use each account, as described above |
 | Enabled APIs | Cloud Resource Manager, IAM, IAM Credentials, Security Token Service | Required by the federation; left enabled on destroy |
 | Secret `grafana-admin-password` | Secret Manager | Admin password of Grafana, value added by hand, `prevent_destroy`. In the code, **not applied yet** |
 | Secret `arc-github-token` and the Secret Manager API | Secret Manager | GitHub token of the runner controller, value added by hand, `prevent_destroy`. In the code since [ADR-0016](adr/0016-external-secrets-operator.md), **not applied yet** (the counts above are those of 2026-10-23) |
+| Secrets `arc-github-app-id`, `arc-github-app-installation-id`, `arc-github-app-private-key` | Secret Manager | GitHub App credentials of the runner controller, values added by hand, `prevent_destroy` (Issue #151, [ADR-0016](adr/0016-external-secrets-operator.md)) |
+| Billing viewer of the instructor and budget | Billing account `015B95-C1627B-339E15` (free credits) | Managed as code; the bindings of the previous account `01A021-589B0D-8ED8BC` are only forgotten by Terraform, remove them by hand |
 
 The full names of the provider and of the two accounts are the outputs of the stack
 (`terraform -chdir=infra/access output`).
@@ -117,13 +120,13 @@ recorded: **Unknown, the team can answer**, and the answer belongs in the decisi
   proves works in both projects, so both were deleted (a deleted pool or account can be restored
   for 30 days). Nothing outside the access stack now authenticates GitHub Actions.
 - **Firebase and related APIs**: Firebase, Firebase Hosting, Firebase Rules, Identity Toolkit,
-  App Engine, Datastore, FCM, Remote Config, and the service account `firebase-adminsdk-…`. They
+  App Engine, Datastore, FCM, Remote Config, and the service account `firebase-adminsdk-â€¦`. They
   are the kind of services that [ADR-0008](adr/0008-firestore-listeners-for-realtime.md) and
   [ADR-0009](adr/0009-firebase-hosting-and-discord-oauth.md) rely on, and may come from the spike
   those ADRs ask for. Nothing in the code uses them yet.
 - **The instructor's access**: the instructor (`jeremie@jjaouen.com`) has the *Editor* role on both dev and prd, managed as code in `infra/access/members.tf`, and *Billing Account Viewer* on the billing account, granted by hand (see [infra.md](infra.md)).
 - **Team members access**: team members have the *Owner* role on both dev and prd, managed as code in `infra/access/members.tf`.
-- **Budget Alerts API** (`billingbudgets.googleapis.com`) is enabled in dev and prd. The budget of each project is created by `infra/access/budget.tf` and managed in the `access` stack with `prevent_destroy = true`. Both projects share the team billing account `01A021-589B0D-8ED8BC`.
+- **Budget Alerts API** (`billingbudgets.googleapis.com`) is enabled in dev and prd. The budget of each project is created by `infra/access/budget.tf` and managed in the `access` stack with `prevent_destroy = true`. Both projects share the team billing account `015B95-C1627B-339E15`.
 
 ### Only in prd
 

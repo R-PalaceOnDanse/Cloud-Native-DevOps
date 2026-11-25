@@ -1,0 +1,19 @@
+{
+  "name": "@teampasx/common",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared TypeScript data model, chunking algorithm, and rate limiting logic for the pixel canvas.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node ./node_modules/typescript/bin/tsc",
+    "test": "node ./node_modules/typescript/bin/tsc && node --test dist/coordinates.test.js dist/color.test.js dist/ratelimit.test.js dist/events.test.js dist/pixel-store.test.js dist/deltas.test.js dist/tile-renderer.test.js dist/logger.test.js dist/tracer.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

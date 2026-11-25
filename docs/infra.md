@@ -206,32 +206,83 @@ kubectl get nodes -L role,cloud.google.com/gke-nodepool
 kubectl describe nodes -l role=runner | grep -E "(Taints|Allocated resources)"
 ```
 
-### Runner token
+### Runner Authentication (GitHub App)
 
-The runners register with a GitHub token. It never goes through Terraform, so it is not in the
-state ([ADR-0016](adr/0016-external-secrets-operator.md)). It lives in Secret Manager, in the
-secret `arc-github-token` of each project, created by the `access` stack. External Secrets Operator
-copies it into the Kubernetes secret `arc-github` (namespace `arc-runners`) that the Helm release
-names, and refreshes it every hour.
+The ARC runner controller registers with GitHub using an **organization-owned GitHub App** (Issue #151, [ADR-0016](adr/0016-external-secrets-operator.md)). Credentials never pass through Terraform or Helm values, preventing accidental exposure in state files or logs.
 
-Add the value once per environment, after the `access` stack is applied. The token needs the
-`repo` scope:
+#### 1. GitHub App Permissions
+
+The GitHub App is created under the organization and installed on `R-PalaceOnDanse/Cloud-Native-DevOps` with strictly minimal required permissions:
+- **Repository permissions**:
+  - `Actions`: Read and write (to register and dispatch runner jobs)
+  - `Administration`: Read and write (to manage repository runner scale sets)
+  - `Checks`: Read (to observe workflow execution status)
+  - `Metadata`: Read-only (mandatory default)
+
+#### 2. Storing Credentials in Secret Manager
+
+The `access` stack creates three secrets in Google Secret Manager per environment with `prevent_destroy = true`:
+- `arc-github-app-id`: Numeric GitHub App ID
+- `arc-github-app-installation-id`: Numeric App installation ID on the repository
+- `arc-github-app-private-key`: RSA Private Key (.pem format)
+
+After applying `infra/access`, add the secret values once per environment:
 
 ```bash
-printf '%s' '<token>' | gcloud secrets versions add arc-github-token \
+# Set App ID
+printf '%s' '<APP_ID>' | gcloud secrets versions add arc-github-app-id \
   --project=teampasx-cloudnative-dev --data-file=-
+
+# Set Installation ID
+printf '%s' '<INSTALLATION_ID>' | gcloud secrets versions add arc-github-app-installation-id \
+  --project=teampasx-cloudnative-dev --data-file=-
+
+# Set Private Key PEM
+gcloud secrets versions add arc-github-app-private-key \
+  --project=teampasx-cloudnative-dev --data-file=/path/to/private-key.pem
 ```
 
-To rotate it, create a new token, add it as a new version (same command), then revoke the old
-token. The cluster picks it up within the hour; to force it now:
+External Secrets Operator (ESO) synchronizes these secrets into the Kubernetes secret `arc-github` (namespace `arc-runners`) every hour, populating `github_app_id`, `github_app_installation_id`, and `github_app_private_key`.
 
-```bash
-kubectl annotate externalsecret arc-github --namespace arc-runners force-sync=$(date +%s) --overwrite
-```
+#### 3. Private Key Rotation Runbook
 
-A cluster that is destroyed and rebuilt finds its secret by itself: the value stays in Secret
-Manager. Check the copy with `kubectl get externalsecret --namespace arc-runners` (status
-`SecretSynced`).
+To rotate the GitHub App private key without downtime:
+1. **Generate a new private key**:
+   - In GitHub organization settings: `Developer Settings > GitHub Apps > [Your App] > General > Private keys`.
+   - Click **Generate a private key** and download the new `.pem` file. (Keep the old key active temporarily).
+2. **Add the new key version to Secret Manager**:
+   ```bash
+   gcloud secrets versions add arc-github-app-private-key \
+     --project=teampasx-cloudnative-dev --data-file=/path/to/new-private-key.pem
+   gcloud secrets versions add arc-github-app-private-key \
+     --project=teampasx-cloudnative-prd --data-file=/path/to/new-private-key.pem
+   ```
+3. **Trigger immediate synchronization in GKE**:
+   ```bash
+   kubectl annotate externalsecret arc-github --namespace arc-runners force-sync=$(date +%s) --overwrite
+   ```
+4. **Verify listener health and pod creation**:
+   ```bash
+   kubectl get externalsecret -n arc-runners arc-github
+   kubectl get pods -n arc-systems
+   kubectl get pods -n arc-runners
+   ```
+5. **Revoke old key**:
+   - Once verified, return to GitHub App settings and delete the old private key.
+   - Destroy old versions in Secret Manager:
+     ```bash
+     gcloud secrets versions destroy arc-github-app-private-key --version=<OLD_VERSION> --project=teampasx-cloudnative-dev
+     ```
+
+#### 4. Legacy Token Decommissioning
+
+If migrating from the legacy Personal Access Token (`arc-github-token`):
+1. Confirm the runner listener is authenticated and functioning via the GitHub App (`kubectl get pods -n arc-runners`).
+2. Revoke the personal access token on GitHub (`Settings > Developer Settings > Personal access tokens`).
+3. Destroy the secret versions in Secret Manager:
+   ```bash
+   gcloud secrets versions destroy arc-github-token --version=1 --project=teampasx-cloudnative-dev
+   ```
 
 ### Cluster Monitoring & Observability
 
@@ -398,7 +449,7 @@ To prevent accidental credit burns from autoscaling or resource misconfiguration
 a monthly budget with alerts. The budgets are defined in `infra/access/budget.tf` and managed as part
 of the `access` stack (which is never destroyed). The billing account and monthly amount of each
 environment are `billing_account` and `budget_amount` in `infra/access/<env>.tfvars`, the single
-source for those values. Both `dev` and `prd` share the same billing account (`01A021-589B0D-8ED8BC`).
+source for those values. Both `dev` and `prd` share the same billing account (`015B95-C1627B-339E15`).
 
 | Threshold | Basis |
 |---|---|

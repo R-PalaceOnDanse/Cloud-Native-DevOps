@@ -1,3 +1,7 @@
 # Set by Terraform (helm-eso.tf).
 projectId: ""
-secretName: ""
+authType: "app" # "app" (GitHub App) or "token" (PAT)
+secretName: "arc-github-token"
+appIdSecretName: "arc-github-app-id"
+appInstallationIdSecretName: "arc-github-app-installation-id"
+appPrivateKeySecretName: "arc-github-app-private-key"

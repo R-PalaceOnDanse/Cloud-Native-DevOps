@@ -22,18 +22,27 @@ in Secret Manager, so something must copy it into the cluster without Terraform 
 
 ## Decision
 
-Option 3. ESO runs on the system pool and reads the secret as its own Kubernetes service account
-through Workload Identity (no Google account, no key), with `secretAccessor` on that one secret.
+Option 3. ESO runs on the system pool and reads the secrets as its own Kubernetes service account
+through Workload Identity (no Google account, no key), with `secretAccessor` on the runner secrets.
 A small local chart declares the store and the `arc-github` secret to copy.
 
-The secret `arc-github-token` is created in the `access` stack, not in `foundation`, so a destroy
-of the foundation keeps its value.
+The runner credentials are created in the `access` stack, not in `foundation`, so a destroy
+of the foundation keeps their values.
+
+### GitHub App Authentication Update (Issue #151)
+
+Initially, ARC authenticated via a fine-grained Personal Access Token (`arc-github-token`). To eliminate reliance on an individual's personal account and token expiration risks, authentication has been migrated to an **organization-owned GitHub App**:
+
+1. **Organization-Level Identity**: The GitHub App is owned by the organization and installed exclusively on `R-PalaceOnDanse/Cloud-Native-DevOps` with minimal required scopes (`Actions: Read & write`, `Administration: Read & write`, `Checks: Read`).
+2. **Secret Manager Storage**: Three secrets live in Secret Manager with `prevent_destroy = true`:
+   - `arc-github-app-id`: numeric GitHub App ID.
+   - `arc-github-app-installation-id`: numeric installation ID for the repository.
+   - `arc-github-app-private-key`: PEM private key generated for the App.
+3. **ESO Synchronization**: The `arc-secret` chart reads these secrets and populates the Kubernetes secret `arc-github` with keys `github_app_id`, `github_app_installation_id`, and `github_app_private_key`. The `gha-runner-scale-set` controller automatically authenticates using these GitHub App credentials.
+4. **Token Deprecation**: The legacy personal token is revoked and its Secret Manager version destroyed once the app is active.
 
 ## Consequences
 
-- Positive: the token is in neither the repository, the state nor the Helm values; rotating it is
-  a new Secret Manager version; a rebuilt cluster finds its secret by itself.
-- Negative / trade-offs accepted: one more operator on a small system node; Workload Identity
-  must be enabled on the cluster and its node pools; the `access` stack must be applied before
-  `foundation`.
-- Follow-up work: a GitHub App instead of a personal token, if the token's owner leaves the team.
+- Positive: no credentials appear in the repository, the Terraform state, or Helm values; rotating the private key requires only a new Secret Manager version without restarting the cluster; rebuilt clusters resolve secrets automatically; runner authentication does not depend on an individual's GitHub account.
+- Negative / trade-offs accepted: one more operator on a small system node; Workload Identity must be enabled on the cluster and its node pools; the `access` stack must be applied before `foundation`.
+- Follow-up work: private key rotation is documented in [docs/infra.md](../infra.md#runner-authentication-github-app).

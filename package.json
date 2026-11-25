@@ -1,0 +1,18 @@
+{
+  "name": "cloud-native-devops",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Collaborative Pixel Canvas (r/place) & Cloud Native Serverless Architecture",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run dev --prefix app/frontend",
+    "test": "npm test --prefix app/common && npm test --prefix app/frontend && npm test --prefix app/functions/web-draw-proxy && npm test --prefix app/functions/auth-callback && npm test --prefix app/functions/draw-worker && node --test scripts/register-discord-commands.test.mjs && node --test tests/load/burst-load.test.mjs",
+    "test:common": "npm test --prefix app/common",
+    "test:frontend": "npm test --prefix app/frontend",
+    "test:functions": "npm test --prefix app/functions/web-draw-proxy && npm test --prefix app/functions/auth-callback && npm test --prefix app/functions/draw-worker",
+    "test:load": "node tests/load/burst-load.mjs --dry-run -c 5 -n 25 -b 9",
+    "test:load:live": "node tests/load/burst-load.mjs",
+    "test:e2e": "node --test app/functions/draw-worker/dist/pipeline-e2e.test.js",
+    "build": "npm run build --prefix app/common && npm run build --prefix app/frontend && npm run build --prefix app/functions/web-draw-proxy && npm run build --prefix app/functions/auth-callback && npm run build --prefix app/functions/draw-worker"
+  }
+}

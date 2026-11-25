@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        function: [hello, discord-proxy]
+        function: [hello, discord-proxy, web-draw-proxy, auth-callback, draw-worker]
     defaults:
       run:
         working-directory: app/functions/${{ matrix.function }}

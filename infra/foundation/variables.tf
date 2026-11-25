@@ -53,6 +53,17 @@ variable "environment" {
   }
 }
 
+variable "runner_auth_type" {
+  type        = string
+  description = "Authentication mode for ARC runners: 'app' (GitHub App) or 'token' (Personal Access Token)."
+  default     = "app"
+
+  validation {
+    condition     = contains(["app", "token"], var.runner_auth_type)
+    error_message = "runner_auth_type must be either 'app' or 'token'."
+  }
+}
+
 variable "alert_emails" {
   type        = list(string)
   description = "Email addresses notified when an alert fires, one notification channel each."

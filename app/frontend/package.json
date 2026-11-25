@@ -1,0 +1,21 @@
+{
+  "name": "@teampasx/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Collaborative pixel canvas reactive web frontend (C07 / Issue #77, #80, #82, #83)",
+  "scripts": {
+    "dev": "node ./node_modules/vite/bin/vite.js",
+    "build": "node ./node_modules/typescript/bin/tsc && node ./node_modules/vite/bin/vite.js build",
+    "preview": "node ./node_modules/vite/bin/vite.js preview",
+    "test": "node ./node_modules/typescript/bin/tsc && node --test dist/viewport.test.js dist/brush.test.js dist/realtime.test.js dist/api.test.js dist/inspector.test.js dist/canvas.test.js dist/auth.test.js dist/rules.test.js dist/integration.test.js dist/minimap.test.js"
+  },
+  "dependencies": {
+    "firebase": "^13.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
+  }
+}

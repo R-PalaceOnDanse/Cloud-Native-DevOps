@@ -1,0 +1,62 @@
+name: register-discord-commands
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target GCP/Discord environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prd
+      guild_id:
+        description: 'Optional Discord Guild ID (instant registration without 1h global cache wait)'
+        required: false
+        default: ''
+        type: string
+      dry_run:
+        description: 'Validate commands payload without making Discord API call'
+        required: false
+        default: false
+        type: boolean
+  pull_request:
+    paths:
+      - 'scripts/register-discord-commands.*'
+      - '.github/workflows/register-discord-commands.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-register:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run command registration unit tests
+        run: node --test scripts/register-discord-commands.test.mjs
+
+      - name: Dry-run validation
+        if: github.event_name == 'pull_request' || inputs.dry_run == true
+        run: node scripts/register-discord-commands.mjs --dry-run
+
+      - name: Live registration via Discord REST API
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run == false
+        env:
+          DISCORD_APPLICATION_ID: ${{ secrets.DISCORD_APPLICATION_ID }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_GUILD_ID: ${{ inputs.guild_id }}
+        run: |
+          if [ -z "$DISCORD_APPLICATION_ID" ] || [ -z "$DISCORD_BOT_TOKEN" ]; then
+            echo "::warning ::DISCORD_APPLICATION_ID or DISCORD_BOT_TOKEN secret not configured; running dry-run mode"
+            node scripts/register-discord-commands.mjs --dry-run
+          else
+            node scripts/register-discord-commands.mjs
+          fi

@@ -1,6 +1,11 @@
 locals {
-  # Created by the access stack (infra/access/runner_secret.tf); the value is added by hand.
-  runner_secret_name  = "arc-github-token"
+  # Created by the access stack (infra/access/runner_secret.tf); the values are added by hand.
+  runner_secret_names = [
+    "arc-github-token",
+    "arc-github-app-id",
+    "arc-github-app-installation-id",
+    "arc-github-app-private-key",
+  ]
   eso_namespace       = "external-secrets"
   eso_service_account = "external-secrets"
 }
@@ -9,7 +14,7 @@ data "google_project" "this" {
   project_id = var.project_id
 }
 
-# External Secrets Operator copies a Secret Manager secret into a Kubernetes secret (ADR-0016).
+# External Secrets Operator copies Secret Manager secrets into Kubernetes secrets (ADR-0016).
 resource "helm_release" "external_secrets" {
   name             = "external-secrets"
   namespace        = local.eso_namespace
@@ -29,10 +34,11 @@ resource "helm_release" "external_secrets" {
   }
 }
 
-# The operator reads the secret as its own Kubernetes service account, through Workload Identity:
-# no Google account and no key. Only this one secret is readable.
-resource "google_secret_manager_secret_iam_member" "eso_reads_runner_token" {
-  secret_id = "projects/${var.project_id}/secrets/${local.runner_secret_name}"
+# The operator reads the secrets as its own Kubernetes service account, through Workload Identity:
+# no Google account and no key. Only these runner secrets are readable.
+resource "google_secret_manager_secret_iam_member" "eso_reads_runner_secrets" {
+  for_each  = toset(local.runner_secret_names)
+  secret_id = "projects/${var.project_id}/secrets/${each.value}"
   role      = "roles/secretmanager.secretAccessor"
   member    = "principal://iam.googleapis.com/projects/${data.google_project.this.number}/locations/global/workloadIdentityPools/${var.project_id}.svc.id.goog/subject/ns/${local.eso_namespace}/sa/${local.eso_service_account}"
 
@@ -54,7 +60,27 @@ resource "helm_release" "arc_secret" {
   }
 
   set {
+    name  = "authType"
+    value = var.runner_auth_type
+  }
+
+  set {
     name  = "secretName"
-    value = local.runner_secret_name
+    value = "arc-github-token"
+  }
+
+  set {
+    name  = "appIdSecretName"
+    value = "arc-github-app-id"
+  }
+
+  set {
+    name  = "appInstallationIdSecretName"
+    value = "arc-github-app-installation-id"
+  }
+
+  set {
+    name  = "appPrivateKeySecretName"
+    value = "arc-github-app-private-key"
   }
 }
