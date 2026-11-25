@@ -2,7 +2,8 @@
 
 locals {
   openapi_spec = templatefile("${path.module}/openapi.yaml.tftpl", {
-    hello_url = google_cloudfunctions2_function.hello.service_config[0].uri
+    hello_url         = google_cloudfunctions2_function.hello.service_config[0].uri
+    discord_proxy_url = google_cloudfunctions2_function.discord_proxy.service_config[0].uri
   })
 }
 

@@ -62,3 +62,23 @@ variable "alert_emails" {
     error_message = "alert_emails needs at least one address, or the alerts reach nobody."
   }
 }
+
+variable "runner_node_max_count" {
+  type        = number
+  description = "Maximum number of nodes of the runner pool, all zones together. Cost ceiling: the cluster autoscaler never adds a node above it, however many jobs are queued."
+
+  validation {
+    condition     = var.runner_node_max_count >= 1 && var.runner_node_max_count <= 3 && floor(var.runner_node_max_count) == var.runner_node_max_count
+    error_message = "runner_node_max_count must be a whole number from 1 to 3. Raising the ceiling is a cost decision: change this validation in its own pull request."
+  }
+}
+
+variable "runner_max_count" {
+  type        = number
+  description = "Maximum number of runner pods the scale set may run at the same time (maxRunners of Actions Runner Controller). Must not exceed runner_node_max_count, since one runner fills one e2-medium node."
+
+  validation {
+    condition     = var.runner_max_count >= 1 && var.runner_max_count <= 3 && floor(var.runner_max_count) == var.runner_max_count
+    error_message = "runner_max_count must be a whole number from 1 to 3."
+  }
+}
