@@ -26,6 +26,7 @@ Welcome to the Cloud Native DevOps documentation hub. This directory contains al
 ## 3. Application Components
 
 - **[frontend.md](frontend.md)**: Real-time HTML5 Canvas frontend, zero-polling architecture, brush tool, eyedropper, minimap radar, and Discord OAuth2 login.
+- **[frontend-architecture-complete.md](frontend-architecture-complete.md)**: Guide complet d'architecture frontend pour Quentin Duval (stack, moteur de rendu, Frustum Culling, subtilités UX, W3C tracing, et FAQ de soutenance).
 - **[runner-auto-scaling-demo.md](runner-auto-scaling-demo.md)**: Live demonstration guide and validation data for GKE Spot VM runner autoscaling (0 to 2 nodes).
 - **[load-testing.md](load-testing.md)**: Load testing engine, burst traffic simulation, rate limiting verification, and latency benchmarking.
 
