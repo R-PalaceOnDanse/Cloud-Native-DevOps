@@ -1,0 +1,4 @@
+apiVersion: v2
+name: arc-metrics
+description: Lets Managed Prometheus scrape the runner controller and its listeners.
+version: 0.1.0

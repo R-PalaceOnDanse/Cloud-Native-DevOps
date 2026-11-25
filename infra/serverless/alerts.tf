@@ -7,13 +7,18 @@
  * 3. Pub/Sub Message Backlog Age (>60s oldest unacknowledged message)
  */
 
-resource "google_monitoring_notification_channel" "email_team" {
+# One email channel per team member (same list as the foundation stack): every alert reaches all of them.
+resource "google_monitoring_notification_channel" "email" {
+  for_each     = toset(var.alert_emails)
   project      = var.project_id
-  display_name = "Team Alert Email (${var.project_id})"
+  display_name = "Alert email ${each.value}"
   type         = "email"
+
   labels = {
-    email_address = "quaduval@gmail.com"
+    email_address = each.value
   }
+
+  depends_on = [google_project_service.serverless]
 }
 
 resource "google_monitoring_alert_policy" "cloud_functions_error_rate" {
@@ -38,7 +43,7 @@ resource "google_monitoring_alert_policy" "cloud_functions_error_rate" {
     }
   }
 
-  notification_channels = [google_monitoring_notification_channel.email_team.name]
+  notification_channels = [for channel in google_monitoring_notification_channel.email : channel.id]
 
   documentation {
     content   = "A Cloud Function error rate exceeded 5% over 60s. Inspect logs filtered by `severity>=ERROR` or correlation ID in Cloud Logging."
@@ -66,7 +71,7 @@ resource "google_monitoring_alert_policy" "pubsub_dlq_messages" {
     }
   }
 
-  notification_channels = [google_monitoring_notification_channel.email_team.name]
+  notification_channels = [for channel in google_monitoring_notification_channel.email : channel.id]
 
   documentation {
     content   = "One or more poison pill messages were routed to the Dead-Letter Queue `pixel-draw-events-dlq` after exhausting delivery retries."
@@ -94,7 +99,7 @@ resource "google_monitoring_alert_policy" "pubsub_message_age" {
     }
   }
 
-  notification_channels = [google_monitoring_notification_channel.email_team.name]
+  notification_channels = [for channel in google_monitoring_notification_channel.email : channel.id]
 
   documentation {
     content   = "The draw worker subscription `draw-worker-sub` has messages older than 60 seconds, indicating worker backpressure or worker scaling limits."

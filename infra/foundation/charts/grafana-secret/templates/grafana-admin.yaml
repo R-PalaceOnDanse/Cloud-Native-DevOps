@@ -1,0 +1,29 @@
+apiVersion: external-secrets.io/v1
+kind: SecretStore
+metadata:
+  name: gcp
+spec:
+  provider:
+    gcpsm:
+      projectID: {{ required "projectId is required" .Values.projectId | quote }}
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: grafana-admin
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: SecretStore
+    name: gcp
+  target:
+    name: grafana-admin
+    creationPolicy: Owner
+    template:
+      data:
+        admin-user: admin
+        admin-password: {{ `"{{ .password }}"` }}
+  data:
+    - secretKey: password
+      remoteRef:
+        key: {{ required "secretName is required" .Values.secretName | quote }}

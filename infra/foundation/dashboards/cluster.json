@@ -1,0 +1,564 @@
+{
+  "uid": "cluster-overview",
+  "title": "Cluster and runners",
+  "description": "Nodes, containers, resources and runner activity of the cluster (issue #85).",
+  "tags": [
+    "cluster",
+    "runners"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "time": {
+    "from": "now-3h",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Nodes by pool",
+      "description": "Number of nodes in each pool. The runner pool goes from 0 up when jobs arrive and back to 0 when they are done.",
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcm"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "stepAfter"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcm"
+          },
+          "refId": "A",
+          "queryType": "promQL",
+          "promQLQuery": {
+            "projectName": "__PROJECT_ID__",
+            "expr": "count by (pool) (label_replace(kubernetes_io:node_cpu_total_cores, \"pool\", \"$1\", \"node_name\", \".*-(system|runner)-pool-.*\")) or label_replace(vector(0), \"pool\", \"runner\", \"\", \"\")",
+            "step": "60s",
+            "legendFormat": "{{pool}}"
+          }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Containers per namespace",
+      "description": "Running containers, by namespace. The arc-runners line is the runners.",
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcm"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "stepAfter"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcm"
+          },
+          "refId": "A",
+          "queryType": "promQL",
+          "promQLQuery": {
+            "projectName": "__PROJECT_ID__",
+            "expr": "count by (namespace_name) (kubernetes_io:container_uptime)",
+            "step": "60s",
+            "legendFormat": "{{namespace_name}}"
+          }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Node CPU used",
+      "description": "Share of the allocatable CPU used, for each node.",
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcm"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcm"
+          },
+          "refId": "A",
+          "queryType": "promQL",
+          "promQLQuery": {
+            "projectName": "__PROJECT_ID__",
+            "expr": "kubernetes_io:node_cpu_allocatable_utilization",
+            "step": "60s",
+            "legendFormat": "{{node_name}}"
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Node memory used",
+      "description": "Share of the allocatable memory that cannot be evicted, for each node.",
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcm"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcm"
+          },
+          "refId": "A",
+          "queryType": "promQL",
+          "promQLQuery": {
+            "projectName": "__PROJECT_ID__",
+            "expr": "kubernetes_io:node_memory_allocatable_utilization{memory_type=\"non-evictable\"}",
+            "step": "60s",
+            "legendFormat": "{{node_name}}"
+          }
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "CPU by namespace",
+      "description": "CPU cores used, by namespace.",
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcm"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcm"
+          },
+          "refId": "A",
+          "queryType": "promQL",
+          "promQLQuery": {
+            "projectName": "__PROJECT_ID__",
+            "expr": "sum by (namespace_name) (rate(kubernetes_io:container_cpu_core_usage_time[5m]))",
+            "step": "60s",
+            "legendFormat": "{{namespace_name}}"
+          }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Memory by namespace",
+      "description": "Memory used, by namespace.",
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcm"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcm"
+          },
+          "refId": "A",
+          "queryType": "promQL",
+          "promQLQuery": {
+            "projectName": "__PROJECT_ID__",
+            "expr": "sum by (namespace_name) (kubernetes_io:container_memory_used_bytes)",
+            "step": "60s",
+            "legendFormat": "{{namespace_name}}"
+          }
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Runner jobs",
+      "description": "Jobs GitHub has given to the runner set, and those that run. The difference is the jobs waiting for a runner.",
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcm"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "stepAfter"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcm"
+          },
+          "refId": "A",
+          "queryType": "promQL",
+          "promQLQuery": {
+            "projectName": "__PROJECT_ID__",
+            "expr": "sum by (name) (gha_assigned_jobs)",
+            "step": "60s",
+            "legendFormat": "assigned {{name}}"
+          }
+        },
+        {
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcm"
+          },
+          "refId": "B",
+          "queryType": "promQL",
+          "promQLQuery": {
+            "projectName": "__PROJECT_ID__",
+            "expr": "sum by (name) (gha_running_jobs)",
+            "step": "60s",
+            "legendFormat": "running {{name}}"
+          }
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Runners",
+      "description": "Runners registered, busy and wanted by the controller.",
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcm"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "stepAfter"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcm"
+          },
+          "refId": "A",
+          "queryType": "promQL",
+          "promQLQuery": {
+            "projectName": "__PROJECT_ID__",
+            "expr": "sum by (name) (gha_registered_runners)",
+            "step": "60s",
+            "legendFormat": "registered {{name}}"
+          }
+        },
+        {
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcm"
+          },
+          "refId": "B",
+          "queryType": "promQL",
+          "promQLQuery": {
+            "projectName": "__PROJECT_ID__",
+            "expr": "sum by (name) (gha_busy_runners)",
+            "step": "60s",
+            "legendFormat": "busy {{name}}"
+          }
+        },
+        {
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcm"
+          },
+          "refId": "C",
+          "queryType": "promQL",
+          "promQLQuery": {
+            "projectName": "__PROJECT_ID__",
+            "expr": "sum by (name) (gha_desired_runners)",
+            "step": "60s",
+            "legendFormat": "desired {{name}}"
+          }
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Container restarts",
+      "description": "Restarts in the last 10 minutes, by pod. A line above 0 is a container that keeps crashing.",
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcm"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 24,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "stepAfter"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcm"
+          },
+          "refId": "A",
+          "queryType": "promQL",
+          "promQLQuery": {
+            "projectName": "__PROJECT_ID__",
+            "expr": "sum by (pod_name) (increase(kubernetes_io:container_restart_count[10m]))",
+            "step": "60s",
+            "legendFormat": "{{pod_name}}"
+          }
+        }
+      ]
+    }
+  ]
+}

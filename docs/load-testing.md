@@ -110,8 +110,9 @@ Defined in [infra/serverless/dashboards.tf](file:///c:/Users/Quadu/Desktop/boulo
 | **Oldest Unacked Message Age** | `pubsub.googleapis.com/subscription/oldest_unacked_message_age` | Remains low ($< 30\text{ s}$), demonstrating fast consumption |
 | **Dead-Letter Queue (DLQ)** | Messages in `pixel-draw-events-dlq` | **Strictly 0**. Any count $> 0$ indicates poisoned messages |
 
-### 2. Cluster & Runners Dashboard (`cluster_runners`)
-Defined in [infra/foundation/dashboard_cluster.tf](file:///c:/Users/Quadu/Desktop/boulot/cloud&Serverless/infra/foundation/dashboard_cluster.tf):
+### 2. Cluster & Runners Dashboards
+The Cloud Monitoring dashboard of [infra/foundation/monitoring.tf](../infra/foundation/monitoring.tf) and the Grafana
+dashboard [infra/foundation/dashboards/cluster.json](../infra/foundation/dashboards/cluster.json) (ADR-0021):
 - **Node Count**: Verify the cluster node pool scales up if running concurrent CI runner jobs.
 - **ARC Runner Pods**: Verify runner pods scale up dynamically from 0 to target under CI load.
 

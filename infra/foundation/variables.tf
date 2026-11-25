@@ -64,6 +64,16 @@ variable "runner_auth_type" {
   }
 }
 
+variable "alert_emails" {
+  type        = list(string)
+  description = "Email addresses notified when an alert fires, one notification channel each."
+
+  validation {
+    condition     = length(var.alert_emails) > 0
+    error_message = "alert_emails needs at least one address, or the alerts reach nobody."
+  }
+}
+
 variable "runner_node_max_count" {
   type        = number
   description = "Maximum number of nodes of the runner pool, all zones together. Cost ceiling: the cluster autoscaler never adds a node above it, however many jobs are queued."

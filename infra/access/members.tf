@@ -4,8 +4,9 @@ resource "google_project_iam_member" "instructor" {
   member  = "user:${var.instructor_email}"
 }
 
-# Billing viewer on the billing account of the projects (the free-credit account since the change
-# of account). New address so that Terraform never needs to read the previous account.
+# Billing viewer of the instructor on the billing account of the projects (the free-credit account).
+# Managed as code (subject §1.2): github-plan and github-apply have billing rights on this account.
+# New address so that Terraform never reads the previous account.
 resource "google_billing_account_iam_member" "instructor_billing_viewer_account" {
   billing_account_id = var.billing_account
   role               = "roles/billing.viewer"

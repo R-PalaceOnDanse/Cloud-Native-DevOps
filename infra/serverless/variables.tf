@@ -30,6 +30,16 @@ variable "worker_max_instances" {
   }
 }
 
+variable "alert_emails" {
+  type        = list(string)
+  description = "Email addresses notified when an alert of the application fires, one notification channel each (same list as foundation)."
+
+  validation {
+    condition     = length(var.alert_emails) > 0
+    error_message = "alert_emails needs at least one address, or the alerts reach nobody."
+  }
+}
+
 variable "discord_client_id" {
   type        = string
   description = "Application (client) ID of the Discord application, used for OAuth2. Public, not a secret."

@@ -84,6 +84,26 @@ Cloud Build runs `gcp-build` (which compiles TypeScript) at deployment; `dist/` 
 `node_modules/` are never committed. Changing the source changes the hash in the uploaded object's
 name, which redeploys the function on the next release.
 
+## Logs
+
+Every line is one JSON object (`app/functions/hello/src/log.ts`): `severity`, `message`, `function`,
+`correlation_id`, and when there is one `path`, `error` and `logging.googleapis.com/trace`, which
+links the line to its trace in Cloud Trace. These are the only fields a line can carry: the logger
+drops anything else, so a token, a header or a request body cannot reach Cloud Logging. The tests
+in `log.test.ts` check it and run in `functions-ci`.
+
+To read everything one request did, open Logs Explorer in the project and run this query with the
+`correlation_id` that the response returns in its body and in the `x-correlation-id` header:
+
+```text
+resource.type="cloud_run_revision"
+jsonPayload.correlation_id="THE-CORRELATION-ID"
+```
+
+Add `severity>=ERROR` to keep only the failures. Save the query in Logs Explorer to reuse it. The
+same field will be carried by the proxy and the workers, so one query will follow a request through
+all of them.
+
 ## Deployment
 
 The stack is planned on every pull request and applied by a release tag after `foundation`, dev

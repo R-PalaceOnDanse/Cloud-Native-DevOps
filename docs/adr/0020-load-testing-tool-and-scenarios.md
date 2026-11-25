@@ -20,7 +20,7 @@ GitHub Decision **#66** asks:
 - Must produce a burst through the API Gateway with valid payloads and correlation IDs.
 - Must be repeatable, scriptable, and runnable by any team member, in CI runners (ARC), and locally without complex prerequisites.
 - Must not exceed free tier credits or cause budget overruns.
-- Must produce measurable signals on Google Cloud Monitoring dashboards (`serverless_app` and `cluster_runners`).
+- Must produce measurable signals on Google Cloud Monitoring dashboards (`serverless_app`, and the cluster dashboards of `infra/foundation/monitoring.tf` and Grafana).
 
 ---
 

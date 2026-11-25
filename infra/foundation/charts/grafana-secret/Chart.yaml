@@ -1,0 +1,4 @@
+apiVersion: v2
+name: grafana-secret
+description: Copies the Grafana admin password from Secret Manager into the grafana-admin secret.
+version: 0.1.0
