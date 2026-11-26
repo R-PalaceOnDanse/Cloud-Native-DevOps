@@ -6,7 +6,7 @@
 
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
-import { getAuth, type Auth, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, type Auth, signInWithCustomToken, signOut, onAuthStateChanged } from 'firebase/auth';
 
 export interface FirebaseInstance {
   app: FirebaseApp;
@@ -97,5 +97,19 @@ export async function authenticateFirebase(customToken: string): Promise<boolean
   } catch (err) {
     console.error('Firebase custom token authentication failed:', err);
     return false;
+  }
+}
+
+/**
+ * Signs out the current Firebase Auth session so the user cannot keep drawing after logging out.
+ */
+export async function signOutFirebase(): Promise<void> {
+  const instance = getFirebaseInstance();
+  if (!instance) return;
+
+  try {
+    await signOut(instance.auth);
+  } catch (err) {
+    console.warn('Firebase signOut failed:', err);
   }
 }

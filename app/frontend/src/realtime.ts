@@ -28,12 +28,14 @@ export interface ChunkPayload {
   chunkId: string;
   chunkX: number;
   chunkY: number;
+  epoch?: number;
   pixels: Record<string, RemotePixel>;
   updatedAt: number;
 }
 
 export interface SystemState {
   paused: boolean;
+  epoch?: number;
   lastClearedAt?: number | null;
   updatedAt?: number;
 }
@@ -105,6 +107,7 @@ export class RealtimeManager {
 
   private activeSubscriptions: Map<string, UnsubscribeCallback> = new Map();
   private systemUnsubscribe: UnsubscribeCallback | null = null;
+  private currentEpoch = 1;
   private systemCallback: SystemStateCallback | null = null;
 
   constructor(
@@ -150,9 +153,21 @@ export class RealtimeManager {
   }
 
   /**
+   * Updates the active grid epoch (from config/system). Stale chunks from older epochs are ignored.
+   */
+  public setEpoch(epoch: number): void {
+    if (epoch > this.currentEpoch) {
+      this.currentEpoch = epoch;
+    }
+  }
+
+  /**
    * Applies deltas in place from a push update.
    */
   public handleChunkUpdate(payload: ChunkPayload): void {
+    if (payload.epoch !== undefined && payload.epoch < this.currentEpoch) {
+      return;
+    }
     const { chunkX, chunkY, pixels } = payload;
     let modified = false;
 
