@@ -90,7 +90,6 @@ export function createDiscordProxyHandler(deps: ProxyDependencies) {
       });
     try {
       const messageId = await deps.publish(envelope);
-      await span('published');
       log('INFO', `Published ${envelope.type} for /${interaction.data?.name}`, {
         correlationId: envelope.correlationId,
         eventId: envelope.id,
@@ -99,15 +98,19 @@ export function createDiscordProxyHandler(deps: ProxyDependencies) {
         trace_id: traceId,
         'logging.googleapis.com/trace': `projects/${projectId}/traces/${traceId}`,
       });
+      // Answer Discord before exporting the span so a slow Cloud Trace call on cold start cannot trip Discord's 3 s deadline.
       res.status(200).json({ type: DEFERRED_CHANNEL_MESSAGE });
+      await span('published');
     } catch (err) {
-      await span('publish_failed');
       log('ERROR', 'Failed to publish the command', {
         correlationId: envelope.correlationId,
         error: err instanceof Error ? err.message : String(err),
         'logging.googleapis.com/trace': `projects/${projectId}/traces/${traceId}`,
       });
-      res.status(200).json({ type: CHANNEL_MESSAGE, data: { content: '⚠️ The command could not be queued, try again in a moment.', flags: EPHEMERAL } });
+      if (!res.headersSent) {
+        res.status(200).json({ type: CHANNEL_MESSAGE, data: { content: '⚠️ The command could not be queued, try again in a moment.', flags: EPHEMERAL } });
+      }
+      await span('publish_failed');
     }
   };
 }

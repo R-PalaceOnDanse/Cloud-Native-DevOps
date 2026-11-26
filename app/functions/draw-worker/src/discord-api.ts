@@ -30,20 +30,22 @@ export class DiscordApiClient {
 
     const url = `${this.baseUrl}/webhooks/${applicationId}/${interactionToken}/messages/@original`;
 
-    try {
-      const res = await fetch(url, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10_000),
+    });
 
-      return res.ok;
-    } catch {
-      // In offline development or test runner, gracefully return true for simulated calls
-      return true;
+    if (res.status === 429 || res.status >= 500) {
+      throw new Error(`Discord API transient error: ${res.status}`);
     }
+    if (!res.ok) {
+      console.error(JSON.stringify({ severity: 'ERROR', message: `Discord API rejected editOriginalResponse (${res.status})` }));
+    }
+    return res.ok;
   }
 
   /**
@@ -60,28 +62,31 @@ export class DiscordApiClient {
       return false;
     }
 
-    try {
-      const formData = new FormData();
-      const blob = new Blob([new Uint8Array(imageBuffer)], { type: 'image/png' });
-      formData.append('files[0]', blob, filename);
-      formData.append(
-        'payload_json',
-        JSON.stringify({
-          content: caption,
-          attachments: [{ id: 0, filename }],
-        })
-      );
+    const formData = new FormData();
+    const blob = new Blob([new Uint8Array(imageBuffer)], { type: 'image/png' });
+    formData.append('files[0]', blob, filename);
+    formData.append(
+      'payload_json',
+      JSON.stringify({
+        content: caption,
+        attachments: [{ id: 0, filename }],
+      })
+    );
 
-      const url = `${this.baseUrl}/webhooks/${applicationId}/${interactionToken}`;
-      const res = await fetch(url, {
-        method: 'POST',
-        body: formData,
-      });
+    const url = `${this.baseUrl}/webhooks/${applicationId}/${interactionToken}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      body: formData,
+      signal: AbortSignal.timeout(10_000),
+    });
 
-      return res.ok;
-    } catch {
-      return true;
+    if (res.status === 429 || res.status >= 500) {
+      throw new Error(`Discord API transient error: ${res.status}`);
     }
+    if (!res.ok) {
+      console.error(JSON.stringify({ severity: 'ERROR', message: `Discord API rejected postFollowupWithImage (${res.status})` }));
+    }
+    return res.ok;
   }
 }
 
