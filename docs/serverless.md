@@ -115,7 +115,7 @@ the plan account `roles/serviceusage.apiKeysViewer`; both are granted by the `ac
 
 | Component | Role | Identity and access |
 |---|---|---|
-| `discord-proxy` | `/discord/interactions`: checks the Ed25519 signature, answers PING | `fn-discord-proxy`, reads `discord-public-key` |
+| `discord-proxy` | `/discord/interactions`: checks the Ed25519 signature, answers PING; for a slash command publishes `pixel.draw` (/draw) or `discord.command` (the others) and answers a deferred response (type 5), which the worker edits | `fn-discord-proxy`, reads `discord-public-key`, publisher on `pixel-draw-events` only |
 | `web-draw-proxy` | `/draw`: validates a pixel batch, publishes `pixel.draw` | `fn-web-draw-proxy`, publisher on `pixel-draw-events` only |
 | `auth-callback` | `/auth/discord/callback`: Discord OAuth2 code exchange, mints a Firebase custom token for `discord:<id>` | `fn-auth-callback`, reads `discord-client-secret`, signs with its own identity |
 | `pixel-draw-events` | Topic; push subscription to the worker with an OIDC token of `pubsub-push`, 5 attempts then `pixel-draw-events-dlq` (kept 7 days in `pixel-draw-events-dlq-inspection`) | |

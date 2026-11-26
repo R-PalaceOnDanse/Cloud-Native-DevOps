@@ -41,6 +41,7 @@ resource "google_cloudfunctions2_function" "discord_proxy" {
 
     environment_variables = {
       DISCORD_PUBLIC_KEY_SECRET_VERSION = "${google_secret_manager_secret.discord_public_key.id}/versions/latest"
+      PIXEL_DRAW_TOPIC                  = google_pubsub_topic.pixel_draw.name
     }
   }
 

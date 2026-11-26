@@ -107,3 +107,9 @@ resource "google_pubsub_topic_iam_member" "web_draw_proxy_publishes" {
   role   = "roles/pubsub.publisher"
   member = "serviceAccount:${google_service_account.web_draw_proxy.email}"
 }
+
+resource "google_pubsub_topic_iam_member" "discord_proxy_publishes" {
+  topic  = google_pubsub_topic.pixel_draw.id
+  role   = "roles/pubsub.publisher"
+  member = "serviceAccount:${google_service_account.discord_proxy.email}"
+}
