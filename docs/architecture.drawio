@@ -1,0 +1,469 @@
+<mxfile host="app.diagrams.net" agent="docs" version="24.7.17">
+  <diagram id="gcp-architecture" name="GCP architecture (dev and prd: same layout)">
+    <mxGraphModel dx="2400" dy="1600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2840" pageHeight="1700" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="zone_gcp" value="Google Cloud - project teampasx-cloudnative-{env}, region europe-west1 (dev and prd: same layout, one project each)" style="rounded=1;absoluteArcSize=1;arcSize=8;html=1;whiteSpace=wrap;verticalAlign=top;align=left;spacingLeft=44;spacingTop=6;fontSize=15;fontStyle=1;strokeColor=#BDC1C6;fillColor=#FAFAFA;fontColor=#3C4043;" vertex="1" parent="1">
+          <mxGeometry x="300" y="20" width="2280" height="1660" as="geometry" />
+        </mxCell>
+        <mxCell id="gcp_logo" value="" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;shape=mxgraph.gcp2.google_cloud_platform;" vertex="1" parent="1">
+          <mxGeometry x="310" y="26" width="30" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="zone_access" value="ACCESS stack (infra/access) - applied by hand by a project Owner" style="rounded=1;absoluteArcSize=1;arcSize=6;html=1;whiteSpace=wrap;verticalAlign=top;align=left;spacingLeft=10;spacingTop=4;fontSize=13;fontStyle=1;strokeColor=#AECBFA;fillColor=#E8F0FE;fontColor=#1A73E8;" vertex="1" parent="1">
+          <mxGeometry x="320" y="60" width="980" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="zone_foundation" value="FOUNDATION stack (infra/foundation) - Terraform + Helm, applied by terraform-deploy" style="rounded=1;absoluteArcSize=1;arcSize=6;html=1;whiteSpace=wrap;verticalAlign=top;align=left;spacingLeft=10;spacingTop=4;fontSize=13;fontStyle=1;strokeColor=#A8DAB5;fillColor=#E6F4EA;fontColor=#188038;" vertex="1" parent="1">
+          <mxGeometry x="320" y="420" width="1000" height="720" as="geometry" />
+        </mxCell>
+        <mxCell id="zone_vpc" value="VPC teampasx-{env}-vpc - subnet teampasx-{env}-vpc-subnet 10.10.0.0/24 (dev) / 10.20.0.0/24 (prd), Private Google Access - secondary ranges pods-range 10.x1.0.0/16, services-range 10.x2.0.0/20" style="rounded=1;absoluteArcSize=1;arcSize=6;html=1;whiteSpace=wrap;verticalAlign=top;align=left;spacingLeft=10;spacingTop=2;fontSize=10;dashed=1;strokeColor=#34A853;fillColor=none;fontColor=#188038;" vertex="1" parent="1">
+          <mxGeometry x="340" y="455" width="960" height="670" as="geometry" />
+        </mxCell>
+        <mxCell id="zone_gke" value="Private GKE teampasx-{env}-vpc-gke (europe-west1-b) - private nodes, master 172.16.0.0/28, Workload Identity, Managed Service for Prometheus" style="rounded=1;absoluteArcSize=1;arcSize=6;html=1;whiteSpace=wrap;verticalAlign=top;align=left;spacingLeft=10;spacingTop=4;spacingRight=50;fontSize=11;fontStyle=1;strokeColor=#34A853;fillColor=#FFFFFF;fontColor=#188038;" vertex="1" parent="1">
+          <mxGeometry x="520" y="500" width="760" height="610" as="geometry" />
+        </mxCell>
+        <mxCell id="ic_gke" value="" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;shape=mxgraph.gcp2.container_engine;" vertex="1" parent="1">
+          <mxGeometry x="1230" y="506" width="40" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="zone_system" value="system-pool: 1 x e2-medium (label role=system)" style="rounded=1;absoluteArcSize=1;arcSize=6;html=1;whiteSpace=wrap;verticalAlign=top;align=left;spacingLeft=8;spacingTop=2;fontSize=10;fontStyle=1;strokeColor=#DADCE0;fillColor=#F1F3F4;fontColor=#3C4043;" vertex="1" parent="1">
+          <mxGeometry x="540" y="560" width="340" height="530" as="geometry" />
+        </mxCell>
+        <mxCell id="zone_runner" value="runner-pool: e2-medium Spot, autoscaling 0..2 nodes, taint runner=true:NoSchedule" style="rounded=1;absoluteArcSize=1;arcSize=6;html=1;whiteSpace=wrap;verticalAlign=top;align=left;spacingLeft=8;spacingTop=2;fontSize=10;fontStyle=1;strokeColor=#DADCE0;fillColor=#F1F3F4;fontColor=#3C4043;" vertex="1" parent="1">
+          <mxGeometry x="900" y="560" width="360" height="530" as="geometry" />
+        </mxCell>
+        <mxCell id="zone_serverless" value="SERVERLESS stack (infra/serverless) - applied by terraform-deploy after the foundation" style="rounded=1;absoluteArcSize=1;arcSize=6;html=1;whiteSpace=wrap;verticalAlign=top;align=left;spacingLeft=10;spacingTop=4;fontSize=13;fontStyle=1;strokeColor=#FDE293;fillColor=#FEF7E0;fontColor=#B06000;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="60" width="1220" height="1340" as="geometry" />
+        </mxCell>
+        <mxCell id="bnd_proxies" value="IAM boundary: roles/run.invoker = SA api-gateway only (no allUsers). Ingress ALLOW_ALL because API Gateway is outside the VPC: a direct call is refused by IAM." style="rounded=1;absoluteArcSize=1;arcSize=6;dashed=1;fillColor=none;strokeColor=#D93025;strokeWidth=2;html=1;whiteSpace=wrap;verticalAlign=bottom;align=left;spacingLeft=6;spacingBottom=4;fontSize=10;fontColor=#D93025;" vertex="1" parent="1">
+          <mxGeometry x="1640" y="100" width="320" height="860" as="geometry" />
+        </mxCell>
+        <mxCell id="bnd_worker" value="IAM boundary: ingress ALLOW_INTERNAL_ONLY, roles/run.invoker = SA pubsub-push only" style="rounded=1;absoluteArcSize=1;arcSize=6;dashed=1;fillColor=none;strokeColor=#D93025;strokeWidth=2;html=1;whiteSpace=wrap;verticalAlign=bottom;align=left;spacingLeft=6;spacingBottom=4;fontSize=10;fontColor=#D93025;" vertex="1" parent="1">
+          <mxGeometry x="2170" y="480" width="320" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="bnd_notifier" value="IAM boundary: ingress internal only, run.invoker = SA pubsub-push only" style="rounded=1;absoluteArcSize=1;arcSize=6;dashed=1;fillColor=none;strokeColor=#D93025;strokeWidth=2;html=1;whiteSpace=wrap;verticalAlign=bottom;align=left;spacingLeft=6;spacingBottom=2;fontSize=9;fontColor=#D93025;" vertex="1" parent="1">
+          <mxGeometry x="2325" y="85" width="235" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="zone_obs" value="OBSERVABILITY - native Google Cloud (ADR-0010, ADR-0021)" style="rounded=1;absoluteArcSize=1;arcSize=6;html=1;whiteSpace=wrap;verticalAlign=top;align=left;spacingLeft=10;spacingTop=4;fontSize=13;fontStyle=1;strokeColor=#D7AEFB;fillColor=#F3E8FD;fontColor=#8430CE;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="1420" width="1220" height="245" as="geometry" />
+        </mxCell>
+        <mxCell id="dev" value="Developer (IDE)&lt;br&gt;signed commits (GPG / SSH)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#3C4043;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="135" y="420" width="30" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="github" value="&lt;b&gt;GitHub&lt;/b&gt; R-PalaceOnDanse/Cloud-Native-DevOps&lt;br&gt;&lt;br&gt;PR checks: terraform-ci (fmt, validate, tflint, plan dev + prd),&lt;br&gt;functions-ci, frontend-ci, secret-scan (gitleaks), auth-check&lt;br&gt;&lt;br&gt;Release: tag vX.Y.Z on main -&gt; terraform-deploy:&lt;br&gt;foundation dev -&gt; serverless dev -&gt; frontend dev -&gt;&lt;br&gt;foundation prd -&gt; serverless prd -&gt; frontend prd&lt;br&gt;(environment prd: required reviewers)&lt;br&gt;&lt;br&gt;Ruleset protect-main: PR + 1 approval, signed&lt;br&gt;commits, gitleaks check, no force push / deletion" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3C4043;fontSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="10" y="530" width="280" height="290" as="geometry" />
+        </mxCell>
+        <mxCell id="ic_repo" value="" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#3C4043;shape=mxgraph.gcp2.repository;" vertex="1" parent="1">
+          <mxGeometry x="262" y="546" width="18" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="browser" value="Web user (browser)&lt;br&gt;signed in with Discord" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#3C4043;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="135" y="1180" width="30" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="discord" value="&lt;b&gt;Discord&lt;/b&gt;&lt;br&gt;guild users: /draw /get /snapshot&lt;br&gt;/admin pause|resume|clear|ratelimit&lt;br&gt;Interactions + webhooks (API v10)&lt;br&gt;OAuth2 (scope identify)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF0FF;strokeColor=#5865F2;fontSize=10;align=center;" vertex="1" parent="1">
+          <mxGeometry x="2600" y="300" width="220" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="wif" value="Workload Identity pool github&lt;br&gt;provider github-actions (OIDC)&lt;br&gt;condition: repository ==&lt;br&gt;R-PalaceOnDanse/Cloud-Native-DevOps" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.cloud_iam;" vertex="1" parent="1">
+          <mxGeometry x="400" y="130" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="sa_plan" value="SA github-plan (read-only)&lt;br&gt;viewer, iam.securityReviewer,&lt;br&gt;serviceUsageConsumer, apiKeysViewer,&lt;br&gt;helmStateReader (custom)" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.cloud_iam;" vertex="1" parent="1">
+          <mxGeometry x="660" y="100" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="sa_apply" value="SA github-apply&lt;br&gt;scoped admin roles, no Editor&lt;br&gt;only jobs of GitHub environment {env}" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.cloud_iam;" vertex="1" parent="1">
+          <mxGeometry x="660" y="250" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="state" value="state_bucket_{env} (europe-west9,&lt;br&gt;created by hand, versioned)&lt;br&gt;prefixes access / foundation / serverless" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.cloud_storage;" vertex="1" parent="1">
+          <mxGeometry x="930" y="100" width="50" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sm_access" value="Secret Manager (prevent_destroy)&lt;br&gt;arc-github-app-id, -installation-id,&lt;br&gt;-private-key, arc-github-token,&lt;br&gt;grafana-admin-password" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.key_management_service;" vertex="1" parent="1">
+          <mxGeometry x="930" y="240" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="humans" value="Human access (members.tf):&lt;br&gt;team: roles/owner&lt;br&gt;instructor: roles/editor +&lt;br&gt;billing.viewer&lt;br&gt;Budget with alerts (budget.tf)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#AECBFA;fontSize=10;align=left;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="110" width="165" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="vpc" value="VPC" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.virtual_private_cloud;" vertex="1" parent="1">
+          <mxGeometry x="405" y="520" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="router" value="Cloud Router&lt;br&gt;{vpc}-router" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.cloud_router;" vertex="1" parent="1">
+          <mxGeometry x="405" y="650" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="nat" value="Cloud NAT {vpc}-nat&lt;br&gt;egress of the private&lt;br&gt;nodes (GitHub, images)" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.cloud_nat;" vertex="1" parent="1">
+          <mxGeometry x="405" y="790" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="arc" value="&lt;b&gt;ARC controller + listener&lt;/b&gt;&lt;br&gt;gha-runner-scale-set-controller 0.9.3&lt;br&gt;ns arc-systems, metrics :8080 -&gt; PodMonitoring" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9AA0A6;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="560" y="600" width="300" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="eso" value="&lt;b&gt;External Secrets Operator&lt;/b&gt; 2.13.0&lt;br&gt;ns external-secrets, KSA external-secrets (WI)&lt;br&gt;-&gt; K8s secrets arc-github, grafana-admin" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9AA0A6;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="560" y="700" width="300" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="grafana" value="&lt;b&gt;Grafana&lt;/b&gt; 14.3.1 (ns monitoring)&lt;br&gt;KSA grafana (WI): roles/monitoring.viewer&lt;br&gt;ClusterIP, reached by kubectl port-forward&lt;br&gt;dashboards cluster.json, serverless.json" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9AA0A6;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="560" y="800" width="300" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="scaleset" value="&lt;b&gt;Runner scale set arc-{env}&lt;/b&gt; (ns arc-runners)&lt;br&gt;minRunners 0, maxRunners 2 (runner_max_count)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9AA0A6;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="920" y="610" width="320" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pod1" value="ephemeral runner pod&lt;br&gt;(Spot node 1)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9AA0A6;dashed=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="930" y="710" width="140" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="pod2" value="ephemeral runner pod&lt;br&gt;(Spot node 2)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9AA0A6;dashed=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1090" y="710" width="140" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="runnernote" value="Jobs with runs-on: vars.RUNNER_LABEL (arc-dev / arc-prd):&lt;br&gt;terraform-ci, functions-ci, frontend-ci, secret-scan.&lt;br&gt;Cluster autoscaler adds a Spot node per pending runner pod&lt;br&gt;and removes empty nodes (OPTIMIZE_UTILIZATION).&lt;br&gt;terraform-deploy / -run / -destroy stay on ubuntu-latest." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;fontSize=10;align=left;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="920" y="800" width="320" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="sm_app" value="Secret Manager&lt;br&gt;discord-public-key -&gt; fn-discord-proxy&lt;br&gt;discord-client-secret -&gt; fn-auth-callback&lt;br&gt;hello-greeting -&gt; fn-hello&lt;br&gt;(accessor granted on each secret)" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.key_management_service;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="120" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="gateway" value="&lt;b&gt;API Gateway canvas-gw&lt;/b&gt;&lt;br&gt;api canvas-api, OpenAPI 2.0, HTTPS only&lt;br&gt;backend identity: SA api-gateway&lt;br&gt;/draw: Firebase ID token checked&lt;br&gt;/hello: API key checked" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.cloud_endpoints;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="500" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="build" value="Cloud Build (SA fn-build)&lt;br&gt;builds sources of {project}-fn-sources&lt;br&gt;images in Artifact Registry repo functions&lt;br&gt;(3 latest kept, others deleted after 7 days)" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.container_builder;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="740" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="hosting" value="&lt;b&gt;Firebase Hosting&lt;/b&gt; default site&lt;br&gt;https://{project}.web.app (google_firebase_hosting_site.default)&lt;br&gt;content: app/frontend/dist, released by frontend-deploy.yml&lt;br&gt;(firebase-tools 15.36.0) after the serverless stack" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#FFA000;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.firebase;" vertex="1" parent="1">
+          <mxGeometry x="1466" y="960" width="38" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="fbauth" value="&lt;b&gt;Firebase Authentication&lt;/b&gt; (Identity Platform)&lt;br&gt;UID discord:{id}, claim name&lt;br&gt;no sign-in provider: only custom tokens" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#FFA000;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.firebase;" vertex="1" parent="1">
+          <mxGeometry x="1466" y="1160" width="38" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="fn_discord" value="&lt;b&gt;discord-proxy&lt;/b&gt;&lt;br&gt;SA fn-discord-proxy: logWriter, cloudtrace.agent,&lt;br&gt;accessor on discord-public-key, publisher on pixel-draw-events&lt;br&gt;Ed25519 check, publish, then deferred ACK (type 5)" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.cloud_functions;" vertex="1" parent="1">
+          <mxGeometry x="1775" y="130" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="fn_auth" value="&lt;b&gt;auth-callback&lt;/b&gt;&lt;br&gt;SA fn-auth-callback: logWriter, cloudtrace.agent,&lt;br&gt;accessor on discord-client-secret,&lt;br&gt;TokenCreator on itself (signBlob)" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.cloud_functions;" vertex="1" parent="1">
+          <mxGeometry x="1775" y="330" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="fn_web" value="&lt;b&gt;web-draw-proxy&lt;/b&gt;&lt;br&gt;SA fn-web-draw-proxy: logWriter, cloudtrace.agent,&lt;br&gt;pubsub.publisher on pixel-draw-events only" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.cloud_functions;" vertex="1" parent="1">
+          <mxGeometry x="1775" y="530" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="fn_hello" value="&lt;b&gt;hello&lt;/b&gt; (C05 demo, GET /hello)&lt;br&gt;SA fn-hello: logWriter, cloudtrace.agent,&lt;br&gt;accessor on hello-greeting" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.cloud_functions;" vertex="1" parent="1">
+          <mxGeometry x="1775" y="730" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="topic" value="topic &lt;b&gt;pixel-draw-events&lt;/b&gt;&lt;br&gt;retention 7 days" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.cloud_pubsub;" vertex="1" parent="1">
+          <mxGeometry x="2040" y="530" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="dlq" value="topic &lt;b&gt;pixel-draw-events-dlq&lt;/b&gt;&lt;br&gt;+ sub pixel-draw-events-dlq-inspection&lt;br&gt;(kept 7 days)" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.cloud_pubsub;" vertex="1" parent="1">
+          <mxGeometry x="2040" y="790" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="worker" value="&lt;b&gt;draw-worker&lt;/b&gt; (max worker_max_instances = 10)&lt;br&gt;SA fn-draw-worker: datastore.user, logWriter,&lt;br&gt;cloudtrace.agent, objectCreator on the&lt;br&gt;snapshots bucket (cannot read or sign)" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.cloud_functions;" vertex="1" parent="1">
+          <mxGeometry x="2305" y="530" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="firestore" value="&lt;b&gt;Firestore (default)&lt;/b&gt;, Native mode&lt;br&gt;chunks/chunk_X_Y (64 x 64 cells)&lt;br&gt;config/system (paused, epoch, admins)&lt;br&gt;ratelimits/{userId} (token bucket)&lt;br&gt;rules: read if signed in, no client write" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.cloud_firestore;" vertex="1" parent="1">
+          <mxGeometry x="2305" y="880" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="snapbucket" value="&lt;b&gt;{project}-canvas-snapshots&lt;/b&gt;&lt;br&gt;private: public access prevention&lt;br&gt;enforced, uniform access, 30-day lifecycle" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.cloud_storage;" vertex="1" parent="1">
+          <mxGeometry x="2190" y="300" width="50" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="snapready" value="topic &lt;b&gt;snapshot-ready&lt;/b&gt;&lt;br&gt;5 attempts -&gt; snapshot-ready-dlq&lt;br&gt;(+ snapshot-ready-dlq-inspection)" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.cloud_pubsub;" vertex="1" parent="1">
+          <mxGeometry x="2420" y="295" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="notifier" value="&lt;b&gt;snapshot-notifier&lt;/b&gt;&lt;br&gt;SA fn-snapshot-notifier: logWriter,&lt;br&gt;cloudtrace.agent, objectViewer on the&lt;br&gt;snapshots bucket, TokenCreator on itself" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.cloud_functions;" vertex="1" parent="1">
+          <mxGeometry x="2420" y="110" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="logging" value="&lt;b&gt;Cloud Logging&lt;/b&gt;&lt;br&gt;structured JSON on stdout,&lt;br&gt;correlationId, logging.googleapis.com/trace" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.logging;" vertex="1" parent="1">
+          <mxGeometry x="1450" y="1470" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="trace" value="&lt;b&gt;Cloud Trace&lt;/b&gt; (API v2 batchWrite)&lt;br&gt;one span per function, one trace ID:&lt;br&gt;proxy -&gt; draw-worker -&gt; snapshot-notifier" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.trace;" vertex="1" parent="1">
+          <mxGeometry x="1700" y="1470" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="monitoring" value="&lt;b&gt;Cloud Monitoring&lt;/b&gt; + Managed Prometheus&lt;br&gt;dashboards: Canvas Serverless Application&lt;br&gt;Dashboard, {vpc}-gke-overview; Grafana in GKE" style="sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#4285F4;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=10;shape=mxgraph.gcp2.cloud_monitoring;" vertex="1" parent="1">
+          <mxGeometry x="1965" y="1465" width="45" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="alerts" value="&lt;b&gt;Alert policies -&gt; e-mail&lt;/b&gt; (one channel per team member)&lt;br&gt;app: functions 5xx rate &gt; 5 %, messages sent to a DLQ&lt;br&gt;(pixel-draw-events-dlq or snapshot-ready-dlq),&lt;br&gt;draw-worker-sub oldest unacked message &gt; 60 s&lt;br&gt;cluster: node CPU / memory &gt; 85 %, container restarts,&lt;br&gt;runner jobs waiting 10 min, hello 5xx" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D7AEFB;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="2180" y="1470" width="360" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" value="&lt;b&gt;Legend&lt;/b&gt;&lt;br&gt;solid arrow: request or data flow (protocol on the label)&lt;br&gt;dashed arrow: identity, secret read or telemetry&lt;br&gt;red dashed frame: IAM boundary (who may invoke)&lt;br&gt;SA = service account; {env} = dev or prd&lt;br&gt;Reference: main + #176 (discord-proxy publish),&lt;br&gt;#177 (Firebase Hosting), #178 (snapshot-notifier)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9AA0A6;fontSize=10;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="10" y="1440" width="280" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="e_dev_gh" value="git push (signed), PR, review, tag" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#3C4043;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="dev" target="github">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_gh_wif" value="GitHub OIDC token -&gt; STS exchange&lt;br&gt;(HTTPS), short-lived, no key" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;dashed=1;strokeColor=#1A73E8;fontColor=#1A73E8;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="github" target="wif">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="150" y="155" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_wif_plan" value="workloadIdentityUser:&lt;br&gt;any workflow of the repo" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;dashed=1;strokeColor=#1A73E8;fontColor=#1A73E8;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="wif" target="sa_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_wif_apply" value="only attribute.environment = {env}" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;dashed=1;strokeColor=#1A73E8;fontColor=#1A73E8;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="wif" target="sa_apply">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="425" y="275" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_apply_state" value="state + lock&lt;br&gt;(objectAdmin)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#3C4043;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="sa_apply" target="state">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="830" y="275" />
+              <mxPoint x="830" y="120" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_apply_found" value="terraform apply (Terraform + Helm)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#188038;fontColor=#188038;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="sa_apply" target="zone_foundation">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="685" y="410" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_apply_srv" value="terraform apply (serverless), then frontend-deploy: firebase deploy --only hosting" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#B06000;fontColor=#B06000;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="sa_apply" target="zone_serverless">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="760" y="345" />
+              <mxPoint x="1320" y="345" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_router_nat" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=none;strokeColor=#3C4043;" edge="1" parent="1" source="router" target="nat">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_arc_gh" value="listener long-polls jobs, registers&lt;br&gt;runners (HTTPS out via Cloud NAT;&lt;br&gt;GitHub App credentials)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;startArrow=block;startFill=1;strokeColor=#3C4043;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="arc" target="github">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="710" y="580" />
+              <mxPoint x="320" y="580" />
+              <mxPoint x="320" y="620" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_arc_set" value="scales 0..2 pods" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#3C4043;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="arc" target="scaleset">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_set_pod1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#9AA0A6;" edge="1" parent="1" source="scaleset" target="pod1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_set_pod2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#9AA0A6;" edge="1" parent="1" source="scaleset" target="pod2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_pods_gh" value="runner pods run the PR jobs (HTTPS via Cloud NAT)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;startArrow=block;startFill=1;strokeColor=#3C4043;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="zone_runner" target="github">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1080" y="1120" />
+              <mxPoint x="150" y="1120" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_eso_sm" value="Workload Identity, gRPC:&lt;br&gt;accessor on these secrets only" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;dashed=1;strokeColor=#1A73E8;fontColor=#1A73E8;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="eso" target="sm_access">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="890" y="735" />
+              <mxPoint x="890" y="440" />
+              <mxPoint x="955" y="440" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_grafana_mon" value="Cloud Monitoring API / PromQL (WI, read-only)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;dashed=1;strokeColor=#8430CE;fontColor=#8430CE;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="grafana" target="monitoring">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="710" y="1160" />
+              <mxPoint x="1987" y="1160" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_gke_mon" value="system metrics, logs, gha_* metrics (Managed Prometheus)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;dashed=1;strokeColor=#8430CE;fontColor=#8430CE;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="zone_gke" target="logging">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="900" y="1440" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_discord_gw" value="HTTPS POST /discord/interactions&lt;br&gt;(Ed25519 signed by Discord)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#5865F2;fontColor=#5865F2;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="discord" target="gateway">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2760" y="40" />
+              <mxPoint x="1590" y="40" />
+              <mxPoint x="1590" y="460" />
+              <mxPoint x="1485" y="460" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_gw_discord" value="HTTPS + Google ID token&lt;br&gt;of SA api-gateway&lt;br&gt;(jwt_audience = function URL)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#3C4043;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="gateway" target="fn_discord">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1620" y="525" />
+              <mxPoint x="1620" y="155" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_gw_auth" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#3C4043;" edge="1" parent="1" source="gateway" target="fn_auth">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1620" y="525" />
+              <mxPoint x="1620" y="355" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_gw_web" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#3C4043;" edge="1" parent="1" source="gateway" target="fn_web">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1620" y="525" />
+              <mxPoint x="1620" y="555" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_gw_hello" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#3C4043;" edge="1" parent="1" source="gateway" target="fn_hello">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1620" y="525" />
+              <mxPoint x="1620" y="755" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_discord_sm" value="gRPC accessSecretVersion" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;dashed=1;strokeColor=#1A73E8;fontColor=#1A73E8;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="fn_discord" target="sm_app">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1700" y="145" />
+              <mxPoint x="1700" y="135" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_auth_sm" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;dashed=1;strokeColor=#1A73E8;" edge="1" parent="1" source="fn_auth" target="sm_app">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1700" y="345" />
+              <mxPoint x="1700" y="160" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_hello_sm" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;dashed=1;strokeColor=#1A73E8;" edge="1" parent="1" source="fn_hello" target="sm_app">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1680" y="745" />
+              <mxPoint x="1680" y="165" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_discord_topic" value="publish pixel.draw (/draw) or discord.command&lt;br&gt;(gRPC), then answers the deferred ACK" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#3C4043;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="fn_discord" target="topic">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2065" y="155" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_auth_discord" value="OAuth2 code exchange + /users/@me (HTTPS);&lt;br&gt;Discord access token not kept" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#5865F2;fontColor=#5865F2;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="fn_auth" target="discord">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2000" y="355" />
+              <mxPoint x="2000" y="75" />
+              <mxPoint x="2660" y="75" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_auth_fb" value="createCustomToken&lt;br&gt;(IAM signBlob, no key file)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;dashed=1;strokeColor=#1A73E8;fontColor=#1A73E8;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="fn_auth" target="fbauth">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1740" y="355" />
+              <mxPoint x="1740" y="1186" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_browser_hosting" value="HTTPS GET static bundle (HTML/JS/CSS)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#3C4043;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="browser" target="hosting">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="150" y="986" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_browser_gw" value="HTTPS POST /draw (Authorization: Bearer Firebase ID token, verified by the gateway)&lt;br&gt;HTTPS POST /auth/discord/callback (code + anti-CSRF state)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#3C4043;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="browser" target="gateway">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1380" y="1210" />
+              <mxPoint x="1380" y="525" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_browser_fb" value="signInWithCustomToken -&gt; ID token (HTTPS)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#3C4043;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="browser" target="fbauth">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="150" y="1300" />
+              <mxPoint x="1485" y="1300" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_browser_discord" value="OAuth2 authorize redirect (HTTPS)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;dashed=1;strokeColor=#5865F2;fontColor=#5865F2;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="browser" target="discord">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="120" y="1670" />
+              <mxPoint x="2800" y="1670" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_fs_browser" value="real-time onSnapshot listeners on visible chunks + config/system&lt;br&gt;(Firestore Web SDK, WebChannel over HTTPS; no polling)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#1E8E3E;fontColor=#1E8E3E;strokeWidth=2;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="firestore" target="browser">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2330" y="1408" />
+              <mxPoint x="180" y="1408" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_web_topic" value="publish pixel.draw&lt;br&gt;(gRPC, traceparent attr.)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#3C4043;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="fn_web" target="topic">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_topic_worker" value="sub draw-worker-sub: push&lt;br&gt;HTTPS + OIDC (SA pubsub-push)&lt;br&gt;ack 60 s, backoff 10-600 s" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#3C4043;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="topic" target="worker">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_topic_dlq" value="after 5 failed deliveries&lt;br&gt;(Pub/Sub service agent)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;dashed=1;strokeColor=#D93025;fontColor=#D93025;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="topic" target="dlq">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_worker_fs" value="transactions on chunks, config/system,&lt;br&gt;ratelimits (gRPC)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#3C4043;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="worker" target="firestore">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2420" y="555" />
+              <mxPoint x="2420" y="905" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_worker_discord" value="edit deferred reply (PATCH @original; /snapshot:&lt;br&gt;being prepared), /get PNG as follow-up (HTTPS)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#5865F2;fontColor=#5865F2;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="worker" target="discord">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2330" y="460" />
+              <mxPoint x="2710" y="460" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_worker_bucket" value="/snapshot: upload snapshots/{timestamp}.png&lt;br&gt;metadata: applicationId, interactionToken,&lt;br&gt;correlationId, traceparent (HTTPS)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#3C4043;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="worker" target="snapbucket">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2215" y="555" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_bucket_ready" value="notification OBJECT_FINALIZE,&lt;br&gt;snapshots/*, JSON_API_V1&lt;br&gt;(Cloud Storage service agent)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#3C4043;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="snapbucket" target="snapready">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ready_notifier" value="sub snapshot-notifier-sub:&lt;br&gt;push HTTPS + OIDC (SA pubsub-push)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#3C4043;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="snapready" target="notifier">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_notifier_bucket" value="V4 signed URL, 1 h&lt;br&gt;(IAM signBlob, no key)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;dashed=1;strokeColor=#1A73E8;fontColor=#1A73E8;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="notifier" target="snapbucket">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2215" y="135" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_notifier_discord" value="PATCH /webhooks/{app}/{token}/&lt;br&gt;messages/@original (HTTPS)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;strokeColor=#5865F2;fontColor=#5865F2;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="notifier" target="discord">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2640" y="135" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_fn_logs" value="JSON logs (stdout) + one span each (Trace API v2)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;dashed=1;strokeColor=#8430CE;fontColor=#8430CE;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="bnd_proxies" target="trace">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_worker_logs" value="logs, request and instance metrics" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=block;endFill=1;dashed=1;strokeColor=#8430CE;fontColor=#8430CE;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="bnd_worker" target="alerts">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2520" y="605" />
+              <mxPoint x="2520" y="1440" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_mon_alerts" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;dashed=1;strokeColor=#8430CE;" edge="1" parent="1" source="monitoring" target="alerts">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

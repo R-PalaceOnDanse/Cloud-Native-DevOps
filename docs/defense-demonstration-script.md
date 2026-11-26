@@ -1,163 +1,259 @@
-# Defense Live Demonstration Script
+# Defense demonstration script (Issue #92)
 
-Step-by-step oral defense demonstration script covering the full Cloud Native DevOps workflow: IDE, GitFlow, PR review, automated CI/CD deployment, GKE runner autoscaling, Discord bot interactions, real-time zero-polling web frontend, distributed tracing, and fallback procedures.
+The live part of the defense, in the order of subject §5.3: IDE to production, runners, the app,
+scaling, security, then observability. Each step gives the exact click or command and what to point
+at. **prd is the reference**. dev is only the fallback. Commands are for bash (Git Bash or WSL on
+Windows).
 
----
+The reference is `main` plus three pull requests:
 
-## Pre-Demonstration Setup Checklist (T - 15 min)
+- #176: discord-proxy defers and publishes, plus Cloud Trace spans;
+- #177: Firebase Hosting;
+- #178: snapshot-notifier.
 
-Open and arrange the following browser tabs and terminal windows before the presentation starts:
+Rehearse on a release that contains all three.
 
-1. **Browser Windows / Tabs**:
-   - Tab 1: **Production Web Frontend** (`https://canvas.teampasx.dev` or local preview `http://localhost:5173`)
-   - Tab 2: **Discord Channel** with the deployed Canvas Bot active
-   - Tab 3: **GitHub Repository**: Pull Requests and Actions tabs (`R-PalaceOnDanse/Cloud-Native-DevOps`)
-   - Tab 4: **Google Cloud Console (`teampasx-cloudnative-prd`)**:
-     - *Monitoring Dashboards*: Application Dashboard & Cluster Dashboard
-     - *Cloud Trace*: Trace List & Waterfall View
-     - *Cloud Logging*: Logs Explorer with filter `resource.type="cloud_run_revision"`
-     - *GKE Clusters*: Nodes & Workloads view
-2. **Terminal Split Windows**:
-   - Terminal 1: GKE runner monitor (`bash scripts/watch-runner-scaling.sh prd`)
-   - Terminal 2: Real-time Cloud Logging stream (`gcloud logging tail 'resource.type="cloud_run_revision"'`)
-   - Terminal 3: Working terminal for Git commands and live load test executions
+## T-30 min: preparation
 
----
+Each presenter checks this on their own machine (§5.1: microphone, screen sharing).
 
-## Act 1: GitFlow, Cryptographic Signing & CI/CD Pipeline
+```bash
+gcloud auth login && gcloud config set project teampasx-cloudnative-prd
+gcloud container clusters get-credentials teampasx-prd-vpc-gke --zone europe-west1-b --project teampasx-cloudnative-prd
+terraform -chdir=infra/serverless init -reconfigure -backend-config=backends/prd.hcl
+GW=$(terraform -chdir=infra/serverless output -raw gateway_url)
+WEB=$(terraform -chdir=infra/serverless output -raw frontend_origin)   # https://teampasx-cloudnative-prd.web.app
+fn_url() { gcloud functions describe "$1" --region europe-west1 --format='value(serviceConfig.uri)'; }
+```
 
-**Objective**: Demonstrate production-grade GitFlow, GPG commit signing, automated CI checks, and keyless cloud deployment via OIDC / Workload Identity.
+Open these tabs:
 
-### Step 1.1: Local Edit & Cryptographic Signing
-- **Action**: Make a small visible change or show recent signed commit in git log:
-  ```bash
-  git log -n 3 --show-signature
-  ```
-- **Narrative**:
-  > *"Every commit across our repository is strictly signed using a personal GPG hardware/software key, verified by GitHub with the green 'Verified' badge. Direct commits to `main` are branch-protected and forbidden. All changes flow through feature branches and pull requests."*
+1. **GitHub**: *Pull requests*, *Actions*, *Settings > Environments*.
+2. **Web app** `$WEB` in two windows side by side (two Discord accounts if possible), DevTools open on
+   *Network*.
+3. **Discord** test server with the bot.
+4. **Cloud Console (prd)**:
+   - *Monitoring > Dashboards*: `Canvas Serverless Application Dashboard (teampasx-cloudnative-prd)`
+     and `teampasx-prd-vpc-gke-overview`;
+   - *Monitoring > Alerting*;
+   - *Logging > Logs Explorer*;
+   - *Trace > Trace explorer*;
+   - *Cloud Run* (instances of `draw-worker`);
+   - *Cloud Storage* bucket `teampasx-cloudnative-prd-canvas-snapshots`.
+5. **Grafana** (cluster dashboard). Start the port-forward, log in as `admin`, and open
+   `http://localhost:3000`:
 
-### Step 1.2: Pull Request Inspection & CI Gates
-- **Action**: Open GitHub PR view in browser.
-- **Narrative**:
-  > *"On each pull request, our automated CI pipeline triggers on GitHub Actions runners. It executes:*
-  > 1. *Gitleaks static secret scanning across the full commit history to prevent credential leaks.*
-  > 2. *Documentation sync checks ensuring code changes update corresponding markdown docs.*
-  > 3. *Complete monorepo test suite (139 automated tests with 0 failures).*
-  > 4. *Terraform fmt and validate across our access, foundation, and serverless stacks.*
-  > 5. *Terraform plan authenticating to GCP via Workload Identity Federation without any stored keys."*
+   ```bash
+   gcloud secrets versions access latest --secret=grafana-admin-password --project=teampasx-cloudnative-prd
+   kubectl port-forward --namespace monitoring service/grafana 3000:80
+   ```
 
----
+6. **Terminal 2**: `scripts/watch-runner-scaling.sh 15` (runner nodes and pods, as CSV).
 
-## Act 2: Foundation & ARC Runner Autoscaling Demo
+Before you start, check that the last `terraform-deploy` run is green and that the web app loads.
+Also check that `gh variable get RUNNER_LABEL` prints `arc-prd` (or `arc-dev`), so the PR checks
+run on the self-hosted runners.
 
-**Objective**: Prove that the GKE cluster is 100% dedicated to self-hosted CI/CD runners, using Spot VMs and scaling to zero when idle.
+## 0:00 to 4:00 - From the IDE to a pull request
 
-### Step 2.1: Show Baseline Idle State (0 Runner Nodes)
-- **Action**: In Terminal 1, show current GKE node status:
-  ```bash
-  kubectl get nodes -L role,cloud.google.com/gke-nodepool
-  ```
-- **Narrative**:
-  > *"Notice that our GKE cluster runs a single e2-small node in `system-pool` for CoreDNS, External Secrets Operator, and ARC controller. The `runner-pool` is currently at 0 nodes, costing zero compute while idle."*
+1. In the IDE, make a small visible change, for example a text in `app/frontend/src/main.ts`.
+2. Commit it signed on a feature branch and open the pull request:
 
-### Step 2.2: Trigger Load & Observe Dynamic Autoscaling
-- **Action**: Trigger the runner load test workflow or run the test script:
-  ```bash
-  gh workflow run runner-load-test.yml -f jobs=3
-  ```
-  Watch Terminal 1 (`scripts/watch-runner-scaling.sh`).
-- **Narrative**:
-  > *"Actions Runner Controller detects pending jobs in the queue and requests ephemeral runner pods. Because runner pods have a specific taint `runner=true:NoSchedule`, GKE node autoscaler automatically provisions an e2-medium Spot VM node within 60 seconds. Once the jobs complete, the pods terminate and the node pool cleanly scales back down to 0."*
+   ```bash
+   git switch -c feat/demo-defense
+   git commit -S -am "feat(frontend): demo change for the defense"
+   git log --show-signature -1
+   git push -u origin feat/demo-defense
+   gh pr create --fill --base main
+   ```
 
----
+3. Show the checks starting on the pull request:
+   - `frontend-ci` (test and build), `secret-scan` (gitleaks on the whole history);
+   - `terraform-ci` and `functions-ci` only if the change touches their paths.
 
-## Act 3: Real-Time Web Frontend & Canvas Usability
+   Open a job and show *Runner name*: `arc-prd-...`, a pod of the cluster, not GitHub's runner.
+4. On an infra pull request (an earlier one if this change has none), open `terraform-ci` >
+   *Summary* to show the plan of each stack in dev and prd. It was made with the read-only
+   `github-plan` account, through Workload Identity Federation.
+5. A teammate reviews and approves (*Files changed > Review changes > Approve*), then merges. Show
+   *Settings > Rules > Rulesets > protect-main*. It requires:
+   - a pull request with 1 approving review;
+   - signed commits;
+   - the gitleaks check.
 
-**Objective**: Demonstrate collaborative real-time canvas capabilities with zero polling, brush validation, minimap navigation, and URL state bookmarking.
+   It also blocks force pushes and deletion of `main`. Merge stays greyed out until all of these
+   pass.
 
-### Step 3.1: Zero-Polling Verification in Browser DevTools
-- **Action**:
-  1. Open browser DevTools (`F12`), switch to the **Network** tab, and filter by `Fetch/XHR`.
-  2. Point out that **no periodic HTTP polling requests** (`setInterval`) appear.
-  3. Show the open WebSocket / streaming channel to Firestore:
-- **Narrative**:
-  > *"Our frontend implements strict Zero Polling (C07 §3). It uses native Firestore `onSnapshot` streaming listeners scoped dynamically to the visible viewport (Frustum Culling). Chunks outside the viewport are unsubscribed to conserve client memory and database bandwidth."*
+Say: GitFlow (feature branch, PR, review, merge to `main`), signed commits enforced on `main`, no
+deploy from a branch.
 
-### Step 3.2: Single-Pixel Drawing & Immediate Feedback
-- **Action**: Select a color (e.g., `#ef4444`), click a pixel on the canvas.
-- **Narrative**:
-  > *"When clicking a pixel, the frontend makes an asynchronous HTTP POST to `/draw` through Google API Gateway. The proxy validates the payload and pushes an event to Pub/Sub, returning HTTP 202 Accepted. The worker applies the write with Last-Write-Wins and emits a delta document, causing Firestore to stream the change to all connected clients."*
+## 4:00 to 8:00 - Release and deploy
 
-### Step 3.3: Brush Tool & Non-Truncation Rule
-- **Action**:
-  1. Select the **Brush tool** and set size to **5px** (25 pixels).
-  2. Attempt to draw on the canvas.
-  3. Observe the clear error toast: *"Trait supérieur à la capacité maximale (25 pixels > 20 max). Réduisez la taille du pinceau. Le trait n'est pas tronqué pour préserver l'intégrité du dessin."*
-- **Narrative**:
-  > *"In accordance with subject constraint C07 §3, a brush stroke that exceeds the user's available token quota is never silently truncated. Truncating would corrupt the user's artwork. Instead, the stroke is rejected with an explanation and token quota feedback."*
+1. Tag `main` and push the tag:
 
-### Step 3.4: Eyedropper, Minimap & URL Hash Coordinate Sync
-- **Action**:
-  1. Press `I` or `Alt + Click` on any existing colored pixel to sample its color (Eyedropper tool).
-  2. Pan across the canvas and watch the minimap bounding box update smoothly. Click on the minimap to instantly jump to another quadrant.
-  3. Observe the URL hash `#x=5000&y=5000&z=2` update dynamically. Copy and paste the URL into a new tab to demonstrate exact coordinate restoring.
+   ```bash
+   git switch main && git pull
+   git tag -s vX.Y.Z -m "vX.Y.Z"    # next version after the last tag: git tag --sort=-v:refname | head -1
+   git push origin vX.Y.Z
+   ```
 
----
+2. *Actions > terraform-deploy*: show the chain `check-tag` -> `foundation-dev` -> `serverless-dev`
+   -> `frontend-dev` -> `foundation-prd` -> `serverless-prd` -> `frontend-prd`.
+3. The prd jobs wait on *Review deployments*: the `prd` environment requires a reviewer (one of the
+   three members). A teammate approves it live.
+4. Open a `serverless-prd` job:
+   - the job runs in the **environment `prd`**, which is the only way to impersonate
+     `github-apply` (ADR-0011);
+   - the step `google-github-actions/auth` uses no key;
+   - the plan in the summary, then `terraform apply` of that saved plan.
+5. Open `frontend-prd` (job *deploy frontend to prd*). It:
+   - reads `terraform output frontend_build_env`;
+   - runs `npm ci` and `npm run build`;
+   - runs `firebase-tools@15.36.0 deploy --only hosting` with the same keyless credentials.
 
-## Act 4: Discord Bot Interactions & Administration
+   The job summary prints the site URL.
+6. A full release takes long. Let it run and come back to it at the end, or show the last green run.
 
-**Objective**: Demonstrate serverless webhook interactions, Ed25519 signature verification, snapshot exports via private bucket signed URLs, and instant $O(1)$ canvas clear.
+## 8:00 to 11:00 - Runners scale with the node pool
 
-### Step 4.1: Discord Commands (`/draw` and `/get`)
-- **Action**: In Discord channel:
-  ```
-  /draw x:1500 y:1500 color:#3b82f6
-  /get x:1500 y:1500
-  ```
-- **Narrative**:
-  > *"Discord sends an Ed25519-signed HTTPS webhook to API Gateway. Our proxy verifies the cryptographic signature with the bot public key, returns an immediate deferred response (type 5) within Discord's 3-second timeout, and delegates processing to the draw worker via Pub/Sub."*
+1. Terminal: `kubectl get nodes -L role,cloud.google.com/gke-nodepool`. At rest there is 1
+   `system-pool` node and 0 `runner-pool` nodes.
+2. Start a burst:
 
-### Step 4.2: Snapshot Generation (`/snapshot`)
-- **Action**: Run `/snapshot` in Discord.
-- **Narrative**:
-  > *"The worker stitches all active chunks into a PNG image and stores it in our Cloud Storage snapshot bucket. The bucket is strictly private (`public_access_prevention = enforced`). The bot replies with a cryptographic Google Cloud Signed URL valid for exactly 1 hour."*
+   ```bash
+   gh workflow run runner-load-test.yml --ref main -f jobs=3 -f minutes=3 -f runner=arc-prd
+   ```
 
-### Step 4.3: Instant Administrative Reset (`/admin clear`)
-- **Action**: Run `/admin clear` in Discord with an admin account, then show non-admin refusal.
-- **Narrative**:
-  > *"`/admin clear` performs an instant O(1) reset by incrementing the system epoch in `config/system`. Because all pixel writes are tied to the active epoch, every previous pixel is instantly invalidated without requiring a slow, expensive scan-and-delete of millions of documents in Firestore."*
+3. Show:
+   - `watch-runner-scaling.sh`: runner pods go Pending, the Spot nodes appear (0 -> 2), the third
+     job waits because `maxRunners` is 2;
+   - Grafana *Cluster and runners*: *Nodes by pool*, *Runner jobs*, *Runners*;
+   - *Actions*: the jobs run on `arc-prd-...`.
+4. About 10 minutes after the jobs end, the runner nodes are removed. Show it at the end, or show
+   [runner-auto-scaling-demo.md](runner-auto-scaling-demo.md) and `docs/evidence/runner-scaling-dev.csv`.
 
----
+Say: the taint `runner=true:NoSchedule` keeps runners on the Spot pool; `minRunners 0` and
+`total_min_node_count 0` mean nothing is billed when idle.
 
-## Act 5: Observability, Cloud Trace & Alerting
+## 11:00 to 17:00 - The app: web, Discord, real time, large grid
 
-**Objective**: Demonstrate end-to-end W3C distributed tracing across serverless microservices, structured log correlation, and real cloud alerting.
+1. **Sign in**: window A, *Connexion Discord* -> Discord consent -> back on `$WEB`, signed in. Do the
+   same in window B with another account.
+2. **Draw**: click a pixel in window A. In DevTools, show `POST $GW/draw` -> **202**, with an
+   `Authorization: Bearer` header and the `correlationId` in the response. The pixel appears in
+   window B with no reload.
+3. **No polling**: in DevTools, filter `firestore.googleapis.com`. Show the long-lived `Listen`
+   channel and that no request repeats on a timer.
+4. **Large grid**: zoom out to the whole 10 000 x 10 000 grid, use the minimap to jump, zoom in on
+   another area. Only the visible chunks get a listener.
+5. **Brush**: draw a stroke larger than the remaining quota (20 pixels per minute). It is refused
+   whole, never truncated, and the message says why.
+6. **Discord**:
+   - `/draw x:5000 y:5000 color:#ff0000`: the bot shows "thinking" at once (deferred response,
+     type 5, after `discord-proxy` has published to `pixel-draw-events`). The worker then edits it,
+     and the pixel appears in both browser windows;
+   - `/draw x:20000 y:0 color:red`: an ephemeral error from the proxy, nothing is published;
+   - `/get`: the current canvas as a PNG;
+   - `/admin pause` with an admin account: a draw from the web or Discord is now refused. Try
+     `/admin pause` with a non-admin: refused. Then `/admin resume`;
+   - `/admin ratelimit user:@someone limit:5`;
+   - `/snapshot` (admin): the answer first says the snapshot is being prepared (edited by
+     `draw-worker`), then the same message gets the link. The link comes from `snapshot-notifier`:
+     - the worker uploads `snapshots/<timestamp>.png` with the interaction in its custom metadata;
+     - the bucket fires the `OBJECT_FINALIZE` notification to `snapshot-ready`;
+     - the notifier receives it by push, then signs the URL.
 
-### Step 5.1: Cloud Trace Waterfall Inspection
-- **Action**: In Google Cloud Console, open **Cloud Trace > Trace List**. Select the most recent `/draw` trace.
-- **Narrative**:
-  > *"Here is the complete distributed trace spanning our serverless architecture: API Gateway -> `web-draw-proxy` (span 1) -> Pub/Sub message envelope carrying W3C `traceparent` -> `draw-worker` (span 2) -> Firestore transaction. Cloud Logging entries automatically link to this exact trace ID."*
+     Open the link: a `storage.googleapis.com` URL with `X-Goog-Signature` and
+     `X-Goog-Expires=3600`. In the console, open the object in the bucket: its custom metadata holds
+     `applicationId`, `correlationId`, `traceparent`. Logs Explorer
+     `resource.labels.service_name="snapshot-notifier"` shows *Signed snapshot link sent to Discord*.
+7. `/admin clear` last, if you clear at all. The canvas empties in every window at once, because
+   the epoch in `config/system` changed.
 
-### Step 5.2: Structured Logging & Automatic Redaction
-- **Action**: In Cloud Logging, inspect a draw worker log entry.
-- **Narrative**:
-  > *"Notice that all logs follow our JSON schema with `correlationId`, `eventId`, and Cloud Trace linking fields. Sensitive parameters (OAuth tokens, client secrets, Ed25519 signatures, authorization headers) are automatically sanitized by our logging engine with `[REDACTED]` before leaving memory."*
+## 17:00 to 20:00 - Serverless scaling under load
 
-### Step 5.3: IaC Dashboards & Alerting Policies
-- **Action**: Show the Terraform-provisioned Application Dashboard and Alerting policies in GCP Console.
-- **Narrative**:
-  > *"Our dashboards and alerting policies are declared as code in Terraform (`dashboards.tf`, `alerts.tf`). Critical incidents (5xx error rate > 5%, DLQ messages > 0, Pub/Sub processing backlog > 60s) trigger real email notifications to the operations on-call engineer."*
+1. Copy the ID token from a `/draw` request in DevTools (*Request Headers > authorization*, without
+   `Bearer `).
+2. Run the load test against the gateway:
 
----
+   ```bash
+   node tests/load/burst-load.mjs --url "$GW/draw" --token "<ID token>" -c 20 -n 600 -b 9
+   ```
 
-## Fallback & Troubleshooting Procedures
+   Every request is accepted by the proxy (202) and goes through Pub/Sub. The worker rejects most of
+   them for the rate limit (one user), but it still processes each message, which is what scales.
+3. Show:
+   - *Canvas Serverless Application Dashboard*: *Cloud Functions Invocations*, *Pub/Sub Queue
+     Depth*, *Oldest Unacked Message Age*, *p95 latency*;
+   - *Cloud Run > draw-worker > Metrics*: instance count going up (max 10), then back to 0;
+   - the tool's summary: throughput, p50, p95, p99, errors.
 
-If any cloud or network glitch occurs during the live presentation, execute the corresponding fallback:
+## 20:00 to 24:00 - Security
 
-| Demonstration Act | Potential Issue | Immediate Fallback Action |
+Detail and proofs are in [security-walkthrough.md](security-walkthrough.md). Live:
+
+```bash
+curl -i "$(fn_url web-draw-proxy)"                    # 403: not public, only SA api-gateway may invoke
+curl -i -X POST "$(fn_url draw-worker)"               # refused: ingress internal only
+curl -i -X POST "$GW/draw" -d '{}'                    # 401 from the gateway: no Firebase ID token
+curl -i -X POST "$GW/discord/interactions" -H 'Content-Type: application/json' -d '{"type":1}'   # 401: no Ed25519 signature
+curl -i "https://storage.googleapis.com/teampasx-cloudnative-prd-canvas-snapshots/snapshots/<name>.png"  # 403 without the signature
+gcloud iam service-accounts keys list --iam-account=github-apply@teampasx-cloudnative-prd.iam.gserviceaccount.com --managed-by=user   # empty
+gcloud secrets get-iam-policy discord-client-secret   # only fn-auth-callback
+```
+
+Then show, in the console:
+
+- *IAM > Service accounts*: one per function;
+- *Security > Workload Identity Federation*: pool `github`, condition on the repository;
+- *Settings > Environments* on GitHub.
+
+## 24:00 to 28:00 - Logs, traces, alert
+
+1. **Logs**: Logs Explorer, query with the `correlationId` of step 11:00-2:
+
+   ```text
+   resource.type="cloud_run_revision"
+   jsonPayload.correlationId="<correlationId>"
+   ```
+
+   You get one line from `web-draw-proxy` (*Received draw request*) and one from `draw-worker`
+   (*pixel.processed*), with the same `trace_id`.
+2. **Trace**: in *Trace explorer*, open the trace with that `trace_id` (or click the trace link of
+   a log line). Each function exports its own span with the Cloud Trace API v2 (`src/trace.ts`):
+   `web-draw-proxy /draw` (or `discord-proxy /draw`), then `draw-worker pixel.draw` as its child, with
+   `correlationId` and outcome as attributes, and the log lines alongside.
+
+   For `/snapshot` the same trace continues: `discord-proxy /snapshot` -> `draw-worker
+   discord.command` -> `snapshot-notifier OBJECT_FINALIZE`. The traceparent rides in the object
+   metadata.
+3. **Alert**: *Monitoring > Alerting* lists the policies:
+   - *Cloud Functions High Error Rate (>5% 5xx)*;
+   - *Pub/Sub Dead-Letter Queue Active Messages*;
+   - *Pub/Sub Draw Queue Backlog (Age > 60s)*;
+   - the cluster alerts.
+
+   To fire one live, publish a message the worker cannot parse:
+
+   ```bash
+   gcloud pubsub topics publish pixel-draw-events --message='not json'
+   ```
+
+   `draw-worker` answers 400. Pub/Sub push retries any non-2xx answer, so it retries the message
+   (backoff from 10 s up to 600 s). After 5 attempts it moves the message to
+   `pixel-draw-events-dlq`, and the DLQ alert e-mails the team. Do it at the start
+   of this section: the retries take a few minutes. Read the message back with
+   `gcloud pubsub subscriptions pull pixel-draw-events-dlq-inspection --auto-ack`.
+4. Back to *Actions*: the release started at 4:00 is green, and the change is live on `$WEB`.
+
+## Fallbacks
+
+| Step | Problem | Fallback |
 |---|---|---|
-| **Act 1: CI/CD & Git** | GitHub Actions queue delay | Show previous passing workflow run [commit `7c52222`] with verified GPG signature and complete job step logs. |
-| **Act 2: Runner Autoscale** | GCP Spot VM quota / delay | Show pre-recorded live terminal recording in [docs/runner-auto-scaling-demo.md](file:///c:/Users/Quadu/Desktop/boulot/cloud&Serverless/docs/runner-auto-scaling-demo.md) with timestamped node scaling logs. |
-| **Act 3: Web Frontend** | WiFi connectivity interruption | Run local dev server (`npm run dev --prefix app/frontend`) using offline mode and localStorage fallback. |
-| **Act 4: Discord Bot** | Discord API rate limit or outage | Run the automated test suite `scripts/register-discord-commands.test.mjs` and execute direct curl to API Gateway `/draw` endpoint. |
-| **Act 5: Cloud Trace** | Cloud Trace ingestion delay (1-2 min) | Query Cloud Logging directly with `logging.googleapis.com/trace` filter to show immediate structured correlation. |
+| PR checks | `arc-prd` runners missing | `gh variable delete RUNNER_LABEL` and re-run: the checks use `ubuntu-latest`. Show the runner evidence in [runner-auto-scaling-demo.md](runner-auto-scaling-demo.md) |
+| Release | slow or failing apply | Show the last green `terraform-deploy` run and its plan summaries |
+| Runners | Spot capacity unavailable | `docs/evidence/runner-scaling-dev.csv` and the Grafana history |
+| Web app | prd down | The same app on dev (`https://teampasx-cloudnative-dev.web.app`) |
+| Discord | reply not arriving | Logs Explorer `resource.labels.service_name="discord-proxy"`, then `"draw-worker"`, then `"snapshot-notifier"`, to show where it stopped |
+| Snapshot link | interaction token expired (15 min) or notifier failing | Messages in `snapshot-ready-dlq-inspection`; the object is still in the bucket |
+| Alert | e-mail delayed | Show the incident in *Monitoring > Alerting* and the messages in `pixel-draw-events-dlq-inspection` |
