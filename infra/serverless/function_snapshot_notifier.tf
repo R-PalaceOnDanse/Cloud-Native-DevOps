@@ -43,6 +43,10 @@ resource "google_cloudfunctions2_function" "snapshot_notifier" {
     all_traffic_on_latest_revision = true
     # Only reachable from Google services of the project (the Pub/Sub push), never from the internet.
     ingress_settings = "ALLOW_INTERNAL_ONLY"
+
+    environment_variables = {
+      GOOGLE_CLOUD_PROJECT = var.project_id
+    }
   }
 
   depends_on = [
