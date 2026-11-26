@@ -1,6 +1,7 @@
 name: terraform-deploy
 
-# A release: pushing a tag vMAJOR.MINOR.PATCH applies foundation then serverless to dev, then to prd.
+# A release: pushing a tag vMAJOR.MINOR.PATCH applies foundation then serverless and deploys the frontend to dev, then
+# does the same in prd.
 on:
   push:
     tags:
@@ -49,8 +50,15 @@ jobs:
       environment: dev
       action: apply
 
-  foundation-prd:
+  frontend-dev:
     needs: serverless-dev
+    uses: ./.github/workflows/frontend-deploy.yml
+    with:
+      environment: dev
+
+  # prd waits for the whole of dev, frontend included.
+  foundation-prd:
+    needs: frontend-dev
     uses: ./.github/workflows/terraform-run.yml
     secrets: inherit
     with:
@@ -66,3 +74,9 @@ jobs:
       stack: serverless
       environment: prd
       action: apply
+
+  frontend-prd:
+    needs: serverless-prd
+    uses: ./.github/workflows/frontend-deploy.yml
+    with:
+      environment: prd

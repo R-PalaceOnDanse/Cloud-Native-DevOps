@@ -310,8 +310,9 @@ npm test
 ## 📦 Déploiement
 
 Le frontend est hébergé de façon 100% serverless sur **Firebase Hosting** avec CDN mondial Google :
-- Fichier de configuration : `firebase.json` à la racine du dépôt.
+- Fichier de configuration : `app/frontend/firebase.json` (site par défaut du projet, `public` = `dist`).
 - Routage SPA : Toutes les requêtes `**` sont réécrites vers `/index.html`.
 - Politique de cache :
-  - Assets compilés (`/assets/*.js`, `/assets/*.css`) : `public, max-age=31536000, immutable` (mise en cache 1 an).
-  - Page d'entrée (`/index.html`) : `no-cache, no-store, must-revalidate` (rafraîchissement immédiat à chaque nouveau déploiement).
+  - Assets compilés et hachés (`/assets/**`) : `public, max-age=31536000, immutable` (mise en cache 1 an).
+  - Page d'entrée (`/`, `/index.html` et les routes sans extension) : `no-cache` (revalidée à chaque visite, donc à jour dès un nouveau déploiement).
+- Déploiement : automatique à chaque release (tag `vX.Y.Z`), par le workflow `frontend-deploy` après l'apply de la stack serverless. Voir [docs/frontend.md](../../docs/frontend.md#9-build-and-deployment-issue-168).

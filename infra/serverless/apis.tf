@@ -17,6 +17,7 @@ locals {
     "logging.googleapis.com",           # Cloud Logging
     "cloudtrace.googleapis.com",        # Cloud Trace (Issue #88)
     "firebase.googleapis.com",          # Firebase project (Auth, Hosting)
+    "firebasehosting.googleapis.com",   # Firebase Hosting: the frontend's site and its releases (#168)
     "identitytoolkit.googleapis.com",   # Firebase Authentication: custom tokens (ADR-0009)
     "iamcredentials.googleapis.com",    # signBlob: custom tokens and snapshot signed URLs, no key file
   ]

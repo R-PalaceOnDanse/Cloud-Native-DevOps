@@ -184,9 +184,36 @@ In accordance with [ADR-0008](adr/0008-firestore-listeners-for-realtime.md) and 
   - **Read Only for Authenticated Users**: `match /chunks/{chunkId}` and `match /config/{docId}` require `request.auth != null`.
   - **Zero Client Writes**: All client writes (`write: if false`) are strictly rejected. Pixel updates must pass exclusively through the API Gateway ➔ Web Draw Proxy ➔ Pub/Sub ➔ Worker pipeline.
   - **Protected Rate Limits**: `match /ratelimits/{userId}` rejects all client reads and writes (accessible only to backend workers via Admin SDK).
-- **Firebase Hosting Configuration (`firebase.json`)**:
+- **Firebase Hosting Configuration (`app/frontend/firebase.json`)**:
   - Serves static assets from `app/frontend/dist`.
   - Single-page application URL rewrites: `**` rewrites to `/index.html`.
-  - Cache-Control headers: Immutable 1-year cache on hashed JS/CSS assets (`public, max-age=31536000, immutable`), and no-cache on `/index.html` for immediate release updates.
+  - Cache-Control headers: Immutable 1-year cache on the hashed Vite assets (`/assets/**`: `public, max-age=31536000, immutable`), and `no-cache` on `/`, `/index.html` and extension-less routes, so a release is visible at the next visit.
+  - It only configures Hosting: the Firestore rules are released by Terraform (`infra/serverless/firestore_rules.tf`), never by `firebase deploy`.
+
+---
+
+## 9. Build and Deployment (Issue #168)
+
+The frontend is released with the infrastructure, by the same tag `vX.Y.Z` (see [ci.md](ci.md#releasing)):
+
+1. **The site is Terraform's.** `infra/serverless/firebase.tf` manages the project's default Hosting
+   site (`google_firebase_hosting_site.default`, `site_id` = project ID, so `https://<project>.web.app`,
+   which is `frontend_origin`). Firebase may already have created it: the provider then adopts it
+   instead of failing, and a destroy only forgets it, because a default site cannot be deleted.
+2. **The content is the pipeline's.** After `serverless` is applied in an environment, the reusable
+   workflow `.github/workflows/frontend-deploy.yml` runs in the same GitHub environment:
+   - it authenticates as that environment's apply account (Workload Identity, no key; the account
+     holds `roles/firebase.admin`) and runs `terraform init` on `infra/serverless`, only to read outputs;
+   - it writes `app/frontend/.env.production` from `terraform output -json frontend_build_env`
+     (gateway URL, Firebase web configuration, Discord client ID: public values that Vite inlines);
+   - `npm ci`, `npm run build`, then `firebase-tools` (pinned version) deploys `dist/` with
+     `deploy --only hosting --project <project_id> --non-interactive`, using the same credentials.
+3. **Order.** dev: foundation → serverless → frontend; prd starts only once the dev frontend is
+   deployed. The build always uses the outputs of the apply that just ran, so the bundle and the
+   gateway it calls cannot drift apart.
+
+Nothing is configured by hand for it. To replay a deployment, re-run the failed `frontend-*` job of
+the release. To roll back without a release, the Firebase console (*Hosting → Release history →
+Rollback*) restores a previous version; the next release overwrites it.
 
 
