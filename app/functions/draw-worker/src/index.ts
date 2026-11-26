@@ -55,7 +55,8 @@ export function createDrawWorkerHandler(resolveDeps: () => WorkerDependencies) {
     try {
       envelope = JSON.parse(Buffer.from(body.message.data, 'base64').toString('utf8'));
     } catch {
-      // A message that cannot be parsed will never succeed: acknowledge it, do not retry.
+      // A message that cannot be parsed will never succeed. Pub/Sub push retries any non-2xx answer,
+      // so it is retried, then lands in pixel-draw-events-dlq (DLQ alert): visible, never lost silently.
       res.status(400).json({ error: 'Bad Request: unable to parse JSON message payload.' });
       return;
     }
