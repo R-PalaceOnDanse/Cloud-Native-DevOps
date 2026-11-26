@@ -16,25 +16,30 @@ permissions:
   id-token: write
 
 jobs:
-  deploy:
-    name: deploy frontend to ${{ inputs.environment }}
+  build:
+    name: build frontend for ${{ inputs.environment }}
     runs-on: ubuntu-latest
-    # Only a job of this environment may impersonate the apply account (ADR-0011), which holds roles/firebase.admin.
-    environment: ${{ inputs.environment }}
-    env:
-      # Exact version, so a release cannot change because firebase-tools published a new one.
-      FIREBASE_TOOLS_VERSION: "15.36.0"
+    outputs:
+      project_id: ${{ steps.config.outputs.project_id }}
     steps:
       - uses: actions/checkout@v4
-      # Authenticates and initialises the serverless stack only to read its outputs: nothing is planned or applied.
-      # The auth step writes a credentials file and exports GOOGLE_APPLICATION_CREDENTIALS, which firebase-tools
-      # reads as Application Default Credentials: no key and no FIREBASE_TOKEN.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/frontend/package-lock.json
+      # Install dependencies before authenticating to GCP so no npm lifecycle script can access any credentials.
+      - name: npm ci
+        shell: bash
+        working-directory: app/frontend
+        run: npm ci
+      # Authenticates with the read-only plan account only to read the public Terraform outputs.
       - uses: ./.github/actions/terraform-init
         with:
           stack: serverless
           environment: ${{ inputs.environment }}
           workload-identity-provider: ${{ inputs.environment == 'dev' && vars.GCP_WIF_PROVIDER_DEV || vars.GCP_WIF_PROVIDER_PRD }}
-          service-account: ${{ inputs.environment == 'dev' && vars.GCP_APPLY_SA_DEV || vars.GCP_APPLY_SA_PRD }}
+          service-account: ${{ inputs.environment == 'dev' && vars.GCP_PLAN_SA_DEV || vars.GCP_PLAN_SA_PRD }}
       - name: Write the build configuration from the Terraform outputs
         id: config
         shell: bash
@@ -50,24 +55,47 @@ jobs:
           fi
           echo "project_id=$project_id" >> "$GITHUB_OUTPUT"
           echo "Building for $project_id with: $(cut -d= -f1 app/frontend/.env.production | paste -sd' ')"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: app/frontend/package-lock.json
-      - name: npm ci
-        shell: bash
-        working-directory: app/frontend
-        run: npm ci
       - name: npm run build
         shell: bash
         working-directory: app/frontend
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ""
         run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist-${{ inputs.environment }}
+          path: app/frontend/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    name: deploy frontend to ${{ inputs.environment }}
+    needs: build
+    runs-on: ubuntu-latest
+    # Only a job of this environment may impersonate the apply account (ADR-0011), which holds roles/firebase.admin.
+    environment: ${{ inputs.environment }}
+    env:
+      # Exact version, so a release cannot change because firebase-tools published a new one.
+      FIREBASE_TOOLS_VERSION: "15.36.0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist-${{ inputs.environment }}
+          path: app/frontend/dist
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Authenticates only after the bundle is already built; firebase-tools reads ADC from GOOGLE_APPLICATION_CREDENTIALS.
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ inputs.environment == 'dev' && vars.GCP_WIF_PROVIDER_DEV || vars.GCP_WIF_PROVIDER_PRD }}
+          service_account: ${{ inputs.environment == 'dev' && vars.GCP_APPLY_SA_DEV || vars.GCP_APPLY_SA_PRD }}
       - name: Deploy to Firebase Hosting
         shell: bash
         working-directory: app/frontend
         env:
-          PROJECT_ID: ${{ steps.config.outputs.project_id }}
+          PROJECT_ID: ${{ needs.build.outputs.project_id }}
         run: |
           npx --yes "firebase-tools@$FIREBASE_TOOLS_VERSION" deploy --only hosting --project "$PROJECT_ID" \
             --non-interactive --message "$GITHUB_REF_NAME ($GITHUB_SHA)"
@@ -75,6 +103,6 @@ jobs:
         shell: bash
         env:
           ENVIRONMENT: ${{ inputs.environment }}
-          PROJECT_ID: ${{ steps.config.outputs.project_id }}
+          PROJECT_ID: ${{ needs.build.outputs.project_id }}
         run: |
           echo "### frontend $GITHUB_REF_NAME deployed to $ENVIRONMENT: https://$PROJECT_ID.web.app" >> "$GITHUB_STEP_SUMMARY"
