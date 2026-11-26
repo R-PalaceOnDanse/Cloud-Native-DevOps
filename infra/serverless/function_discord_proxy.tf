@@ -17,9 +17,10 @@ resource "google_cloudfunctions2_function" "discord_proxy" {
   description = "C06: discord proxy function"
 
   build_config {
-    runtime         = "nodejs22"
-    entry_point     = "discordProxy"
-    service_account = google_service_account.build.id
+    runtime           = "nodejs22"
+    entry_point       = "discordProxy"
+    service_account   = google_service_account.build.id
+    docker_repository = google_artifact_registry_repository.functions.id
 
     source {
       storage_source {

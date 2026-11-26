@@ -3,9 +3,9 @@
  *
  * - The grid is 10000x10000: the image covers the painted area (bounding box plus a margin), scaled
  *   down so its longest side is at most MAX_IMAGE_SIDE pixels.
- * - Snapshots go to the private bucket under a timestamped name; Discord gets a V4 signed URL valid one
- *   hour. On Cloud Run there is no key file: the Storage client signs through the IAM signBlob API with
- *   the function's own service account (roles/iam.serviceAccountTokenCreator on itself).
+ * - Snapshots go to the private bucket under a timestamped name, with the Discord interaction in their
+ *   custom metadata. The worker only creates the object: its ObjectCreated event triggers
+ *   snapshot-notifier, which signs the URL and edits the Discord answer (event-driven, Issue #169).
  */
 
 import { deflateSync } from 'node:zlib';
@@ -106,19 +106,30 @@ export function renderCanvas(pixels: readonly PixelWrite[]): RenderedCanvas {
   return { png: encodeRgbaToPng(rgba, width, height), width, height, originX: minX, originY: minY, scale };
 }
 
+/** Custom metadata read by snapshot-notifier to answer the right interaction, in the same trace. */
+export interface SnapshotMetadata {
+  applicationId: string;
+  interactionToken: string;
+  correlationId: string;
+  traceparent: string;
+  requestedBy: string;
+}
+
 export interface SnapshotStorage {
-  /** Stores the image and returns a time-limited signed URL to it. */
-  save(objectName: string, png: Buffer, expiresInSeconds: number): Promise<string>;
+  /** Creates the object; it never signs URLs (the worker only has objectCreator on the bucket). */
+  save(objectName: string, png: Buffer, metadata: SnapshotMetadata): Promise<void>;
 }
 
 export class GcsSnapshotStorage implements SnapshotStorage {
   constructor(private readonly storage: Storage, private readonly bucketName: string) {}
 
-  async save(objectName: string, png: Buffer, expiresInSeconds: number): Promise<string> {
+  async save(objectName: string, png: Buffer, metadata: SnapshotMetadata): Promise<void> {
     const file = this.storage.bucket(this.bucketName).file(objectName);
-    await file.save(png, { contentType: 'image/png', resumable: false, metadata: { cacheControl: 'private, max-age=0' } });
-    const [url] = await file.getSignedUrl({ version: 'v4', action: 'read', expires: Date.now() + expiresInSeconds * 1000 });
-    return url;
+    await file.save(png, {
+      contentType: 'image/png',
+      resumable: false,
+      metadata: { cacheControl: 'private, max-age=0', metadata: { ...metadata } },
+    });
   }
 }
 

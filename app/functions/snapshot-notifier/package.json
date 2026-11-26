@@ -1,0 +1,25 @@
+{
+  "name": "snapshot-notifier",
+  "version": "1.0.0",
+  "description": "Event-driven snapshot notifier: GCS ObjectCreated -> signed URL -> Discord (Issue #169 / C07 §2)",
+  "main": "dist/index.js",
+  "type": "module",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "node ./node_modules/typescript/bin/tsc",
+    "gcp-build": "npm run build",
+    "test": "node ./node_modules/typescript/bin/tsc && node --test dist/index.test.js",
+    "start": "functions-framework --target=snapshotNotifier"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^5.0.5",
+    "@google-cloud/storage": "^7.22.0",
+    "google-auth-library": "^9.15.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -59,7 +59,7 @@ resource "google_monitoring_alert_policy" "pubsub_dlq_messages" {
   conditions {
     display_name = "Unacknowledged messages on Dead-Letter Subscription"
     condition_threshold {
-      filter          = "metric.type=\"pubsub.googleapis.com/topic/send_request_count\" resource.type=\"pubsub_topic\" resource.label.topic_id=\"pixel-draw-events-dlq\""
+      filter          = "metric.type=\"pubsub.googleapis.com/topic/send_request_count\" resource.type=\"pubsub_topic\" resource.label.topic_id=one_of(\"pixel-draw-events-dlq\", \"snapshot-ready-dlq\")"
       duration        = "0s"
       comparison      = "COMPARISON_GT"
       threshold_value = 0
@@ -74,7 +74,7 @@ resource "google_monitoring_alert_policy" "pubsub_dlq_messages" {
   notification_channels = [for channel in google_monitoring_notification_channel.email : channel.id]
 
   documentation {
-    content   = "One or more poison pill messages were routed to the Dead-Letter Queue `pixel-draw-events-dlq` after exhausting delivery retries."
+    content   = "One or more poison pill messages were routed to a Dead-Letter Queue (`pixel-draw-events-dlq` or `snapshot-ready-dlq`) after exhausting delivery retries."
     mime_type = "text/markdown"
   }
 }

@@ -4,7 +4,7 @@ import { createDrawWorkerHandler, type WorkerDependencies } from './index.js';
 import { ChunkStore } from './chunk-store.js';
 import { WorkerRateLimiter } from './rate-limiter.js';
 import type { DiscordApiClient } from './discord-api.js';
-import { renderCanvas } from './snapshot-service.js';
+import { renderCanvas, type SnapshotMetadata } from './snapshot-service.js';
 
 function http(body: unknown) {
   let statusCode = 200;
@@ -30,14 +30,13 @@ function push(envelope: unknown) {
 function setup(overrides: Partial<WorkerDependencies> = {}, admins: string[] = []) {
   const replies: string[] = [];
   const images: Buffer[] = [];
-  const saved: string[] = [];
+  const saved: Array<{ name: string; metadata: SnapshotMetadata }> = [];
   const deps: WorkerDependencies = {
     canvas: new ChunkStore(admins),
     rateLimiter: new WorkerRateLimiter(),
     snapshots: {
-      save: async (name: string) => {
-        saved.push(name);
-        return `https://storage.googleapis.com/bucket/${name}?X-Goog-Signature=abc`;
+      save: async (name: string, _png: Buffer, metadata: SnapshotMetadata) => {
+        saved.push({ name, metadata });
       },
     },
     discord: {
@@ -191,17 +190,43 @@ test('draw worker', async (t) => {
     assert.deepEqual([...images[0]!.subarray(0, 4)], [0x89, 0x50, 0x4e, 0x47]);
   });
 
-  await t.test('/snapshot stores a timestamped image and returns its signed URL (admins only)', async () => {
+  await t.test('/snapshot stores a timestamped image with the interaction in its metadata (admins only)', async () => {
     const { handler, saved, replies } = setup({}, ['eve']);
     const refused = http(push(command('s0', 'mallory', 'snapshot')));
     await handler(refused.req, refused.res);
     assert.equal(refused.data().status, 'unauthorized');
+    assert.equal(saved.length, 0);
 
-    const h = http(push(command('s1', 'eve', 'snapshot')));
+    const traceParent = '00-abcdef1234567890abcdef1234567890-1122334455667788-01';
+    const h = http(push({ ...command('s1', 'eve', 'snapshot'), traceParent }));
     await handler(h.req, h.res);
     assert.equal(h.data().status, 'snapshot_success');
-    assert.match(saved[0]!, /^snapshots\/\d{4}-\d{2}-\d{2}T.*\.png$/);
-    assert.match(replies.at(-1)!, /X-Goog-Signature/);
+    assert.equal(h.data().signedUrl, undefined); // signing is the notifier's job now
+    assert.match(saved[0]!.name, /^snapshots\/\d{4}-\d{2}-\d{2}T.*\.png$/);
+    const meta = saved[0]!.metadata;
+    assert.equal(meta.applicationId, 'app');
+    assert.equal(meta.interactionToken, 'tok');
+    assert.equal(meta.correlationId, 'corr-s1');
+    assert.equal(meta.requestedBy, 'eve');
+    // Same trace, parent = the worker span, so the notifier span hangs under it.
+    assert.equal(meta.traceparent, `00-abcdef1234567890abcdef1234567890-${h.data().spanId}-01`);
+    assert.match(replies.at(-1)!, /being prepared/);
+  });
+
+  await t.test('/snapshot answers 500 when the upload fails so Pub/Sub retries', async () => {
+    const { handler } = setup(
+      {
+        snapshots: {
+          save: async () => {
+            throw new Error('storage unavailable');
+          },
+        },
+      },
+      ['eve']
+    );
+    const h = http(push(command('s2', 'eve', 'snapshot')));
+    await handler(h.req, h.res);
+    assert.equal(h.status(), 500);
   });
 
   await t.test('answers 500 on a storage failure so Pub/Sub retries then dead-letters', async () => {

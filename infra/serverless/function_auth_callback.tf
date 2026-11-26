@@ -19,9 +19,10 @@ resource "google_cloudfunctions2_function" "auth_callback" {
   description = "Exchanges Discord OAuth2 authorization code and mints session token."
 
   build_config {
-    runtime         = "nodejs22"
-    entry_point     = "authCallback"
-    service_account = google_service_account.build.id
+    runtime           = "nodejs22"
+    entry_point       = "authCallback"
+    service_account   = google_service_account.build.id
+    docker_repository = google_artifact_registry_repository.functions.id
 
     source {
       storage_source {
