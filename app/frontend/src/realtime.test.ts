@@ -189,3 +189,30 @@ describe('Real-time Viewport & Chunk Subscription Engine (Issue #81 / C07 §3.3)
     manager.destroy();
   });
 });
+
+describe('Listeners re-opened after the sign-in', () => {
+  it('restart() re-subscribes every visible chunk and the system state', () => {
+    let chunkSubs = 0;
+    let systemSubs = 0;
+    const provider = {
+      subscribe: () => { chunkSubs++; return () => {}; },
+      subscribeSystemState: () => { systemSubs++; return () => {}; },
+    };
+    const renderer = new CanvasRenderer(new MockCanvasElement() as unknown as HTMLCanvasElement);
+    const manager = new RealtimeManager(provider, renderer, () => {});
+    const viewport = createDefaultViewport(800, 600);
+
+    manager.subscribeSystemState(() => {});
+    manager.updateViewport(viewport);
+    const visible = manager.getActiveSubscriptionCount();
+    assert.ok(visible > 0);
+    assert.strictEqual(chunkSubs, visible);
+    assert.strictEqual(systemSubs, 1);
+
+    // Page loaded before the session was restored: every listener must be opened again.
+    manager.restart(viewport);
+    assert.strictEqual(chunkSubs, visible * 2);
+    assert.strictEqual(systemSubs, 2);
+    assert.strictEqual(manager.getActiveSubscriptionCount(), visible);
+  });
+});

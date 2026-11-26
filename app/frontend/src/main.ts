@@ -20,7 +20,7 @@ import { Minimap } from './minimap.js';
 import { getBrushPixels, validateBrushStroke, BRUSH_PIXEL_COUNTS, BrushSize } from './brush.js';
 import { RealtimeManager, SystemState } from './realtime.js';
 import { createRealtimeProvider } from './firestore-provider.js';
-import { authenticateFirebase, getFirebaseIdToken } from './firebase.js';
+import { authenticateFirebase, getFirebaseIdToken, onFirebaseSignIn } from './firebase.js';
 import { authManager, UserProfile } from './auth.js';
 import { drawApiClient } from './api.js';
 import { formatPixelInspection } from './inspector.js';
@@ -162,6 +162,10 @@ realtimeManager.subscribeSystemState((state: SystemState) => {
     showToast('🧹 Canvas has been cleared by an administrator.', 'info');
   }
 });
+
+// The Firestore rules only serve signed-in users: listeners opened before the sign-in were refused
+// and stopped. Re-open them as soon as Firebase has a user (login, or session restored on reload).
+onFirebaseSignIn(() => realtimeManager.restart(viewport));
 
 // Minimap Radar Initialization
 let minimap: Minimap | null = null;

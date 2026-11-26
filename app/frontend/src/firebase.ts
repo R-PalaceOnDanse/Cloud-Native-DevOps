@@ -6,7 +6,7 @@
 
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
-import { getAuth, type Auth, signInWithCustomToken } from 'firebase/auth';
+import { getAuth, type Auth, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 
 export interface FirebaseInstance {
   app: FirebaseApp;
@@ -68,6 +68,20 @@ export function getFirebaseInstance(): FirebaseInstance | null {
 export async function getFirebaseIdToken(): Promise<string | null> {
   const user = getFirebaseInstance()?.auth.currentUser;
   return user ? user.getIdToken() : null;
+}
+
+/**
+ * Calls `onSignedIn` each time a Firebase user becomes signed in: after the Discord login, and when
+ * the SDK restores the session on page load. Does nothing without a Firebase configuration.
+ */
+export function onFirebaseSignIn(onSignedIn: () => void): () => void {
+  const instance = getFirebaseInstance();
+  if (!instance) return () => {};
+  let lastUid: string | null = null;
+  return onAuthStateChanged(instance.auth, (user) => {
+    if (user && user.uid !== lastUid) onSignedIn();
+    lastUid = user ? user.uid : null;
+  });
 }
 
 /**
