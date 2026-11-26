@@ -14,7 +14,9 @@
   "license": "ISC",
   "dependencies": {
     "@google-cloud/functions-framework": "^5.0.5",
-    "@google-cloud/secret-manager": "^8.0.0"
+    "@google-cloud/pubsub": "^4.11.0",
+    "@google-cloud/secret-manager": "^8.0.0",
+    "google-auth-library": "^9.15.1"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

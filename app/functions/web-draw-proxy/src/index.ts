@@ -12,6 +12,7 @@ import type { Request, Response } from '@google-cloud/functions-framework';
 import { validateDrawBatch } from './validator.js';
 import { identityFromGateway, USERINFO_HEADER } from './auth.js';
 import { EventPublisher, PubSubEventPublisher, EventEnvelope } from './publisher.js';
+import { exportSpan } from './trace.js';
 
 export interface PixelDrawData {
   userId: string;
@@ -31,6 +32,7 @@ function setCors(res: Response) {
 
 export function createDrawProxyHandler(publisher: EventPublisher, topicName = process.env.PIXEL_DRAW_TOPIC || 'pixel-draw-events') {
   return async function webDrawProxy(req: Request, res: Response): Promise<void> {
+    const start = new Date();
     setCors(res);
     if (req.method === 'OPTIONS') {
       res.status(204).send('');
@@ -129,8 +131,19 @@ export function createDrawProxyHandler(publisher: EventPublisher, topicName = pr
     };
 
     // 6. Publish to Pub/Sub (Asynchronous pipeline, zero direct storage writes)
+    const span = (outcome: string) =>
+      exportSpan({
+        traceId,
+        spanId, // the worker's span is its child (traceParent of the event)
+        parentSpanId, // the browser's span, when it sent a traceparent
+        name: 'web-draw-proxy /draw',
+        start,
+        end: new Date(),
+        attributes: { correlationId, eventType: 'pixel.draw', pixels: validation.pixels?.length ?? 0, outcome },
+      });
     try {
       const messageId = await publisher.publish(topicName, event);
+      await span('published');
 
       res.status(202).json({
         status: 'accepted',
@@ -142,6 +155,7 @@ export function createDrawProxyHandler(publisher: EventPublisher, topicName = pr
         pixelCount: validation.pixels.length,
       });
     } catch (err) {
+      await span('publish_failed');
       console.error(
         JSON.stringify({
           severity: 'ERROR',
