@@ -47,13 +47,12 @@ locals {
     # Cloud Logging log sinks and configurations
     "roles/logging.admin",
     # Serverless stack (infra/serverless): without these the release fails once Editor is gone
-    "roles/pubsub.admin",                   # topics, subscriptions, dead-letter grants
-    "roles/datastore.owner",                # Firestore database
-    "roles/firebaserules.admin",            # Firestore security rules
-    "roles/firebase.admin",                 # Firebase project and web app
-    "roles/identityplatform.admin",         # Firebase Authentication configuration
-    "roles/iam.serviceAccountTokenCreator", # API Gateway, Pub/Sub and self-signing grants on service accounts
-    "roles/artifactregistry.admin",         # images repository of the functions, deleted with the stack (#171)
+    "roles/pubsub.admin",           # topics, subscriptions, dead-letter grants
+    "roles/datastore.owner",        # Firestore database
+    "roles/firebaserules.admin",    # Firestore security rules
+    "roles/firebase.admin",         # Firebase project and web app
+    "roles/identityplatform.admin", # Firebase Authentication configuration
+    "roles/artifactregistry.admin", # images repository of the functions, deleted with the stack (#171)
   ]
 }
 
