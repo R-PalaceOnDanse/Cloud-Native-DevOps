@@ -19,10 +19,12 @@ client --HTTPS + x-api-key--> API Gateway (canvas-gw) --ID token of api-gateway 
 | Cloud Run function | `web-draw-proxy` (Node.js 22, TypeScript) | Validates pixel draw batches and publishes event envelopes to Pub/Sub (#76). |
 | Cloud Run function | `auth-callback` (Node.js 22, TypeScript) | Exchanges Discord OAuth2 code, discards access token, and mints session token (#79). |
 | Cloud Run function | `draw-worker` (Node.js 22, TypeScript) | Consumes Pub/Sub messages, updates Firestore chunks, enforces rate limits, handles admin commands and snapshots (#141, #147). |
+| Cloud Run function | `snapshot-notifier` (Node.js 22, TypeScript) | Triggered by each new snapshot object: signs a read URL valid 1 hour and edits the Discord answer of `/snapshot` (#169). |
 | Service account | `fn-hello` | Runtime identity of `hello`: writes logs, reads `hello-greeting`. Nothing else. |
 | Service account | `fn-web-draw-proxy` | Runtime identity of `web-draw-proxy`: publishes to `pixel-draw-events`. |
 | Service account | `fn-auth-callback` | Runtime identity of `auth-callback`: reads Discord OAuth secrets from Secret Manager. |
-| Service account | `fn-draw-worker` | Runtime identity of `draw-worker`: reads Pub/Sub messages, writes Firestore chunks, accesses snapshot bucket (#136). |
+| Service account | `fn-draw-worker` | Runtime identity of `draw-worker`: reads Pub/Sub messages, writes Firestore chunks, creates snapshot objects (`storage.objectCreator`, cannot read or sign them) (#136, #169). |
+| Service account | `fn-snapshot-notifier` | Runtime identity of `snapshot-notifier`: reads the snapshots (`storage.objectViewer` on the bucket), signs URLs with its own identity (`iam.serviceAccountTokenCreator` on itself), logs, traces. |
 | Service account | `api-gateway` | Identity of the gateway. The only principal with `run.invoker` on protected functions. |
 | Service account | `fn-build` | Builds the sources with Cloud Build, instead of the default compute account. Roles: log writer, Artifact Registry writer, Storage object viewer. |
 | Secret | `hello-greeting` | Created by Terraform, **value added by hand** (below). |
@@ -30,6 +32,10 @@ client --HTTPS + x-api-key--> API Gateway (canvas-gw) --ID token of api-gateway 
 | Bucket | `<project>-canvas-snapshots` | Private bucket for timestamped canvas snapshots, accessed strictly via signed URLs (#135). |
 | Pub/Sub Topic | `pixel-draw-events` | Message broker topic for asynchronous pixel draws and commands (#137). |
 | Pub/Sub Subscription | `draw-worker-sub` | Push subscription invoking `draw-worker` with exponential retry backoff and DLQ (#137). |
+| Bucket notification | snapshots bucket -> `snapshot-ready` | `OBJECT_FINALIZE` of `snapshots/*`, JSON payload (the object with its custom metadata), published by the Cloud Storage service agent (#169). |
+| Pub/Sub Topic | `snapshot-ready` (+ `snapshot-ready-dlq`) | ObjectCreated events of the snapshots; 5 attempts then the dead-letter topic, kept 7 days in `snapshot-ready-dlq-inspection`. |
+| Pub/Sub Subscription | `snapshot-notifier-sub` | Push subscription invoking `snapshot-notifier` with an OIDC token of `pubsub-push`. |
+| Artifact Registry | `functions` | Images built for the functions (`docker_repository`), cleaned after 7 days except the 3 latest; deleted with the stack (#171). |
 | API key | `canvas-demo` | Restricted to `canvas-api`. Read with `terraform output -raw demo_api_key`. |
 
 Every identity is explicit: the function runtime, the build and the gateway each name their own
@@ -111,6 +117,75 @@ then prd ([ci.md](ci.md)). The destroy workflow destroys it before `foundation`.
 apply account needs `roles/run.admin` and `roles/secretmanager.admin` in addition to Editor, and
 the plan account `roles/serviceusage.apiKeysViewer`; both are granted by the `access` stack.
 
+## Destroy (#171)
+
+A `terraform destroy` of this stack leaves nothing billable and needs no manual step before it:
+
+- Buckets (`<project>-fn-sources`, `<project>-canvas-snapshots`) have `force_destroy`: their objects
+  go with them. Firestore has `deletion_policy = "DELETE"` and no delete protection. The Firebase web
+  app has `deletion_policy = "DELETE"`.
+- The function images live in the Terraform-managed `functions` repository (`docker_repository` on
+  every function), deleted with its images. Without it Cloud Functions would create `gcf-artifacts`,
+  which a destroy does not see and which keeps billing storage. The apply account needs
+  `roles/artifactregistry.admin` for it (access stack).
+- Functions, API Gateway (the config is `create_before_destroy`), Pub/Sub topics and subscriptions
+  (their retained messages included), the bucket notification, secrets and their values, service
+  accounts, alerts, dashboard and API key are all deleted.
+
+What remains, on purpose, and costs nothing:
+
+| Leftover | Why |
+|---|---|
+| `google_firebase_project`, `google_identity_platform_config` | No delete API: Firebase cannot be removed from a project, and Identity Platform cannot be turned off. A destroy forgets them. Free without monthly active users; the `discord:<id>` users stay but sign-ins stop with the stack. |
+| Enabled APIs (`disable_on_destroy = false`) | Disabling an API is slow, breaks a re-apply that follows, and an enabled API costs nothing by itself. |
+| Google-managed service agents (Pub/Sub, Cloud Storage, API Gateway) | Created by Google per project, not deletable, free. |
+| Soft-deleted API key and Firebase web app | Kept 30 days by Google in a deleted state, then purged. Not usable, not billed. |
+| Logs and traces already written | Kept until their retention ends (30 days for `_Default`), inside the free allotment. |
+
+### Verify on dev (human, with an owner account)
+
+1. Destroy: *Actions* -> `terraform-destroy` -> *Run workflow* on `main`, environment `dev`,
+   confirm `dev` (or `gh workflow run terraform-destroy.yml --ref main -f environment=dev -f confirm=dev`).
+   It destroys `serverless` then `foundation`.
+2. Once only, on a project deployed before #171: delete the repository Cloud Functions created by
+   itself, which no destroy can see:
+   `gcloud artifacts repositories delete gcf-artifacts --location=europe-west1 --project=teampasx-cloudnative-dev`.
+3. Check that nothing billable remains; every command must print nothing (or only what is said):
+   ```bash
+   P=teampasx-cloudnative-dev; R=europe-west1
+   gcloud functions list --project=$P
+   gcloud run services list --project=$P --region=$R
+   gcloud api-gateway gateways list --project=$P --location=$R
+   gcloud api-gateway apis list --project=$P
+   gcloud pubsub topics list --project=$P --format='value(name)'
+   gcloud pubsub subscriptions list --project=$P --format='value(name)'
+   gcloud storage buckets list --project=$P --format='value(name)'   # only the Terraform state bucket(s)
+   gcloud artifacts repositories list --project=$P --location=$R
+   gcloud firestore databases list --project=$P --format='value(name)'
+   gcloud secrets list --project=$P --format='value(name)'           # only secrets of the access stack, if any
+   gcloud services api-keys list --project=$P
+   gcloud iam service-accounts list --project=$P --format='value(email)' | grep -E 'fn-|pubsub-push|api-gateway'
+   gcloud container clusters list --project=$P                        # foundation: no GKE cluster
+   gcloud compute routers list --project=$P                           # foundation: no Cloud NAT router
+   gcloud compute addresses list --project=$P                         # no reserved IP
+   ```
+   Then the *Billing* -> *Reports* page of the project, grouped by SKU, the next day: no cost after
+   the destroy time.
+4. Re-apply: re-run the last `terraform-deploy` run (*Re-run all jobs*), or push the next tag.
+   Afterwards, as after any first deployment: add the three secret values again
+   ([Configure an environment](#configure-an-environment-for-the-application-once-per-environment),
+   and `hello-greeting` above), set the Discord *Interactions endpoint URL* to the new `gateway_url`
+   if it changed, and rebuild the frontend with the new `frontend_build_env` (new web app ID). If
+   the apply fails with `ALREADY_EXISTS` on `google_firebase_project.this` or
+   `google_identity_platform_config.this` (the leftovers above), import them once with the apply
+   account and re-run:
+   `terraform import -var-file=dev.tfvars google_firebase_project.this projects/teampasx-cloudnative-dev`,
+   `terraform import -var-file=dev.tfvars google_identity_platform_config.this projects/teampasx-cloudnative-dev/config`.
+   If it fails on `google_apikeys_key.demo` because the soft-deleted `canvas-demo` still holds its
+   name, restore it (`gcloud services api-keys undelete <key-uid> --project=$P`, uid from
+   `gcloud services api-keys list --show-deleted`) and import it:
+   `terraform import -var-file=dev.tfvars google_apikeys_key.demo projects/teampasx-cloudnative-dev/locations/global/keys/canvas-demo`.
+
 ## The application pipeline (C06 & C07)
 
 | Component | Role | Identity and access |
@@ -119,7 +194,26 @@ the plan account `roles/serviceusage.apiKeysViewer`; both are granted by the `ac
 | `web-draw-proxy` | `/draw`: validates a pixel batch, publishes `pixel.draw` | `fn-web-draw-proxy`, publisher on `pixel-draw-events` only |
 | `auth-callback` | `/auth/discord/callback`: Discord OAuth2 code exchange, mints a Firebase custom token for `discord:<id>` | `fn-auth-callback`, reads `discord-client-secret`, signs with its own identity |
 | `pixel-draw-events` | Topic; push subscription to the worker with an OIDC token of `pubsub-push`, 5 attempts then `pixel-draw-events-dlq` (kept 7 days in `pixel-draw-events-dlq-inspection`) | |
-| `draw-worker` | Draws, `/get`, `/snapshot`, `/admin *`. Ingress internal only: only the Pub/Sub push reaches it | `fn-draw-worker`: Firestore, snapshot bucket, signs its own URLs |
+| `draw-worker` | Draws, `/get`, `/snapshot`, `/admin *`. Ingress internal only: only the Pub/Sub push reaches it | `fn-draw-worker`: Firestore, creates objects in the snapshot bucket |
+| `snapshot-ready` | Topic fed by the notification of the snapshots bucket (`OBJECT_FINALIZE`, `snapshots/*`); push subscription to the notifier with an OIDC token of `pubsub-push`, 5 attempts then `snapshot-ready-dlq` | Publisher: the Cloud Storage service agent only |
+| `snapshot-notifier` | Signs a V4 read URL valid 1 hour for the new object and edits the original `/snapshot` answer. Ingress internal only | `fn-snapshot-notifier`: reads the snapshot bucket, signs with its own identity |
+
+`/snapshot` is event-driven (C07 §2): nothing calls the notifier, the bucket event does.
+
+```
+/snapshot -> discord-proxy (deferred answer) -> pixel-draw-events -> draw-worker
+  draw-worker: edits the answer "being prepared", uploads snapshots/<timestamp>.png with custom
+               metadata {applicationId, interactionToken, correlationId, traceparent, requestedBy}
+  bucket OBJECT_FINALIZE -> snapshot-ready -> snapshot-notifier
+  snapshot-notifier: signed URL (1 h, signBlob) -> PATCH /webhooks/{applicationId}/{token}/messages/@original
+```
+
+The `traceparent` metadata carries the worker span, so the notifier span is its child in the same
+Cloud Trace trace, and its logs carry the same `correlationId`. The notifier answers 200 when the
+object has no interaction metadata (an object uploaded by hand) or when Discord refuses for good
+(the interaction token expires after 15 minutes), and 500 on a transient failure (signing,
+Discord 429/5xx or unreachable) so that Pub/Sub retries. The worker edits the answer before the
+upload, so its "being prepared" message can never overwrite the link.
 
 Data in Firestore (the frontend listens to `chunks/*` and `config/system`; clients can read, never write):
 

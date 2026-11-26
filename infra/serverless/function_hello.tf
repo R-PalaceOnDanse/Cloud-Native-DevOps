@@ -35,9 +35,10 @@ resource "google_cloudfunctions2_function" "hello" {
   description = "C05: first function, reachable only through API Gateway."
 
   build_config {
-    runtime         = "nodejs22"
-    entry_point     = "hello"
-    service_account = google_service_account.build.id
+    runtime           = "nodejs22"
+    entry_point       = "hello"
+    service_account   = google_service_account.build.id
+    docker_repository = google_artifact_registry_repository.functions.id
 
     source {
       storage_source {

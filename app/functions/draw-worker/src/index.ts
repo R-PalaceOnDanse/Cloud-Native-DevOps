@@ -9,7 +9,7 @@
  * answers 500 so Pub/Sub redelivers, then dead-letters after 5 attempts; a business rejection (paused,
  * rate limited, unauthorized, invalid) answers 200 so it is not retried.
  *
- * Issues #48, #52, #53, #55, #56, #57, #68, #141, #142, #167 (C06 §4, C07 §1-2).
+ * Issues #48, #52, #53, #55, #56, #57, #68, #141, #142, #167, #169 (C06 §4, C07 §1-2).
  */
 
 import { randomBytes } from 'node:crypto';
@@ -35,8 +35,6 @@ export interface WorkerDependencies {
   snapshots: SnapshotStorage;
   discord: DiscordApiClient;
 }
-
-const SIGNED_URL_SECONDS = 3600;
 
 function log(severity: string, message: string, fields: Record<string, unknown> = {}) {
   const line = JSON.stringify({ severity, message, function: 'draw-worker', ...fields });
@@ -172,12 +170,26 @@ export function createDrawWorkerHandler(resolveDeps: () => WorkerDependencies) {
             done('unauthorized');
             return;
           }
+          if (!appId || !token) {
+            // Nobody to send the link to: the notifier would ignore the object anyway.
+            done('invalid_arguments');
+            return;
+          }
           const image = renderCanvas(await deps.canvas.listPixels());
           const objectName = snapshotObjectName();
-          const signedUrl = await deps.snapshots.save(objectName, image.png, SIGNED_URL_SECONDS);
+          // Answer before the upload: the notifier edits the same message, and this edit must not
+          // land after the link and overwrite it.
+          await reply('📸 Snapshot is being prepared, the signed link follows in this message.');
+          await deps.snapshots.save(objectName, image.png, {
+            applicationId: appId,
+            interactionToken: token,
+            correlationId,
+            // The notifier span becomes a child of this one: one trace from /snapshot to the link.
+            traceparent: `00-${traceId}-${spanId}-01`,
+            requestedBy: String(userId ?? ''),
+          });
           log('NOTICE', `Snapshot stored: ${objectName}`, trace);
-          await reply(`📸 Snapshot saved. Signed link, valid 1 hour:\n${signedUrl}`);
-          done('snapshot_success', { objectName, signedUrl });
+          done('snapshot_success', { objectName });
           return;
         }
 

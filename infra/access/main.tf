@@ -53,6 +53,7 @@ locals {
     "roles/firebase.admin",                 # Firebase project and web app
     "roles/identityplatform.admin",         # Firebase Authentication configuration
     "roles/iam.serviceAccountTokenCreator", # API Gateway, Pub/Sub and self-signing grants on service accounts
+    "roles/artifactregistry.admin",         # images repository of the functions, deleted with the stack (#171)
   ]
 }
 

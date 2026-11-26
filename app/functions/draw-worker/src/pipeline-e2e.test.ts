@@ -16,7 +16,7 @@ test('web proxy envelope -> Pub/Sub push -> worker -> store', async () => {
   const handler = createDrawWorkerHandler(() => ({
     canvas,
     rateLimiter: new WorkerRateLimiter(),
-    snapshots: { save: async () => 'unused' },
+    snapshots: { save: async () => {} },
     discord: {} as DiscordApiClient,
   }));
 

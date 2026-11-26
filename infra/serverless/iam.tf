@@ -102,18 +102,45 @@ resource "google_project_iam_member" "draw_worker" {
   member  = "serviceAccount:${google_service_account.draw_worker.email}"
 }
 
-# Writes the snapshots, nothing else in Cloud Storage.
+# Creates the snapshots, nothing else: it can neither read, list, overwrite nor sign them. The link
+# is the job of snapshot-notifier (#169).
 resource "google_storage_bucket_iam_member" "draw_worker_snapshots" {
   bucket = google_storage_bucket.snapshots.name
-  role   = "roles/storage.objectAdmin"
+  role   = "roles/storage.objectCreator"
   member = "serviceAccount:${google_service_account.draw_worker.email}"
 }
 
+# Runtime identity of the snapshot notifier function (#169).
+resource "google_service_account" "snapshot_notifier" {
+  account_id   = "fn-snapshot-notifier"
+  display_name = "Function snapshot-notifier: runtime"
+  description  = "Signs a read URL for each new snapshot and edits the Discord answer."
+}
+
+# Pub/Sub pushes to it (pubsub.tf), so it needs no subscriber role.
+resource "google_project_iam_member" "snapshot_notifier" {
+  for_each = toset([
+    "roles/logging.logWriter",
+    "roles/cloudtrace.agent",
+  ])
+
+  project = var.project_id
+  role    = each.value
+  member  = "serviceAccount:${google_service_account.snapshot_notifier.email}"
+}
+
+# A signed URL grants what its signer may do: reading the snapshots, nothing else.
+resource "google_storage_bucket_iam_member" "snapshot_notifier_reads_snapshots" {
+  bucket = google_storage_bucket.snapshots.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.snapshot_notifier.email}"
+}
+
 # Signs the snapshot URLs with its own identity (IAM signBlob): no key file exists.
-resource "google_service_account_iam_member" "draw_worker_signs_urls" {
-  service_account_id = google_service_account.draw_worker.name
+resource "google_service_account_iam_member" "snapshot_notifier_signs_urls" {
+  service_account_id = google_service_account.snapshot_notifier.name
   role               = "roles/iam.serviceAccountTokenCreator"
-  member             = "serviceAccount:${google_service_account.draw_worker.email}"
+  member             = "serviceAccount:${google_service_account.snapshot_notifier.email}"
 }
 
 # Runtime identity of the web draw proxy function.

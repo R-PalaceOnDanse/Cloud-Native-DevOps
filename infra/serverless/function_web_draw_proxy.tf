@@ -19,9 +19,10 @@ resource "google_cloudfunctions2_function" "web_draw_proxy" {
   description = "Receives web client brush strokes and publishes to Pub/Sub."
 
   build_config {
-    runtime         = "nodejs22"
-    entry_point     = "webDrawProxy"
-    service_account = google_service_account.build.id
+    runtime           = "nodejs22"
+    entry_point       = "webDrawProxy"
+    service_account   = google_service_account.build.id
+    docker_repository = google_artifact_registry_repository.functions.id
 
     source {
       storage_source {
