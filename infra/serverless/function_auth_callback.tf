@@ -44,6 +44,7 @@ resource "google_cloudfunctions2_function" "auth_callback" {
     # The client secret never appears in Terraform: the function reads it from Secret Manager at
     # request time, so a deployment does not fail before someone has added its value.
     environment_variables = {
+      GOOGLE_CLOUD_PROJECT          = var.project_id
       DISCORD_CLIENT_ID             = var.discord_client_id
       DISCORD_REDIRECT_URI          = local.frontend_origin # must be registered as an OAuth2 redirect on Discord
       FRONTEND_ORIGIN               = local.frontend_origin

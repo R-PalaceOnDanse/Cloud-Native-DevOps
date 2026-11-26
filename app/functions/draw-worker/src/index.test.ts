@@ -152,13 +152,24 @@ test('draw worker', async (t) => {
     assert.equal((deps.canvas as ChunkStore).getPauseState(), false);
   });
 
-  await t.test('admin clear empties the grid', async () => {
+  await t.test('admin clear empties the grid and is idempotent on Pub/Sub redelivery', async () => {
     const { deps, handler } = setup({}, ['eve']);
     await deps.canvas.applyDraw('before', [{ x: 5, y: 5, color: '#ff0000' }], 'u', Date.now());
     const h = http(push(command('c', 'eve', 'admin', { subcommand: 'clear' })));
     await handler(h.req, h.res);
     assert.equal(h.data().status, 'admin_clear_success');
+    assert.equal(h.data().duplicate, false);
+    const epochAfterFirst = h.data().epoch;
     assert.equal((deps.canvas as ChunkStore).getPixel(5, 5), undefined);
+
+    // Draw a new pixel after the clear, then simulate Pub/Sub redelivering the same clear event
+    await deps.canvas.applyDraw('after', [{ x: 6, y: 6, color: '#00ff00' }], 'u', Date.now());
+    const dup = http(push(command('c', 'eve', 'admin', { subcommand: 'clear' })));
+    await handler(dup.req, dup.res);
+    assert.equal(dup.data().status, 'admin_clear_success');
+    assert.equal(dup.data().duplicate, true);
+    assert.equal(dup.data().epoch, epochAfterFirst);
+    assert.ok((deps.canvas as ChunkStore).getPixel(6, 6));
   });
 
   await t.test('admin ratelimit overrides the limit of one user', async () => {

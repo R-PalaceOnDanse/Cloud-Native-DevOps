@@ -31,6 +31,7 @@ interface MemoryChunk {
 export class ChunkStore implements CanvasStore {
   private readonly chunks = new Map<string, MemoryChunk>();
   private state: SystemState = { paused: false, epoch: 1, lastClearedAt: null, admins: [] };
+  private lastClearEventId: string | undefined;
 
   constructor(admins: string[] = []) {
     this.state.admins = [...admins];
@@ -44,11 +45,15 @@ export class ChunkStore implements CanvasStore {
     this.state.paused = paused;
   }
 
-  async clear(): Promise<number> {
+  async clear(eventId: string): Promise<{ epoch: number; duplicate: boolean }> {
+    if (this.lastClearEventId === eventId) {
+      return { epoch: this.state.epoch, duplicate: true };
+    }
+    this.lastClearEventId = eventId;
     this.state.epoch += 1;
     this.state.lastClearedAt = Date.now();
     this.chunks.clear();
-    return this.state.epoch;
+    return { epoch: this.state.epoch, duplicate: false };
   }
 
   async applyDraw(eventId: string, pixels: readonly PixelWrite[], author: string, timestamp: number): Promise<DrawResult> {

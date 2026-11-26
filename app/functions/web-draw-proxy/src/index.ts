@@ -75,7 +75,7 @@ export function createDrawProxyHandler(publisher: EventPublisher, topicName = pr
     res.setHeader('X-Correlation-ID', correlationId);
     res.setHeader('traceparent', traceParent);
 
-    const projectId = process.env.GCP_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'teampasx-cloudnative-dev';
+    const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT || 'unknown-project';
 
     // Cloud Logging structured trace linking (Issue #88, C08 §6)
     console.log(

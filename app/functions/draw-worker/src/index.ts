@@ -198,10 +198,10 @@ export function createDrawWorkerHandler(resolveDeps: () => WorkerDependencies) {
           }
 
           if (subcommand === 'clear') {
-            const epoch = await deps.canvas.clear(userId);
-            log('NOTICE', `Canvas cleared by admin, epoch ${epoch}`, { ...trace, userId });
+            const { epoch, duplicate } = await deps.canvas.clear(envelope.id, userId);
+            log('NOTICE', `Canvas cleared by admin, epoch ${epoch}${duplicate ? ' (duplicate)' : ''}`, { ...trace, userId, duplicate });
             await reply('🧹 The canvas has been cleared.');
-            done('admin_clear_success', { epoch });
+            done('admin_clear_success', { epoch, duplicate });
             return;
           }
 
