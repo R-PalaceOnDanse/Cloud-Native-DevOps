@@ -14,3 +14,6 @@ alert_emails = [
 # Cost safeguards of the runners (docs/infra.md#cost-safeguards).
 runner_node_max_count = 2
 runner_max_count      = 2
+
+# ARC authenticates with the token in arc-github-token until the GitHub App secrets have values (#151).
+runner_auth_type = "token"
