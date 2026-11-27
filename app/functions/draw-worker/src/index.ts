@@ -18,6 +18,7 @@ import { isUserAdmin } from './admin-auth.js';
 import { discordApiClient, type DiscordApiClient } from './discord-api.js';
 import { renderCanvas, snapshotObjectName, type SnapshotStorage } from './snapshot-service.js';
 import { isValidColor, isValidCoordinate, type CanvasStore, type PixelWrite, type RateLimiter } from './store.js';
+import { exportSpan } from './trace.js';
 
 export interface PubSubMessagePayload {
   message?: {
@@ -100,8 +101,10 @@ export function createDrawWorkerHandler(resolveDeps: () => WorkerDependencies) {
     const reply = async (content: string) => {
       if (appId && token) await deps.discord.editOriginalResponse(appId, token, { content });
     };
+    // The span IDs ride in the answer so that the entry point can export the span (Pub/Sub ignores the body).
+    const spanIds = { traceId, spanId, parentSpanId: trace.parent_span_id, eventType };
     const done = (status: string, extra: Record<string, unknown> = {}) => {
-      res.status(200).json({ status, correlationId, ...extra });
+      res.status(200).json({ status, correlationId, ...extra, ...spanIds });
     };
 
     try {
@@ -195,10 +198,10 @@ export function createDrawWorkerHandler(resolveDeps: () => WorkerDependencies) {
           }
 
           if (subcommand === 'clear') {
-            const epoch = await deps.canvas.clear(userId);
-            log('NOTICE', `Canvas cleared by admin, epoch ${epoch}`, { ...trace, userId });
+            const { epoch, duplicate } = await deps.canvas.clear(envelope.id, userId);
+            log('NOTICE', `Canvas cleared by admin, epoch ${epoch}${duplicate ? ' (duplicate)' : ''}`, { ...trace, userId, duplicate });
             await reply('🧹 The canvas has been cleared.');
-            done('admin_clear_success', { epoch });
+            done('admin_clear_success', { epoch, duplicate });
             return;
           }
 
@@ -223,7 +226,7 @@ export function createDrawWorkerHandler(resolveDeps: () => WorkerDependencies) {
     } catch (err) {
       // Transient failure (Firestore, Storage, Discord): let Pub/Sub retry, then dead-letter.
       log('ERROR', 'Event processing failed', { ...trace, error: err instanceof Error ? err.message : String(err) });
-      res.status(500).json({ error: 'processing failed', correlationId });
+      res.status(500).json({ error: 'processing failed', status: 'failed', correlationId, ...spanIds });
     }
   };
 }
@@ -255,6 +258,7 @@ const productionHandler = createDrawWorkerHandler(() => {
 });
 
 export async function drawWorker(req: Request, res: Response): Promise<void> {
+  const start = new Date();
   if (!productionDeps) {
     try {
       productionDeps = await buildProductionDeps();
@@ -264,5 +268,27 @@ export async function drawWorker(req: Request, res: Response): Promise<void> {
       return;
     }
   }
-  await productionHandler(req, res);
+
+  // Hold the answer until the span is exported: once the answer is sent, Cloud Run throttles the CPU.
+  let code = 200;
+  let body: any;
+  const held = {
+    status(c: number) { code = c; return held; },
+    json(b: unknown) { body = b; return held; },
+    send(b: unknown) { body = b; return held; },
+  } as unknown as Response;
+  await productionHandler(req, held);
+
+  if (body?.traceId && body?.spanId) {
+    await exportSpan({
+      traceId: body.traceId,
+      spanId: body.spanId,
+      parentSpanId: body.parentSpanId,
+      name: `draw-worker ${body.eventType ?? 'event'}`,
+      start,
+      end: new Date(),
+      attributes: { correlationId: body.correlationId, outcome: body.status, applied: body.applied },
+    });
+  }
+  res.status(code).json(body);
 }

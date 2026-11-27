@@ -42,9 +42,10 @@ resource "google_cloudfunctions2_function" "draw_worker" {
     ingress_settings = "ALLOW_INTERNAL_ONLY"
 
     environment_variables = {
-      SNAPSHOT_BUCKET = google_storage_bucket.snapshots.name
-      ADMIN_USER_IDS  = join(",", var.admin_user_ids)
-      ADMIN_ROLE_ID   = var.admin_role_id
+      GOOGLE_CLOUD_PROJECT = var.project_id
+      SNAPSHOT_BUCKET      = google_storage_bucket.snapshots.name
+      ADMIN_USER_IDS       = join(",", var.admin_user_ids)
+      ADMIN_ROLE_ID        = var.admin_role_id
     }
   }
 

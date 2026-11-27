@@ -34,11 +34,16 @@ export interface DrawResult {
   duplicate: boolean;
 }
 
+export interface ClearResult {
+  epoch: number;
+  duplicate: boolean;
+}
+
 export interface CanvasStore {
   getSystemState(): Promise<SystemState>;
   setPaused(paused: boolean, updatedBy: string): Promise<void>;
-  /** Empties the grid and returns the new epoch. */
-  clear(updatedBy: string): Promise<number>;
+  /** Empties the grid, idempotent on `eventId`, and returns the active epoch. */
+  clear(eventId: string, updatedBy: string): Promise<ClearResult>;
   /** Writes the pixels of one event, idempotent on `eventId`, last write wins per pixel. */
   applyDraw(eventId: string, pixels: readonly PixelWrite[], author: string, timestamp: number): Promise<DrawResult>;
   /** Every painted pixel of the current epoch, for /get and /snapshot. */

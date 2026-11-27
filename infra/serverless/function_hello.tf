@@ -60,6 +60,7 @@ resource "google_cloudfunctions2_function" "hello" {
     ingress_settings = "ALLOW_ALL"
 
     environment_variables = {
+      GOOGLE_CLOUD_PROJECT = var.project_id
       HELLO_SECRET_VERSION = "${google_secret_manager_secret.hello_greeting.id}/versions/latest"
       PROJECT_ID           = var.project_id
     }

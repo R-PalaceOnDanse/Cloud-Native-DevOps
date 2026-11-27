@@ -43,8 +43,9 @@ resource "google_cloudfunctions2_function" "web_draw_proxy" {
     ingress_settings = "ALLOW_ALL"
 
     environment_variables = {
-      PIXEL_DRAW_TOPIC = google_pubsub_topic.pixel_draw.name
-      FRONTEND_ORIGIN  = local.frontend_origin
+      GOOGLE_CLOUD_PROJECT = var.project_id
+      PIXEL_DRAW_TOPIC     = google_pubsub_topic.pixel_draw.name
+      FRONTEND_ORIGIN      = local.frontend_origin
     }
   }
 

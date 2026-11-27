@@ -63,16 +63,27 @@ export class FirestoreCanvasStore implements CanvasStore {
     await this.systemRef.set({ paused, updatedBy, updatedAt: Date.now() }, { merge: true });
   }
 
-  async clear(updatedBy: string): Promise<number> {
-    const epoch = await this.db.runTransaction(async (tx) => {
-      const current = toSystemState((await tx.get(this.systemRef)).data());
+  async clear(eventId: string, updatedBy: string): Promise<{ epoch: number; duplicate: boolean }> {
+    const result = await this.db.runTransaction(async (tx) => {
+      const snap = await tx.get(this.systemRef);
+      const data = snap.data();
+      const current = toSystemState(data);
+      if (data?.lastClearEventId === eventId) {
+        return { epoch: current.epoch, duplicate: true };
+      }
       const next = current.epoch + 1;
-      tx.set(this.systemRef, { epoch: next, lastClearedAt: Date.now(), updatedBy, updatedAt: Date.now() }, { merge: true });
-      return next;
+      tx.set(
+        this.systemRef,
+        { epoch: next, lastClearedAt: Date.now(), lastClearEventId: eventId, updatedBy, updatedAt: Date.now() },
+        { merge: true }
+      );
+      return { epoch: next, duplicate: false };
     });
-    // The new epoch already hides the old chunks; deleting them frees the storage.
-    await this.db.recursiveDelete(this.db.collection('chunks'));
-    return epoch;
+    if (!result.duplicate) {
+      // The new epoch already hides the old chunks; deleting them frees the storage.
+      await this.db.recursiveDelete(this.db.collection('chunks'));
+    }
+    return result;
   }
 
   async applyDraw(eventId: string, pixels: readonly PixelWrite[], author: string, timestamp: number): Promise<DrawResult> {

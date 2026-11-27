@@ -52,6 +52,13 @@ resource "google_project_iam_member" "discord_proxy_logs" {
 
 }
 
+# Writes its span of each command to Cloud Trace (#88).
+resource "google_project_iam_member" "discord_proxy_traces" {
+  project = var.project_id
+  role    = "roles/cloudtrace.agent"
+  member  = "serviceAccount:${google_service_account.discord_proxy.email}"
+}
+
 # Identity the gateway uses to call the functions. It is the only principal allowed to invoke them.
 resource "google_service_account" "gateway" {
   account_id   = "api-gateway"
