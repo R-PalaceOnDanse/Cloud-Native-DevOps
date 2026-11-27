@@ -147,7 +147,8 @@ call the function, so the identity cannot be forged.
    printf '%s' "<client secret>" | gcloud secrets versions add discord-client-secret --data-file=- --project=<project>
    printf '%s' "<public key>"    | gcloud secrets versions add discord-public-key   --data-file=- --project=<project>
    ```
-4. Build the frontend with `terraform output -json frontend_build_env` as its `VITE_*` variables (#168).
+4. Nothing to do for the frontend: each release builds it from `terraform output -json frontend_build_env`
+   and deploys it to the default Hosting site (see [frontend.md](frontend.md#9-build-and-deployment-issue-168)).
 
 Check: `curl -X POST <gateway_url>/draw` answers 401 (no Firebase token); the worker URL answers 403
 from the internet; `/discord/interactions` with a bad signature answers 401.

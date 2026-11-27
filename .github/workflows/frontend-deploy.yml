@@ -1,0 +1,108 @@
+name: frontend-deploy
+
+# Builds app/frontend with the configuration of one environment and releases it to the default Firebase Hosting site
+# of that environment (#168). Called by the release after the serverless stack is applied; not meant to be started by
+# hand.
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: dev or prd. Also the name of the GitHub environment the job runs in.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    name: build frontend for ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    outputs:
+      project_id: ${{ steps.config.outputs.project_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/frontend/package-lock.json
+      # Install dependencies before authenticating to GCP so no npm lifecycle script can access any credentials.
+      - name: npm ci
+        shell: bash
+        working-directory: app/frontend
+        run: npm ci
+      # Authenticates with the read-only plan account only to read the public Terraform outputs.
+      - uses: ./.github/actions/terraform-init
+        with:
+          stack: serverless
+          environment: ${{ inputs.environment }}
+          workload-identity-provider: ${{ inputs.environment == 'dev' && vars.GCP_WIF_PROVIDER_DEV || vars.GCP_WIF_PROVIDER_PRD }}
+          service-account: ${{ inputs.environment == 'dev' && vars.GCP_PLAN_SA_DEV || vars.GCP_PLAN_SA_PRD }}
+      - name: Write the build configuration from the Terraform outputs
+        id: config
+        shell: bash
+        run: |
+          set -euo pipefail
+          terraform -chdir=infra/serverless output -json frontend_build_env > "$RUNNER_TEMP/frontend_build_env.json"
+          # Public values only (see outputs.tf): Vite inlines them into the bundle anyway.
+          jq -r 'to_entries[] | "\(.key)=\(.value)"' "$RUNNER_TEMP/frontend_build_env.json" > app/frontend/.env.production
+          project_id="$(jq -r '.VITE_FIREBASE_PROJECT_ID' "$RUNNER_TEMP/frontend_build_env.json")"
+          if [ -z "$project_id" ] || [ "$project_id" = "null" ]; then
+            echo "::error::frontend_build_env has no VITE_FIREBASE_PROJECT_ID. Is the serverless stack applied?"
+            exit 1
+          fi
+          echo "project_id=$project_id" >> "$GITHUB_OUTPUT"
+          echo "Building for $project_id with: $(cut -d= -f1 app/frontend/.env.production | paste -sd' ')"
+      - name: npm run build
+        shell: bash
+        working-directory: app/frontend
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ""
+        run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist-${{ inputs.environment }}
+          path: app/frontend/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    name: deploy frontend to ${{ inputs.environment }}
+    needs: build
+    runs-on: ubuntu-latest
+    # Only a job of this environment may impersonate the apply account (ADR-0011), which holds roles/firebase.admin.
+    environment: ${{ inputs.environment }}
+    env:
+      # Exact version, so a release cannot change because firebase-tools published a new one.
+      FIREBASE_TOOLS_VERSION: "15.36.0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist-${{ inputs.environment }}
+          path: app/frontend/dist
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Authenticates only after the bundle is already built; firebase-tools reads ADC from GOOGLE_APPLICATION_CREDENTIALS.
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ inputs.environment == 'dev' && vars.GCP_WIF_PROVIDER_DEV || vars.GCP_WIF_PROVIDER_PRD }}
+          service_account: ${{ inputs.environment == 'dev' && vars.GCP_APPLY_SA_DEV || vars.GCP_APPLY_SA_PRD }}
+      - name: Deploy to Firebase Hosting
+        shell: bash
+        working-directory: app/frontend
+        env:
+          PROJECT_ID: ${{ needs.build.outputs.project_id }}
+        run: |
+          npx --yes "firebase-tools@$FIREBASE_TOOLS_VERSION" deploy --only hosting --project "$PROJECT_ID" \
+            --non-interactive --message "$GITHUB_REF_NAME ($GITHUB_SHA)"
+      - name: Show the site in the job summary
+        shell: bash
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          PROJECT_ID: ${{ needs.build.outputs.project_id }}
+        run: |
+          echo "### frontend $GITHUB_REF_NAME deployed to $ENVIRONMENT: https://$PROJECT_ID.web.app" >> "$GITHUB_STEP_SUMMARY"

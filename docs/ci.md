@@ -14,9 +14,11 @@ The choices are in [ADR-0012](adr/0012-terraform-pipelines.md); the identities a
 | Workflow | Starts when | Identity | What it does |
 |---|---|---|---|
 | `terraform-ci` | a pull request changes `infra/**`, `app/functions/**`, `.tflint.hcl` or one of these workflows | `github-plan`, read-only, **no** GitHub environment | For each stack (`foundation`, `access`, `serverless`): `fmt -check`, `validate`, `tflint`; then `plan` in dev and in prd |
-| `terraform-deploy` | a tag `vMAJOR.MINOR.PATCH` is pushed | `github-apply` | Checks the tag is on `main`, applies `foundation` then `serverless` to **dev**, then to **prd** |
+| `terraform-deploy` | a tag `vMAJOR.MINOR.PATCH` is pushed | `github-apply` | Checks the tag is on `main`, applies `foundation` then `serverless` and deploys the frontend to **dev**, then does the same in **prd** |
 | `terraform-destroy` | started by hand (*Run workflow*) | `github-apply` | Destroys `serverless` then `foundation` of one environment, after a confirmation |
 | `terraform-run` | called by the two above | `github-apply` | Plans, then applies the saved plan, for the stack it is given. Not started by hand |
+| `frontend-deploy` | called by `terraform-deploy` | `github-apply` | Reads `frontend_build_env` from the serverless state, builds `app/frontend` and deploys it to Firebase Hosting with a pinned `firebase-tools`. Not started by hand ([frontend.md](frontend.md#9-build-and-deployment-issue-168)) |
+| `frontend-ci` | a pull request changes `app/frontend/**` or a frontend workflow | none (no cloud access) | `npm ci`, `npm test`, `npm run build` |
 | `functions-ci` | a pull request changes `app/functions/**` | none (no cloud access) | `npm ci` and `npm run build` (strict TypeScript) for each function |
 | `auth-check` | a pull request changes `infra/access/**` or this workflow, or by hand | both | Proves the keyless authentication behaves as designed (see below) |
 | `secret-scan` | a pull request, or a push to `main` | none (no cloud access) | gitleaks on the whole history, same version as `mise.lock` ([ADR-0015](adr/0015-secrets-in-secret-manager.md)) |
@@ -89,15 +91,18 @@ git push origin v0.1.0
 `terraform-deploy` then runs, one release at a time and never cancelled halfway:
 
 1. `check-tag` refuses a tag whose commit is not on `main`.
-2. `dev` plans, then applies **that saved plan** to dev. The job is in the GitHub environment `dev`,
-   which is what allows it to use the `github-apply` account of dev.
-3. `prd` starts only if `dev` succeeded, and does the same in the environment `prd`.
+2. `dev` plans, then applies **that saved plan** to dev, `foundation` then `serverless`. The jobs are
+   in the GitHub environment `dev`, which is what allows them to use the `github-apply` account of dev.
+3. `frontend-dev` builds the frontend with the outputs of the serverless stack just applied and
+   deploys it to the default Firebase Hosting site of dev (`https://<project>.web.app`).
+4. `prd` starts only if all of `dev` succeeded, frontend included, and does the same in the
+   environment `prd`: `foundation-prd`, `serverless-prd`, then `frontend-prd`.
 
 Version numbers follow semantic versioning; a tag is never moved. To repeat a release that failed
 halfway, use **Re-run failed jobs** on the run: it replays the same tag. To release a fix, merge it
 and push the next tag.
 
-The pipeline applies `foundation` and `serverless`. The `access` stack is the identity the pipeline
+The pipeline applies `foundation` and `serverless`, and deploys the frontend. The `access` stack is the identity the pipeline
 runs with, so a pipeline that changed it could lock itself out: it is planned on every pull
 request, and applied **by hand** by a project Owner after the pull request is approved
 ([infra.md](infra.md#github-actions-authentication)).
@@ -188,6 +193,8 @@ three, and written down here so that it is not a surprise.
 | `Error acquiring the state lock` | Another apply is running, or one was killed | Wait; if nobody is running, `terraform force-unlock <id>` after asking the team |
 | `tflint` reports a rule | A real finding | Fix it, or discuss disabling the rule in `.tflint.hcl` in the pull request |
 | `check-tag` fails | The tag is not on `main` | Delete the tag, merge the change to `main`, tag again |
+| `frontend_build_env has no VITE_FIREBASE_PROJECT_ID` in `frontend-*` | The serverless state has no such output yet | Check that the `serverless-*` job of the same release applied, then re-run the failed job |
+| `firebase deploy` says `403` or `Hosting API has not been used` | `firebasehosting.googleapis.com` is not enabled, or the apply account lacks `roles/firebase.admin` | The serverless stack enables the API and the access stack grants the role; check both have been applied |
 
 ## Rebuilding this elsewhere
 

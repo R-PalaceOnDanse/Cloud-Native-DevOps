@@ -11,3 +11,5 @@ dist/
 tests/load/*-report.json
 load-report.json
 infra/**/.build/
+# Written by the frontend-deploy workflow from the Terraform outputs
+app/frontend/.env.production
