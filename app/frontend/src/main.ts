@@ -20,7 +20,7 @@ import { Minimap } from './minimap.js';
 import { getBrushPixels, validateBrushStroke, BRUSH_PIXEL_COUNTS, BrushSize } from './brush.js';
 import { RealtimeManager, SystemState } from './realtime.js';
 import { createRealtimeProvider } from './firestore-provider.js';
-import { authenticateFirebase, getFirebaseIdToken } from './firebase.js';
+import { authenticateFirebase, getFirebaseIdToken, onFirebaseSignIn } from './firebase.js';
 import { authManager, UserProfile } from './auth.js';
 import { drawApiClient } from './api.js';
 import { formatPixelInspection } from './inspector.js';
@@ -43,6 +43,7 @@ let lastMouseX = 0;
 let lastMouseY = 0;
 let isCanvasPaused = false;
 let lastClearedAtTimestamp: number | null = null;
+let systemStateInitialized = false;
 let lastDrawnCoord: { x: number; y: number } | null = null;
 
 let userPixelsCount = 0;
@@ -143,6 +144,10 @@ const realtimeManager = new RealtimeManager(
 
 // Subscribe to global system state (pause / resume / admin clear)
 realtimeManager.subscribeSystemState((state: SystemState) => {
+  if (typeof state.epoch === 'number') {
+    realtimeManager.setEpoch(state.epoch);
+  }
+
   isCanvasPaused = state.paused;
   if (pauseBanner) {
     if (isCanvasPaused) {
@@ -153,7 +158,13 @@ realtimeManager.subscribeSystemState((state: SystemState) => {
     }
   }
 
-  // Handle global grid reset (/admin clear)
+  // Handle global grid reset (/admin clear): on initial load, record the last clear date without wiping the canvas.
+  if (!systemStateInitialized) {
+    systemStateInitialized = true;
+    lastClearedAtTimestamp = state.lastClearedAt ?? null;
+    return;
+  }
+
   if (state.lastClearedAt && state.lastClearedAt !== lastClearedAtTimestamp) {
     lastClearedAtTimestamp = state.lastClearedAt;
     renderer.clearAll();
@@ -162,6 +173,10 @@ realtimeManager.subscribeSystemState((state: SystemState) => {
     showToast('🧹 Canvas has been cleared by an administrator.', 'info');
   }
 });
+
+// The Firestore rules only serve signed-in users: listeners opened before the sign-in were refused
+// and stopped. Re-open them as soon as Firebase has a user (login, or session restored on reload).
+onFirebaseSignIn(() => realtimeManager.restart(viewport));
 
 // Minimap Radar Initialization
 let minimap: Minimap | null = null;

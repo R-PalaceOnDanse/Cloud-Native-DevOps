@@ -41,6 +41,7 @@ export class FirestoreRealtimeProvider implements RealtimeSubscriptionProvider {
         const coords = parseChunkId(chunkId);
         const chunkX = typeof data.chunkX === 'number' ? data.chunkX : (coords?.cx ?? 0);
         const chunkY = typeof data.chunkY === 'number' ? data.chunkY : (coords?.cy ?? 0);
+        const epoch = typeof data.epoch === 'number' ? data.epoch : 1;
         const rawPixels = (data.pixels || {}) as Record<string, RemotePixel>;
         const updatedAt = typeof data.updatedAt === 'number' ? data.updatedAt : Date.now();
 
@@ -48,6 +49,7 @@ export class FirestoreRealtimeProvider implements RealtimeSubscriptionProvider {
           chunkId,
           chunkX,
           chunkY,
+          epoch,
           pixels: rawPixels,
           updatedAt,
         };
@@ -76,6 +78,7 @@ export class FirestoreRealtimeProvider implements RealtimeSubscriptionProvider {
         const data = snapshot.data();
         onUpdate({
           paused: Boolean(data.paused),
+          epoch: typeof data.epoch === 'number' ? data.epoch : 1,
           lastClearedAt: typeof data.lastClearedAt === 'number' ? data.lastClearedAt : null,
           updatedAt: typeof data.updatedAt === 'number' ? data.updatedAt : Date.now(),
         });

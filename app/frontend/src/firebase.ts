@@ -6,7 +6,7 @@
 
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
-import { getAuth, type Auth, signInWithCustomToken } from 'firebase/auth';
+import { getAuth, type Auth, signInWithCustomToken, signOut, onAuthStateChanged } from 'firebase/auth';
 
 export interface FirebaseInstance {
   app: FirebaseApp;
@@ -71,6 +71,20 @@ export async function getFirebaseIdToken(): Promise<string | null> {
 }
 
 /**
+ * Calls `onSignedIn` each time a Firebase user becomes signed in: after the Discord login, and when
+ * the SDK restores the session on page load. Does nothing without a Firebase configuration.
+ */
+export function onFirebaseSignIn(onSignedIn: () => void): () => void {
+  const instance = getFirebaseInstance();
+  if (!instance) return () => {};
+  let lastUid: string | null = null;
+  return onAuthStateChanged(instance.auth, (user) => {
+    if (user && user.uid !== lastUid) onSignedIn();
+    lastUid = user ? user.uid : null;
+  });
+}
+
+/**
  * Authenticates the Firebase client with a custom token minted by the auth-callback function.
  */
 export async function authenticateFirebase(customToken: string): Promise<boolean> {
@@ -83,5 +97,19 @@ export async function authenticateFirebase(customToken: string): Promise<boolean
   } catch (err) {
     console.error('Firebase custom token authentication failed:', err);
     return false;
+  }
+}
+
+/**
+ * Signs out the current Firebase Auth session so the user cannot keep drawing after logging out.
+ */
+export async function signOutFirebase(): Promise<void> {
+  const instance = getFirebaseInstance();
+  if (!instance) return;
+
+  try {
+    await signOut(instance.auth);
+  } catch (err) {
+    console.warn('Firebase signOut failed:', err);
   }
 }

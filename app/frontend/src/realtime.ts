@@ -28,12 +28,14 @@ export interface ChunkPayload {
   chunkId: string;
   chunkX: number;
   chunkY: number;
+  epoch?: number;
   pixels: Record<string, RemotePixel>;
   updatedAt: number;
 }
 
 export interface SystemState {
   paused: boolean;
+  epoch?: number;
   lastClearedAt?: number | null;
   updatedAt?: number;
 }
@@ -105,6 +107,8 @@ export class RealtimeManager {
 
   private activeSubscriptions: Map<string, UnsubscribeCallback> = new Map();
   private systemUnsubscribe: UnsubscribeCallback | null = null;
+  private currentEpoch = 1;
+  private systemCallback: SystemStateCallback | null = null;
 
   constructor(
     provider: RealtimeSubscriptionProvider,
@@ -149,9 +153,21 @@ export class RealtimeManager {
   }
 
   /**
+   * Updates the active grid epoch (from config/system). Stale chunks from older epochs are ignored.
+   */
+  public setEpoch(epoch: number): void {
+    if (epoch > this.currentEpoch) {
+      this.currentEpoch = epoch;
+    }
+  }
+
+  /**
    * Applies deltas in place from a push update.
    */
   public handleChunkUpdate(payload: ChunkPayload): void {
+    if (payload.epoch !== undefined && payload.epoch < this.currentEpoch) {
+      return;
+    }
     const { chunkX, chunkY, pixels } = payload;
     let modified = false;
 
@@ -179,11 +195,32 @@ export class RealtimeManager {
    * Subscribes to global system state changes (pause, clear).
    */
   public subscribeSystemState(onUpdate: SystemStateCallback): UnsubscribeCallback {
+    this.systemCallback = onUpdate;
+    if (this.systemUnsubscribe) this.systemUnsubscribe();
     if (this.provider.subscribeSystemState) {
-      return this.provider.subscribeSystemState(onUpdate);
+      this.systemUnsubscribe = this.provider.subscribeSystemState(onUpdate);
+      return this.systemUnsubscribe;
     }
     onUpdate({ paused: false });
     return () => {};
+  }
+
+  /**
+   * Re-opens every listener: the visible chunks and the system state.
+   *
+   * The Firestore rules only let a signed-in user read. Listeners opened before the sign-in (page
+   * load, session still being restored) are refused, and a refused listener stops for good: they must
+   * be opened again once the user is signed in, or the canvas never updates in real time.
+   */
+  public restart(viewport: ViewportState): void {
+    for (const unsubscribe of this.activeSubscriptions.values()) {
+      unsubscribe();
+    }
+    this.activeSubscriptions.clear();
+    if (this.systemCallback) {
+      this.subscribeSystemState(this.systemCallback);
+    }
+    this.updateViewport(viewport);
   }
 
   /**

@@ -8,6 +8,8 @@
  * 3. Never stores client secrets or Discord access tokens on the browser client.
  */
 
+import { signOutFirebase } from './firebase.js';
+
 export interface UserProfile {
   id: string;
   username: string;
@@ -224,6 +226,7 @@ export class AuthManager {
       sessionStorage.removeItem(this.sessionTokenKey);
       sessionStorage.removeItem(this.stateKey);
     }
+    void signOutFirebase();
     this.notify();
   }
 }

@@ -189,3 +189,63 @@ describe('Real-time Viewport & Chunk Subscription Engine (Issue #81 / C07 §3.3)
     manager.destroy();
   });
 });
+
+describe('Listeners re-opened after the sign-in', () => {
+  it('restart() re-subscribes every visible chunk and the system state', () => {
+    let chunkSubs = 0;
+    let systemSubs = 0;
+    const provider = {
+      subscribe: () => { chunkSubs++; return () => {}; },
+      subscribeSystemState: () => { systemSubs++; return () => {}; },
+    };
+    const renderer = new CanvasRenderer(new MockCanvasElement() as unknown as HTMLCanvasElement);
+    const manager = new RealtimeManager(provider, renderer, () => {});
+    const viewport = createDefaultViewport(800, 600);
+
+    manager.subscribeSystemState(() => {});
+    manager.updateViewport(viewport);
+    const visible = manager.getActiveSubscriptionCount();
+    assert.ok(visible > 0);
+    assert.strictEqual(chunkSubs, visible);
+    assert.strictEqual(systemSubs, 1);
+
+    // Page loaded before the session was restored: every listener must be opened again.
+    manager.restart(viewport);
+    assert.strictEqual(chunkSubs, visible * 2);
+    assert.strictEqual(systemSubs, 2);
+    assert.strictEqual(manager.getActiveSubscriptionCount(), visible);
+  });
+
+  it('ignores stale chunks from older epochs after setEpoch()', () => {
+    const provider = new MockRealtimeProvider();
+    const renderer = new CanvasRenderer(new MockCanvasElement() as unknown as HTMLCanvasElement);
+    let renderCalls = 0;
+    const manager = new RealtimeManager(provider, renderer, () => { renderCalls++; });
+
+    manager.setEpoch(2);
+
+    // Stale chunk from epoch 1 must be ignored
+    manager.handleChunkUpdate({
+      chunkId: 'chunk_0_0',
+      chunkX: 0,
+      chunkY: 0,
+      epoch: 1,
+      pixels: { '1,1': { color: '#ff0000', author: 'alice', timestamp: 1000 } },
+      updatedAt: 1000,
+    });
+    assert.strictEqual(renderer.getPixel(1, 1), undefined);
+    assert.strictEqual(renderCalls, 0);
+
+    // Chunk from epoch 2 must be applied
+    manager.handleChunkUpdate({
+      chunkId: 'chunk_0_0',
+      chunkX: 0,
+      chunkY: 0,
+      epoch: 2,
+      pixels: { '2,2': { color: '#00ff00', author: 'bob', timestamp: 2000 } },
+      updatedAt: 2000,
+    });
+    assert.strictEqual(renderer.getPixel(2, 2)?.color, '#00ff00');
+    assert.strictEqual(renderCalls, 1);
+  });
+});
